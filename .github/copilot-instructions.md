@@ -95,6 +95,17 @@
   - 사용자 요청 없는 파괴적 git 명령은 사용하지 않는다.
   - 관련 없는 기존 변경사항은 보존한다.
 
+  ## 라이브러리 문서 조회 기준
+
+  - GPUI, gpui-component, windows-sys 등 외부 라이브러리 API를 사용할 때는 반드시 mcp_context7을 통해 최신 문서를 조회한다.
+  - 조회 순서: `mcp_context7_resolve-library-id`로 라이브러리 ID 확인 → `mcp_context7_query-docs`로 특정 API 문서 조회.
+  - 라이브러리 버전이 명시된 경우 `/org/project/version` 형식 ID를 사용한다.
+  - 주요 라이브러리 참조:
+    - gpui-component: `/longbridge/gpui-component` (현재 버전 0.5.1)
+    - GPUI 프레임워크: gpui 관련 API는 gpui-component 문서에서 함께 조회
+    - windows-sys: Windows Win32 API 사용 전 함수/상수 이름 확인
+  - mcp_context7에서 확인한 API 패턴이 실제 빌드 결과와 다를 경우, 로컬 크레이트 소스(`~/.cargo/registry`)를 직접 확인하여 최종 판단한다.
+
   ## 검증 및 완료 보고 기준
 
   - 코드 수정 후 cargo check를 수행한다.

@@ -1402,7 +1402,7 @@ impl Render for AppRoot {
                                         this.active_panel = ActivePanel::ServiceView;
                                         cx.notify();
                                     }))
-                                    .child("Service"),
+                                    .child("Task Scheduler"),
                             )
                             .child(
                                 div()

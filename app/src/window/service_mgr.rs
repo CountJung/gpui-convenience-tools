@@ -8,7 +8,7 @@ use gpui::{
     div, px, size, AnyElement, Context, InteractiveElement, IntoElement, ParentElement,
     StatefulInteractiveElement, Styled, Window,
 };
-use gpui_component::{h_flex, theme::ActiveTheme, v_flex, v_virtual_list};
+use gpui_component::{h_flex, scroll::{Scrollbar, ScrollbarShow}, theme::ActiveTheme, v_flex, v_virtual_list};
 use std::{ops::Range, rc::Rc};
 
 use crate::app::AppRoot;
@@ -19,6 +19,7 @@ pub fn render(this: &mut AppRoot, window: &mut Window, cx: &mut Context<AppRoot>
     this.ensure_service_search_input(window, cx);
     let search_input = this.service_search_input.clone();
     let pending_delete = this.pending_delete_service.clone();
+    let svc_scroll = this.svc_scroll_handle.clone();
 
     let theme = cx.theme();
 
@@ -65,7 +66,7 @@ pub fn render(this: &mut AppRoot, window: &mut Window, cx: &mut Context<AppRoot>
                 .collect::<Vec<_>>(),
         );
         let idx = Rc::clone(&filtered_indices);
-        let scroll = this.svc_scroll_handle.clone();
+        let scroll = svc_scroll.clone();
 
         v_virtual_list(
             cx.entity(),
@@ -466,7 +467,25 @@ pub fn render(this: &mut AppRoot, window: &mut Window, cx: &mut Context<AppRoot>
                             ),
                     )
                     // 목록 본문
-                    .child(div().flex_1().min_h_0().child(list_body)),
+                    .child(
+                        div()
+                            .relative()
+                            .flex_1()
+                            .min_h_0()
+                            .child(list_body)
+                            .child(
+                                div()
+                                    .absolute()
+                                    .top_0()
+                                    .left_0()
+                                    .right_0()
+                                    .bottom_0()
+                                    .child(
+                                        Scrollbar::vertical(&svc_scroll)
+                                            .scrollbar_show(ScrollbarShow::Always),
+                                    ),
+                            ),
+                    ),
             ),
     );
 
