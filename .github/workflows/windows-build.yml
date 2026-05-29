@@ -20,13 +20,13 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Cargo check
-        run: cargo check -p webview-ad-ban-gpui
+        run: cargo check -p gpui-convenience-tools
 
       - name: Cargo test
-        run: cargo test -p webview-ad-ban-gpui -- --nocapture
+        run: cargo test -p gpui-convenience-tools -- --nocapture
 
       - name: Cargo build release
-        run: cargo build -p webview-ad-ban-gpui --release
+        run: cargo build -p gpui-convenience-tools --release
 
 
 

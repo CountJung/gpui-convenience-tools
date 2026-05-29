@@ -23,8 +23,8 @@ use std::{
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 
 use crate::config::{load_config, save_config, AppConfig};
-use crate::platform::{NativePlatform, NativeWindowHandle, Platform};
-use crate::window::{service_view, settings};
+use crate::platform::{NativePlatform, NativeWindowHandle, Platform, SysServiceInfo};
+use crate::window::{service_mgr, service_view, settings};
 
 #[cfg(target_os = "windows")]
 use crate::platform::{
@@ -80,6 +80,7 @@ enum PlatformEvent {
     TargetStatusChanged(bool),
     ServiceToggled(bool),
     TargetToggled { index: usize, enabled: bool },
+    TargetRemoved { index: usize },
 }
 
 #[derive(Clone, Debug)]
@@ -96,6 +97,7 @@ pub enum ActivePanel {
     Settings,
     Logs,
     ServiceView,
+    ServiceMgr,
 }
 
 pub struct AppRoot {
@@ -105,13 +107,17 @@ pub struct AppRoot {
     pub(crate) theme_filter_active_only: bool,
     pub(crate) theme_filter_input: Option<Entity<InputState>>,
     running_processes: Vec<String>,
-    platform: Arc<dyn Platform>,
+    pub(crate) platform: Arc<dyn Platform>,
     event_tx: UnboundedSender<PlatformEvent>,
     event_rx: UnboundedReceiver<PlatformEvent>,
     log_scroll_handle: VirtualListScrollHandle,
     scanner_state: Arc<Mutex<ScannerState>>,
     subscriptions: Vec<Subscription>,
     pub(crate) scan_interval_secs: u32,
+    pub(crate) sys_services: Vec<SysServiceInfo>,
+    pub(crate) service_search_query: String,
+    pub(crate) service_search_input: Option<Entity<InputState>>,
+    pub(crate) svc_scroll_handle: VirtualListScrollHandle,
 }
 
 impl AppRoot {
@@ -207,6 +213,10 @@ impl AppRoot {
             scanner_state,
             subscriptions: Vec::new(),
             scan_interval_secs: initial_scan_interval_secs,
+            sys_services: Vec::new(),
+            service_search_query: String::new(),
+            service_search_input: None,
+            svc_scroll_handle: VirtualListScrollHandle::new(),
         }
     }
 
@@ -252,6 +262,37 @@ impl AppRoot {
             input.update(cx, |state, cx| {
                 state.set_value(query, window, cx);
             });
+        }
+    }
+
+    pub(crate) fn ensure_service_search_input(
+        &mut self,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if self.service_search_input.is_some() {
+            return;
+        }
+        let input = cx.new(|cx| {
+            InputState::new(window, cx).placeholder("서비스 이름 검색")
+        });
+        let subscription = cx.subscribe(
+            &input,
+            |this: &mut Self, input: Entity<InputState>, ev: &InputEvent, cx| {
+                if let InputEvent::Change = ev {
+                    this.service_search_query = input.read(cx).value().to_string();
+                    cx.notify();
+                }
+            },
+        );
+        self.service_search_input = Some(input);
+        self.subscriptions.push(subscription);
+    }
+
+    pub(crate) fn refresh_sys_services(&mut self) {
+        match self.platform.list_sys_services() {
+            Ok(services) => { self.sys_services = services; }
+            Err(err) => { log::error!("failed to list sys services: {err}"); }
         }
     }
 
@@ -538,40 +579,203 @@ impl AppRoot {
                     );
                     self.log_scroll_handle.scroll_to_bottom();
                 }
+                PlatformEvent::TargetRemoved { index } => {
+                    if index < self.app_state.targets.len() {
+                        let name = self.app_state.targets.remove(index).process_name;
+                        self.sync_scanner_state();
+                        self.persist_config();
+                        self.app_state.log_entries.push(LogEntry {
+                            level: "INFO".to_string(),
+                            message: format!("Removed target: {name}"),
+                        });
+                        window.push_notification(
+                            Notification::new()
+                                .message("Target removed")
+                                .with_type(NotificationType::Info)
+                                .title("gpui-convenience-tools"),
+                            cx,
+                        );
+                        self.log_scroll_handle.scroll_to_bottom();
+                    }
+                }
             }
         }
     }
 
     fn render_dashboard_panel(&self, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme();
-        let status_text = if !self.app_state.is_active {
-            "Service: disabled"
-        } else if self.app_state.is_target_running {
-            "Service: enabled / target running"
+
+        // ── 서비스 상태 배지 ──
+        let (svc_label, svc_bg, svc_fg) = if self.app_state.is_active {
+            ("Service: Active", theme.success, theme.success_foreground)
         } else {
-            "Service: enabled / target not running"
+            ("Service: Inactive", theme.warning, theme.warning_foreground)
         };
 
-        let status_bg = if !self.app_state.is_active {
-            theme.warning
-        } else if self.app_state.is_target_running {
-            theme.success
+        // ── 타겟 상태 배지 ──
+        let (tgt_label, tgt_bg, tgt_fg) = if self.app_state.is_target_running {
+            ("Target: Running", theme.success, theme.success_foreground)
         } else {
-            theme.info
+            ("Target: Not Running", theme.muted, theme.muted_foreground)
         };
 
-        let status_fg = if !self.app_state.is_active {
-            theme.warning_foreground
-        } else if self.app_state.is_target_running {
-            theme.success_foreground
+        let active_targets = self.app_state.targets.iter().filter(|t| t.enabled).count();
+
+        // ── 최근 활동 (최신 5개, 역순) ──
+        let recent: Vec<_> = self.app_state.log_entries.iter().rev().take(5).collect();
+
+        let mut activity = v_flex().gap_1();
+        if recent.is_empty() {
+            activity = activity.child(
+                div()
+                    .text_color(theme.muted_foreground)
+                    .child("No activity yet."),
+            );
         } else {
-            theme.info_foreground
-        };
+            for entry in &recent {
+                let level_color = match entry.level.as_str() {
+                    "SUCCESS" => theme.success,
+                    "WARN" => theme.warning,
+                    "ERROR" => theme.danger,
+                    _ => theme.info,
+                };
+                activity = activity.child(
+                    h_flex()
+                        .gap_2()
+                        .child(
+                            div()
+                                .w(px(64.0))
+                                .text_color(level_color)
+                                .child(entry.level.clone()),
+                        )
+                        .child(
+                            div()
+                                .flex_1()
+                                .text_color(theme.muted_foreground)
+                                .child(entry.message.clone()),
+                        ),
+                );
+            }
+        }
 
         v_flex()
             .size_full()
             .gap_3()
             .child(div().text_color(theme.foreground).child("Dashboard"))
+            // ── 상태 + 통계 카드 ──
+            .child(
+                div()
+                    .rounded_lg()
+                    .p_4()
+                    .bg(theme.secondary)
+                    .border_1()
+                    .border_color(theme.border)
+                    .child(
+                        v_flex()
+                            .gap_3()
+                            // 상태 배지 행
+                            .child(
+                                h_flex()
+                                    .gap_2()
+                                    .child(
+                                        div()
+                                            .rounded_md()
+                                            .px_3()
+                                            .py_1()
+                                            .bg(svc_bg)
+                                            .text_color(svc_fg)
+                                            .child(svc_label),
+                                    )
+                                    .child(
+                                        div()
+                                            .rounded_md()
+                                            .px_3()
+                                            .py_1()
+                                            .bg(tgt_bg)
+                                            .text_color(tgt_fg)
+                                            .child(tgt_label),
+                                    ),
+                            )
+                            // 통계 카드 3개
+                            .child(
+                                h_flex()
+                                    .gap_3()
+                                    .child(
+                                        div()
+                                            .flex_1()
+                                            .rounded_md()
+                                            .px_3()
+                                            .py_3()
+                                            .bg(theme.list)
+                                            .border_1()
+                                            .border_color(theme.border)
+                                            .child(
+                                                v_flex()
+                                                    .gap_1()
+                                                    .child(
+                                                        div()
+                                                            .text_color(theme.muted_foreground)
+                                                            .child("Total Blocks"),
+                                                    )
+                                                    .child(
+                                                        div()
+                                                            .text_color(theme.foreground)
+                                                            .child(format!("{}", self.app_state.blocked_count)),
+                                                    ),
+                                            ),
+                                    )
+                                    .child(
+                                        div()
+                                            .flex_1()
+                                            .rounded_md()
+                                            .px_3()
+                                            .py_3()
+                                            .bg(theme.list)
+                                            .border_1()
+                                            .border_color(theme.border)
+                                            .child(
+                                                v_flex()
+                                                    .gap_1()
+                                                    .child(
+                                                        div()
+                                                            .text_color(theme.muted_foreground)
+                                                            .child("Active Targets"),
+                                                    )
+                                                    .child(
+                                                        div()
+                                                            .text_color(theme.foreground)
+                                                            .child(format!("{} / {}", active_targets, self.app_state.targets.len())),
+                                                    ),
+                                            ),
+                                    )
+                                    .child(
+                                        div()
+                                            .flex_1()
+                                            .rounded_md()
+                                            .px_3()
+                                            .py_3()
+                                            .bg(theme.list)
+                                            .border_1()
+                                            .border_color(theme.border)
+                                            .child(
+                                                v_flex()
+                                                    .gap_1()
+                                                    .child(
+                                                        div()
+                                                            .text_color(theme.muted_foreground)
+                                                            .child("Scan Interval"),
+                                                    )
+                                                    .child(
+                                                        div()
+                                                            .text_color(theme.foreground)
+                                                            .child(format!("{}s", self.scan_interval_secs)),
+                                                    ),
+                                            ),
+                                    ),
+                            ),
+                    ),
+            )
+            // ── 최근 활동 카드 ──
             .child(
                 div()
                     .rounded_lg()
@@ -584,25 +788,10 @@ impl AppRoot {
                             .gap_2()
                             .child(
                                 div()
-                                    .rounded_md()
-                                    .px_3()
-                                    .py_2()
-                                    .bg(status_bg)
-                                    .text_color(status_fg)
-                                    .child(status_text),
+                                    .text_color(theme.foreground)
+                                    .child("Recent Activity"),
                             )
-                            .child(
-                                div().text_color(theme.foreground).child(format!(
-                                    "Total blocks: {}",
-                                    self.app_state.blocked_count
-                                )),
-                            )
-                            .child(
-                                div().text_color(theme.foreground).child(format!(
-                                    "Targets: {}",
-                                    self.app_state.targets.len()
-                                )),
-                            ),
+                            .child(activity),
                     ),
             )
             .into_any_element()
@@ -611,42 +800,56 @@ impl AppRoot {
     fn render_target_list_panel(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme();
 
-        let target_rows = self
-            .app_state
-            .targets
-            .iter()
-            .enumerate()
-            .fold(v_flex().gap_2(), |list, (ix, target)| {
-                list.child(
-                    div()
-                        .rounded_md()
+        // ── 타겟 목록 (테이블 스타일) ──
+        let mut target_rows = v_flex();
+        if self.app_state.targets.is_empty() {
+            target_rows = target_rows.child(
+                div()
+                    .px_3()
+                    .py_4()
+                    .text_color(theme.muted_foreground)
+                    .child("등록된 타겟이 없습니다."),
+            );
+        } else {
+            for (ix, target) in self.app_state.targets.iter().enumerate() {
+                let enabled = target.enabled;
+                let display = target.display_name.clone();
+                let process = target.process_name.clone();
+                let class = target.ad_window_class.clone();
+                target_rows = target_rows.child(
+                    h_flex()
+                        .h(px(44.0))
                         .px_3()
-                        .py_2()
-                        .bg(theme.list)
-                        .border_1()
+                        .gap_2()
+                        .items_center()
+                        .border_b_1()
                         .border_color(theme.border)
+                        .hover(|s| s.bg(theme.secondary_hover))
+                        // 표시 이름 + 프로세스 (flex_1)
                         .child(
-                            h_flex()
-                                .justify_between()
+                            v_flex()
+                                .flex_1()
+                                .min_w_0()
+                                .child(div().text_color(theme.foreground).child(display))
+                                .child(div().text_color(theme.muted_foreground).child(process)),
+                        )
+                        // 광고 창 클래스
+                        .child(
+                            div()
+                                .w(px(150.0))
+                                .text_color(theme.muted_foreground)
+                                .child(class),
+                        )
+                        // 활성 토글
+                        .child(
+                            div()
+                                .w(px(64.0))
+                                .flex()
                                 .items_center()
-                                .child(
-                                    v_flex()
-                                        .gap_1()
-                                        .child(
-                                            div().text_color(theme.foreground).child(format!(
-                                                "{} ({})",
-                                                target.display_name, target.process_name
-                                            )),
-                                        )
-                                        .child(
-                                            div()
-                                                .text_color(theme.muted_foreground)
-                                                .child(format!("class: {}", target.ad_window_class)),
-                                        ),
-                                )
+                                .justify_center()
                                 .child(
                                     Switch::new(("target-switch", ix))
-                                        .checked(target.enabled)
+                                        .checked(enabled)
                                         .on_click(cx.listener(move |this, checked: &bool, window, cx| {
                                             let _ = this.event_tx.send(PlatformEvent::TargetToggled {
                                                 index: ix,
@@ -656,103 +859,179 @@ impl AppRoot {
                                             cx.notify();
                                         })),
                                 ),
+                        )
+                        // 삭제 버튼
+                        .child(
+                            div()
+                                .id(("target-remove", ix))
+                                .w(px(40.0))
+                                .flex()
+                                .items_center()
+                                .justify_center()
+                                .rounded_md()
+                                .py_1()
+                                .cursor_pointer()
+                                .text_color(theme.danger)
+                                .hover(|s| s.bg(theme.danger).text_color(theme.danger_foreground))
+                                .on_click(cx.listener(move |this, _event, window, cx| {
+                                    let _ = this.event_tx.send(PlatformEvent::TargetRemoved { index: ix });
+                                    this.process_pending_events(window, cx);
+                                    cx.notify();
+                                }))
+                                .child("×"),
                         ),
-                )
-            });
+                );
+            }
+        }
 
-        let mut running_process_chips = h_flex().gap_2().flex_wrap();
+        // ── 실행 중인 프로세스 (추가 가능 목록) ──
+        let mut proc_rows = v_flex();
         for (ix, process_name) in self.running_processes.iter().enumerate() {
             let exists = self
                 .app_state
                 .targets
                 .iter()
-                .any(|target| target.process_name.eq_ignore_ascii_case(process_name));
-
-            if exists {
-                running_process_chips = running_process_chips.child(
-                    div()
-                        .rounded_md()
-                        .px_2()
-                        .py_1()
-                        .bg(theme.muted)
-                        .text_color(theme.muted_foreground)
-                        .border_1()
-                        .border_color(theme.border)
-                        .child(format!("{process_name} (added)")),
-                );
+                .any(|t| t.process_name.eq_ignore_ascii_case(process_name));
+            let name = process_name.clone();
+            let action_el: AnyElement = if exists {
+                div()
+                    .w(px(72.0))
+                    .rounded_md()
+                    .px_2()
+                    .py_1()
+                    .bg(theme.muted)
+                    .text_color(theme.muted_foreground)
+                    .child("등록됨")
+                    .into_any_element()
             } else {
-                running_process_chips = running_process_chips.child(
-                    div()
-                        .rounded_md()
-                        .px_2()
-                        .py_1()
-                        .cursor_pointer()
-                        .bg(theme.secondary)
-                        .text_color(theme.foreground)
-                        .border_1()
-                        .border_color(theme.border)
-                        .hover(|s| s.bg(theme.secondary_hover))
-                        .id(("running-process-chip", ix))
-                        .on_click(cx.listener({
-                            let process_name = process_name.clone();
-                            move |this, _event, window, cx| {
-                                this.add_target_process(&process_name, window, cx);
-                                cx.notify();
-                            }
-                        }))
-                        .child(format!("+ {process_name}")),
-                );
-            }
+                div()
+                    .id(("proc-add", ix))
+                    .w(px(72.0))
+                    .rounded_md()
+                    .px_2()
+                    .py_1()
+                    .cursor_pointer()
+                    .bg(theme.list)
+                    .border_1()
+                    .border_color(theme.border)
+                    .text_color(theme.foreground)
+                    .hover(|s| s.bg(theme.secondary_hover))
+                    .on_click(cx.listener(move |this, _event, window, cx| {
+                        this.add_target_process(&name, window, cx);
+                        cx.notify();
+                    }))
+                    .child("+ 추가")
+                    .into_any_element()
+            };
+            proc_rows = proc_rows.child(
+                h_flex()
+                    .h(px(36.0))
+                    .px_3()
+                    .gap_2()
+                    .items_center()
+                    .border_b_1()
+                    .border_color(theme.border)
+                    .hover(|s| s.bg(theme.secondary_hover))
+                    .child(
+                        div()
+                            .flex_1()
+                            .text_color(if exists { theme.muted_foreground } else { theme.foreground })
+                            .child(process_name.clone()),
+                    )
+                    .child(action_el),
+            );
         }
 
         v_flex()
             .size_full()
             .gap_3()
             .child(div().text_color(theme.foreground).child("Targets"))
+            // ── 실행 중인 프로세스 카드 ──
             .child(
                 div()
                     .rounded_lg()
-                    .p_4()
                     .bg(theme.secondary)
                     .border_1()
                     .border_color(theme.border)
                     .child(
                         v_flex()
-                            .gap_3()
-                            .child(div().text_color(theme.foreground).child("Running Processes"))
+                            // 헤더
                             .child(
-                                div()
-                                    .rounded_md()
+                                h_flex()
                                     .px_3()
                                     .py_2()
-                                    .cursor_pointer()
-                                    .bg(theme.list)
-                                    .border_1()
+                                    .border_b_1()
                                     .border_color(theme.border)
-                                    .hover(|s| s.bg(theme.secondary_hover))
-                                    .id("refresh-running-processes")
-                                    .on_click(cx.listener(|this, _event, _window, cx| {
-                                        this.refresh_running_processes();
-                                        cx.notify();
-                                    }))
-                                    .child("Refresh running process list"),
+                                    .justify_between()
+                                    .items_center()
+                                    .child(
+                                        div()
+                                            .text_color(theme.foreground)
+                                            .child("실행 중인 프로세스"),
+                                    )
+                                    .child(
+                                        div()
+                                            .id("refresh-running-processes")
+                                            .rounded_md()
+                                            .px_3()
+                                            .py_1()
+                                            .cursor_pointer()
+                                            .bg(theme.list)
+                                            .border_1()
+                                            .border_color(theme.border)
+                                            .text_color(theme.foreground)
+                                            .hover(|s| s.bg(theme.secondary_hover))
+                                            .on_click(cx.listener(|this, _event, _window, cx| {
+                                                this.refresh_running_processes();
+                                                cx.notify();
+                                            }))
+                                            .child("새로고침"),
+                                    ),
                             )
+                            // 컬럼 헤더
                             .child(
-                                div()
-                                    .text_color(theme.muted_foreground)
-                                    .child("Click a process to add it as a target."),
+                                h_flex()
+                                    .px_3()
+                                    .py_1()
+                                    .border_b_1()
+                                    .border_color(theme.border)
+                                    .gap_2()
+                                    .child(div().flex_1().text_color(theme.muted_foreground).child("프로세스"))
+                                    .child(div().w(px(72.0)).text_color(theme.muted_foreground).child("액션")),
                             )
-                            .child(running_process_chips),
+                            .child(proc_rows),
                     ),
             )
+            // ── 타겟 목록 카드 ──
             .child(
                 div()
                     .rounded_lg()
-                    .p_4()
                     .bg(theme.secondary)
                     .border_1()
                     .border_color(theme.border)
-                    .child(target_rows),
+                    .child(
+                        v_flex()
+                            // 컬럼 헤더
+                            .child(
+                                h_flex()
+                                    .px_3()
+                                    .py_2()
+                                    .border_b_1()
+                                    .border_color(theme.border)
+                                    .gap_2()
+                                    .child(
+                                        div()
+                                            .flex_1()
+                                            .min_w_0()
+                                            .text_color(theme.muted_foreground)
+                                            .child("표시 이름 / 프로세스"),
+                                    )
+                                    .child(div().w(px(150.0)).text_color(theme.muted_foreground).child("광고 창 클래스"))
+                                    .child(div().w(px(64.0)).text_color(theme.muted_foreground).child("활성"))
+                                    .child(div().w(px(40.0))),
+                            )
+                            .child(target_rows),
+                    ),
             )
             .into_any_element()
     }
@@ -950,6 +1229,7 @@ impl Render for AppRoot {
             ActivePanel::Settings => settings::render(self, window, cx),
             ActivePanel::Logs => self.render_log_panel(cx),
             ActivePanel::ServiceView => service_view::render(self, window, cx),
+            ActivePanel::ServiceMgr => service_mgr::render(self, window, cx),
         };
 
         let theme = cx.theme();
@@ -966,6 +1246,7 @@ impl Render for AppRoot {
         let settings_active = self.active_panel == ActivePanel::Settings;
         let logs_active = self.active_panel == ActivePanel::Logs;
         let service_active = self.active_panel == ActivePanel::ServiceView;
+        let service_mgr_active = self.active_panel == ActivePanel::ServiceMgr;
 
         let app_enabled = self.app_state.is_active;
 
@@ -1110,6 +1391,24 @@ impl Render for AppRoot {
                                         cx.notify();
                                     }))
                                     .child("Service"),
+                            )
+                            .child(
+                                div()
+                                    .px_3()
+                                    .py_2()
+                                    .rounded_md()
+                                    .cursor_pointer()
+                                    .bg(if service_mgr_active { sidebar_active_bg } else { sidebar })
+                                    .text_color(if service_mgr_active { sidebar_active_fg } else { sidebar_fg })
+                                    .id("nav-service-mgr")
+                                    .on_click(cx.listener(|this, _event, _window, cx| {
+                                        if this.sys_services.is_empty() {
+                                            this.refresh_sys_services();
+                                        }
+                                        this.active_panel = ActivePanel::ServiceMgr;
+                                        cx.notify();
+                                    }))
+                                    .child("Services"),
                             ),
                     )
                     .child(

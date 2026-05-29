@@ -28,7 +28,10 @@
 - [x] `installer/windows/*.wxs` 파일 업데이트 (파일명 포함)
 - [x] `MasterPlan.md` / `TASKS.md` / `AGENTS.md` / `copilot-instructions.md` 정리
 - [x] `.vscode/tasks.json` / `launch.json` 업데이트
-- [ ] 기존 Git 저장소 제거 후 새 저장소(`gpui-convenience-tools`) 재생성
+- [x] 기존 Git 저장소 제거 후 새 저장소(`gpui-convenience-tools`) 재생성
+- [x] GitHub 워크플로우 패키지명 수정 (`webview-ad-ban-gpui` → `gpui-convenience-tools`)
+- [x] 릴리즈 워크플로우에 WiX 인스톨러 빌드 + MSI 아티팩트 업로드 추가
+- [x] 대시보드 재구성 (상태 배지 2개 + 통계 3개 + 최근 활동 5개)
 
 ---
 
@@ -39,29 +42,29 @@
 > 상세 계획: MasterPlan.md Phase B 참조
 
 #### B-1. Platform 레이어 확장 (platform/windows.rs)
-- [ ] `ServiceInfo`, `ServiceStatus`, `ServiceStartType` 구조체 정의
-- [ ] `Platform` trait에 서비스 관련 메서드 추가
-  - `list_services() -> Result<Vec<ServiceInfo>>`
-  - `start_service(name: &str) -> Result<()>`
-  - `stop_service(name: &str) -> Result<()>`
-  - `query_service(name: &str) -> Result<ServiceInfo>`
-- [ ] `Cargo.toml` windows-sys features에 `Win32_System_Services`, `Win32_Security` 추가
-- [ ] Win32 구현: `OpenSCManager`, `EnumServicesStatusEx`, `StartService`, `ControlService`
-- [ ] 관리자 권한 확인 (`IsUserAnAdmin`) 및 elevated 재시작 유도
+- [x] `ServiceInfo`, `ServiceStatus`, `ServiceStartType` 구조체 정의 (`SysServiceInfo`, `SysServiceStatus`, `SysServiceStartType`)
+- [x] `Platform` trait에 서비스 관련 메서드 추가
+  - `list_sys_services() -> Result<Vec<SysServiceInfo>>`
+  - `start_sys_service(name: &str) -> Result<()>`
+  - `stop_sys_service(name: &str) -> Result<()>`
+  - `query_sys_service(name: &str) -> Result<SysServiceInfo>`
+- [x] `Cargo.toml` windows-sys features에 `Win32_Security` 추가 (`Win32_System_Services`는 기존 존재)
+- [x] Win32 구현: `OpenSCManager`, `EnumServicesStatusEx`, `StartService`, `ControlService`, `QueryServiceStatusEx`, `QueryServiceConfigW`
+- [x] 관리자 권한 확인 (`IsUserAnAdmin`) — `is_elevated()` 함수 및 `Platform::is_elevated()` 메서드
 
 #### B-2. 서비스 관리 패널 UI (window/service_mgr.rs)
-- [ ] `window/service_mgr.rs` 신규 파일 생성
-- [ ] 헤더 (제목 + 새로고침 버튼)
-- [ ] 검색 입력창 (InputState 사용)
-- [ ] 서비스 목록 Virtual List
+- [x] `window/service_mgr.rs` 신규 파일 생성
+- [x] 헤더 (제목 + 카운터 + 새로고침 버튼)
+- [x] 검색 입력창 (InputState 사용)
+- [x] 서비스 목록 Virtual List
   - 상태 배지 (Running=success, Stopped=muted, Pending=warning)
-  - 시작 / 중지 / 재시작 버튼 (권한 없으면 비활성)
-- [ ] 관리자 권한 안내 배너
+  - 시작 / 중지 버튼 (권한 없으면 warning 배너)
+- [x] 관리자 권한 안내 배너
 
 #### B-3. AppRoot 연동 (app.rs)
-- [ ] `ActivePanel::ServiceMgr` variant 추가
-- [ ] 사이드바 "Services" 네비게이션 항목 추가
-- [ ] `render_service_mgr_panel()` 연동
+- [x] `ActivePanel::ServiceMgr` variant 추가
+- [x] 사이드바 "Services" 네비게이션 항목 추가
+- [x] `render_service_mgr_panel()` 연동
 - [ ] 서비스 제어 이벤트 처리 (`PlatformEvent` 확장)
 
 #### B-4. 설정 연동

@@ -23,11 +23,21 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Build release
-        run: cargo build -p webview-ad-ban-gpui --release
+        run: cargo build -p gpui-convenience-tools --release
+
+      - name: Add WiX to PATH
+        shell: pwsh
+        run: echo "C:\Program Files (x86)\WiX Toolset v3.11\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Build installer
+        shell: pwsh
+        run: .\installer\windows\build-installer.ps1 -Configuration release
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           name: "Release ${{ github.ref_name }}"
           generate_release_notes: true
-          files: target/release/webview-ad-ban-gpui.exe
+          files: |
+            target/release/gpui-convenience-tools.exe
+            installer/windows/gpui-convenience-tools.msi
