@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <Product
+    Id="*"
+    Name="gpui-convenience-tools"
+    Language="1033"
+    Version="1.0.0"
+    Manufacturer="gpui-convenience-tools"
+    UpgradeCode="A065C9D1-CC12-4ACF-9E67-9356CBA97DCC">
+    <Package InstallerVersion="500" Compressed="yes" InstallScope="perMachine" />
+
+    <MajorUpgrade DowngradeErrorMessage="A newer version of gpui-convenience-tools is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <Feature Id="ProductFeature" Title="gpui-convenience-tools" Level="1">
+      <ComponentRef Id="MainExecutableComponent" />
+    </Feature>
+
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="ProgramFilesFolder">
+        <Directory Id="INSTALLFOLDER" Name="gpui-convenience-tools">
+          <Component Id="MainExecutableComponent" Guid="CF5E1F2A-EA84-43A1-AB30-EEC79BDA9AB4">
+            <File Id="MainExecutableFile" Source="..\..\target\release\gpui-convenience-tools.exe" KeyPath="yes" />
+          </Component>
+        </Directory>
+      </Directory>
+    </Directory>
+
+    <UIRef Id="WixUI_Minimal" />
+    <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
+  </Product>
+</Wix>
+
+
+

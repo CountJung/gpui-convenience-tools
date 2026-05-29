@@ -1,0 +1,30 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "cargo-build-gpui-convenience-tools",
+      "type": "shell",
+      "command": "cargo",
+      "args": ["build", "-p", "gpui-convenience-tools"],
+      "group": "build",
+      "problemMatcher": ["$rustc"]
+    },
+    {
+      "label": "cargo-check-gpui-convenience-tools",
+      "type": "shell",
+      "command": "cargo",
+      "args": ["check", "-p", "gpui-convenience-tools"],
+      "problemMatcher": ["$rustc"]
+    },
+    {
+      "label": "cargo-test-gpui-convenience-tools",
+      "type": "shell",
+      "command": "cargo",
+      "args": ["test", "-p", "gpui-convenience-tools", "--", "--nocapture"],
+      "problemMatcher": ["$rustc"]
+    }
+  ]
+}
+
+
+

@@ -1,0 +1,32 @@
+﻿name: windows-build
+
+on:
+  push:
+    branches: ["main", "master"]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Cargo check
+        run: cargo check -p webview-ad-ban-gpui
+
+      - name: Cargo test
+        run: cargo test -p webview-ad-ban-gpui -- --nocapture
+
+      - name: Cargo build release
+        run: cargo build -p webview-ad-ban-gpui --release
+
+
+

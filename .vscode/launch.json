@@ -1,0 +1,59 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      // 일반 디버그 빌드 (UAC 없음 - 빠른 반복 개발용)
+      "name": "Debug gpui-convenience-tools (cargo build)",
+      "type": "cppvsdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}\\target\\debug\\gpui-convenience-tools.exe",
+      "args": [],
+      "cwd": "${workspaceFolder}",
+      "environment": [
+        {
+          "name": "RUST_LOG",
+          "value": "debug"
+        }
+      ],
+      "console": "integratedTerminal",
+      "preLaunchTask": "cargo-build-gpui-convenience-tools"
+    },
+    {
+      // 관리자 권한 디버그: VS Code를 관리자로 실행 후 이 구성을 사용한다.
+      // 디버그 exe에는 UAC 매니페스트가 없으므로 VS Code가 관리자이면
+      // 디버그 프로세스도 관리자 권한으로 실행된다.
+      "name": "Debug gpui-convenience-tools (Admin - VS Code를 관리자로 실행 필요)",
+      "type": "cppvsdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}\\target\\debug\\gpui-convenience-tools.exe",
+      "args": [],
+      "cwd": "${workspaceFolder}",
+      "environment": [
+        {
+          "name": "RUST_LOG",
+          "value": "debug"
+        }
+      ],
+      "console": "integratedTerminal",
+      "preLaunchTask": "cargo-build-gpui-convenience-tools"
+    },
+    {
+      // 이미 실행 중인 프로세스에 디버거를 attach한다.
+      // 1. 관리자 권한 터미널에서 exe를 직접 실행한다.
+      // 2. 이 구성으로 attach → 프로세스 목록에서 gpui-convenience-tools 선택.
+      "name": "Attach to gpui-convenience-tools",
+      "type": "cppvsdbg",
+      "request": "attach",
+      "processId": "${command:pickProcess}"
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Build + Debug gpui-convenience-tools",
+      "configurations": ["Debug gpui-convenience-tools (cargo build)"]
+    }
+  ]
+}
+
+
+

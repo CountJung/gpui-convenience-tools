@@ -1,0 +1,6 @@
+// Windows 리소스 스크립트
+// UAC 매니페스트를 EXE에 임베드한다 (릴리즈 빌드 전용).
+
+#include <winresrc.h>
+
+1 RT_MANIFEST "webview-ad-ban-gpui.exe.manifest"

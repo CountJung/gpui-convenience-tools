@@ -1,0 +1,22 @@
+# Rust build artifacts
+target/
+ctarget/
+**/*.rs.bk
+
+# Debug symbols and temporary outputs
+*.pdb
+*.ilk
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# VS Code transient files (keep launch/tasks tracked)
+.vscode/*.log
+.vscode/ipch/
+.vscode/.ropeproject/
+
+# Local environment files
+.env
+.env.local
