@@ -62,7 +62,7 @@ pub fn render(this: &mut AppRoot, window: &mut Window, cx: &mut Context<AppRoot>
         let item_sizes = Rc::new(
             filtered_indices
                 .iter()
-                .map(|_| size(px(0.), px(44.0)))
+                .map(|_| size(px(0.), px(52.0)))
                 .collect::<Vec<_>>(),
         );
         let idx = Rc::clone(&filtered_indices);
@@ -77,10 +77,10 @@ pub fn render(this: &mut AppRoot, window: &mut Window, cx: &mut Context<AppRoot>
                 visible_range
                     .map(|list_ix| {
                         let Some(&svc_ix) = idx.get(list_ix) else {
-                            return div().h(px(44.0));
+                            return div().h(px(52.0));
                         };
                         let Some(svc) = this.sys_services.get(svc_ix) else {
-                            return div().h(px(44.0));
+                            return div().h(px(52.0));
                         };
 
                         let (badge_bg, badge_fg) = match svc.status {
@@ -101,15 +101,16 @@ pub fn render(this: &mut AppRoot, window: &mut Window, cx: &mut Context<AppRoot>
                         let name_delete = svc.name.clone();
 
                         div()
-                            .h(px(44.0))
-                            .px_3()
+                            .h(px(52.0))
+                            .px_4()
+                            .pr(px(20.0))
                             .border_b_1()
                             .border_color(theme.border)
                             .hover(|s| s.bg(theme.secondary_hover))
                             .child(
                                 h_flex()
                                     .h_full()
-                                    .gap_2()
+                                    .gap_3()
                                     .items_center()
                                     // 표시 이름 + 서비스명
                                     .child(
@@ -428,11 +429,12 @@ pub fn render(this: &mut AppRoot, window: &mut Window, cx: &mut Context<AppRoot>
                     // 컬럼 헤더
                     .child(
                         h_flex()
-                            .px_3()
+                            .px_4()
+                            .pr(px(20.0))
                             .py_2()
                             .border_b_1()
                             .border_color(theme.border)
-                            .gap_2()
+                            .gap_3()
                             .child(
                                 div()
                                     .flex_1()
