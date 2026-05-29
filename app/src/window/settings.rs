@@ -280,7 +280,7 @@ pub fn render(this: &mut AppRoot, window: &mut Window, cx: &mut Context<AppRoot>
     }
 
     v_flex()
-        .size_full()
+        .w_full()
         .gap_3()
         .child(div().text_color(fg).child("설정"))
         .child(

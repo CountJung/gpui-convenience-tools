@@ -522,6 +522,10 @@ impl Platform for WindowsPlatform {
         query_sys_service_impl(name)
     }
 
+    fn delete_sys_service(&self, name: &str) -> Result<()> {
+        delete_sys_service_impl(name)
+    }
+
     fn is_elevated(&self) -> bool {
         is_elevated()
     }
@@ -1325,4 +1329,33 @@ fn query_sys_service_impl(name: &str) -> Result<crate::platform::SysServiceInfo>
         status: sys_status,
         start_type,
     })
+}
+
+/// 지정한 서비스를 SCM에서 영구 삭제한다. 관리자 권한이 필요하다.
+#[allow(dead_code)]
+fn delete_sys_service_impl(name: &str) -> Result<()> {
+    use windows_sys::Win32::System::Services::{CloseServiceHandle, DeleteService, OpenServiceW, SC_MANAGER_CONNECT};
+    // DELETE = 0x00010000
+    const DELETE_ACCESS: u32 = 0x00010000;
+
+    let scm = open_scm_handle(SC_MANAGER_CONNECT)?;
+    let service_name = wide_null(name);
+    // SAFETY: service_name은 wide_null이 생성한 null-terminated UTF-16 벡터다.
+    let svc = unsafe { OpenServiceW(scm, service_name.as_ptr(), DELETE_ACCESS) };
+    if svc == 0 {
+        unsafe { CloseServiceHandle(scm); }
+        return Err(anyhow!("OpenServiceW failed for '{name}': service not found or access denied"));
+    }
+    // SAFETY: svc는 유효한 서비스 핸들이다.
+    let result = unsafe { DeleteService(svc) };
+    unsafe {
+        CloseServiceHandle(svc);
+        CloseServiceHandle(scm);
+    }
+    if result == 0 {
+        Err(anyhow!("DeleteService failed for '{name}'"))
+    } else {
+        log::info!("System service deleted: {name}");
+        Ok(())
+    }
 }

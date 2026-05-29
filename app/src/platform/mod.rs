@@ -96,6 +96,11 @@ pub trait Platform: Send + Sync {
         Err(anyhow::anyhow!("not supported on this platform"))
     }
 
+    /// 지정한 서비스를 삭제(영구 제거)한다. 관리자 권한 필요.
+    fn delete_sys_service(&self, _name: &str) -> Result<()> {
+        Err(anyhow::anyhow!("not supported on this platform"))
+    }
+
     /// 현재 프로세스가 관리자 권한으로 실행 중이면 `true`.
     fn is_elevated(&self) -> bool {
         false

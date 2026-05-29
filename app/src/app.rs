@@ -1,13 +1,13 @@
 use gpui::{
     div, px, size, AnyElement, AppContext, Context, Entity, InteractiveElement, IntoElement,
-    ParentElement, Render, StatefulInteractiveElement, Styled, Subscription, Window,
+    ParentElement, Render, ScrollHandle, StatefulInteractiveElement, Styled, Subscription, Window,
     WindowControlArea,
 };
 use gpui_component::{
     h_flex,
     input::{InputEvent, InputState},
     notification::{Notification, NotificationType},
-    scroll::ScrollableElement,
+    scroll::{Scrollbar, ScrollbarShow},
     switch::Switch,
     theme::ActiveTheme,
     v_flex, v_virtual_list, VirtualListScrollHandle, WindowExt, TITLE_BAR_HEIGHT,
@@ -118,6 +118,8 @@ pub struct AppRoot {
     pub(crate) service_search_query: String,
     pub(crate) service_search_input: Option<Entity<InputState>>,
     pub(crate) svc_scroll_handle: VirtualListScrollHandle,
+    content_scroll_handle: ScrollHandle,
+    pub(crate) pending_delete_service: Option<String>,
 }
 
 impl AppRoot {
@@ -181,6 +183,10 @@ impl AppRoot {
                             .as_ref()
                             .map(|cfg| cfg.scan_interval_secs)
                             .unwrap_or(10),
+                        favorite_services: existing
+                            .as_ref()
+                            .map(|cfg| cfg.favorite_services.clone())
+                            .unwrap_or_default(),
                     };
                     if let Err(err) = save_config(&cfg) {
                         log::error!("failed to save config from tray toggle: {err}");
@@ -217,6 +223,8 @@ impl AppRoot {
             service_search_query: String::new(),
             service_search_input: None,
             svc_scroll_handle: VirtualListScrollHandle::new(),
+            content_scroll_handle: ScrollHandle::default(),
+            pending_delete_service: None,
         }
     }
 
@@ -410,6 +418,10 @@ impl AppRoot {
                 .as_ref()
                 .and_then(|cfg| cfg.dark_theme_name.clone()),
             scan_interval_secs: self.scan_interval_secs,
+            favorite_services: existing
+                .as_ref()
+                .map(|cfg| cfg.favorite_services.clone())
+                .unwrap_or_default(),
         };
 
         if let Err(err) = save_config(&cfg) {
@@ -659,7 +671,7 @@ impl AppRoot {
         }
 
         v_flex()
-            .size_full()
+            .w_full()
             .gap_3()
             .child(div().text_color(theme.foreground).child("Dashboard"))
             // ── 상태 + 통계 카드 ──
@@ -943,9 +955,40 @@ impl AppRoot {
         }
 
         v_flex()
-            .size_full()
+            .w_full()
             .gap_3()
             .child(div().text_color(theme.foreground).child("Targets"))
+            // ── 타겟 목록 카드 ──
+            .child(
+                div()
+                    .rounded_lg()
+                    .bg(theme.secondary)
+                    .border_1()
+                    .border_color(theme.border)
+                    .child(
+                        v_flex()
+                            // 컬럼 헤더
+                            .child(
+                                h_flex()
+                                    .px_3()
+                                    .py_2()
+                                    .border_b_1()
+                                    .border_color(theme.border)
+                                    .gap_2()
+                                    .child(
+                                        div()
+                                            .flex_1()
+                                            .min_w_0()
+                                            .text_color(theme.muted_foreground)
+                                            .child("표시 이름 / 프로세스"),
+                                    )
+                                    .child(div().w(px(150.0)).text_color(theme.muted_foreground).child("광고 창 클래스"))
+                                    .child(div().w(px(64.0)).text_color(theme.muted_foreground).child("활성"))
+                                    .child(div().w(px(40.0))),
+                            )
+                            .child(target_rows),
+                    ),
+            )
             // ── 실행 중인 프로세스 카드 ──
             .child(
                 div()
@@ -1000,37 +1043,6 @@ impl AppRoot {
                                     .child(div().w(px(72.0)).text_color(theme.muted_foreground).child("액션")),
                             )
                             .child(proc_rows),
-                    ),
-            )
-            // ── 타겟 목록 카드 ──
-            .child(
-                div()
-                    .rounded_lg()
-                    .bg(theme.secondary)
-                    .border_1()
-                    .border_color(theme.border)
-                    .child(
-                        v_flex()
-                            // 컬럼 헤더
-                            .child(
-                                h_flex()
-                                    .px_3()
-                                    .py_2()
-                                    .border_b_1()
-                                    .border_color(theme.border)
-                                    .gap_2()
-                                    .child(
-                                        div()
-                                            .flex_1()
-                                            .min_w_0()
-                                            .text_color(theme.muted_foreground)
-                                            .child("표시 이름 / 프로세스"),
-                                    )
-                                    .child(div().w(px(150.0)).text_color(theme.muted_foreground).child("광고 창 클래스"))
-                                    .child(div().w(px(64.0)).text_color(theme.muted_foreground).child("활성"))
-                                    .child(div().w(px(40.0))),
-                            )
-                            .child(target_rows),
                     ),
             )
             .into_any_element()
@@ -1412,15 +1424,52 @@ impl Render for AppRoot {
                             ),
                     )
                     .child(
-                        div()
-                            .flex_1()
-                            .min_w_0()
-                            .h_full()
-                            .p_4()
-                            .border_l_1()
-                            .border_color(border)
-                            .child(panel)
-                            .overflow_y_scrollbar(),
+                        {
+                            let uses_virtual = matches!(
+                                self.active_panel,
+                                ActivePanel::Logs | ActivePanel::ServiceMgr
+                            );
+                            let content_scroll = self.content_scroll_handle.clone();
+                            let outer = div()
+                                .flex_1()
+                                .min_w_0()
+                                .h_full()
+                                .relative()
+                                .border_l_1()
+                                .border_color(border);
+                            if uses_virtual {
+                                outer.child(
+                                    div()
+                                        .id("content-area")
+                                        .size_full()
+                                        .p_4()
+                                        .child(panel),
+                                )
+                            } else {
+                                outer
+                                    .child(
+                                        div()
+                                            .id("content-area")
+                                            .size_full()
+                                            .p_4()
+                                            .overflow_y_scroll()
+                                            .track_scroll(&content_scroll)
+                                            .child(panel),
+                                    )
+                                    .child(
+                                        div()
+                                            .absolute()
+                                            .top_0()
+                                            .left_0()
+                                            .right_0()
+                                            .bottom_0()
+                                            .child(
+                                                Scrollbar::vertical(&content_scroll)
+                                                    .scrollbar_show(ScrollbarShow::Always),
+                                            ),
+                                    )
+                            }
+                        }
                     ),
             )
     }

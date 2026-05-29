@@ -15,6 +15,8 @@ pub struct AppConfig {
     pub dark_theme_name: Option<String>,
     #[serde(default = "default_scan_interval_secs")]
     pub scan_interval_secs: u32,
+    #[serde(default)]
+    pub favorite_services: Vec<String>,
 }
 
 fn default_scan_interval_secs() -> u32 {
@@ -34,6 +36,7 @@ impl Default for AppConfig {
             light_theme_name: None,
             dark_theme_name: None,
             scan_interval_secs: default_scan_interval_secs(),
+            favorite_services: Vec::new(),
         }
     }
 }

@@ -18,6 +18,7 @@ pub fn render(this: &mut AppRoot, window: &mut Window, cx: &mut Context<AppRoot>
     // ensure_service_search_input은 cx를 mut으로 빌리므로 theme() 이전에 호출
     this.ensure_service_search_input(window, cx);
     let search_input = this.service_search_input.clone();
+    let pending_delete = this.pending_delete_service.clone();
 
     let theme = cx.theme();
 
@@ -96,6 +97,7 @@ pub fn render(this: &mut AppRoot, window: &mut Window, cx: &mut Context<AppRoot>
                         let name_label = svc.name.clone();
                         let name_start = svc.name.clone();
                         let name_stop = svc.name.clone();
+                        let name_delete = svc.name.clone();
 
                         div()
                             .h(px(44.0))
@@ -226,6 +228,25 @@ pub fn render(this: &mut AppRoot, window: &mut Window, cx: &mut Context<AppRoot>
                                                 cx.notify();
                                             }))
                                             .child("중지"),
+                                    )
+                                    // 삭제 버튼 (spacer + danger 스타일)
+                                    .child(div().w(px(8.0)))
+                                    .child(
+                                        div()
+                                            .id(("svc-delete", svc_ix))
+                                            .w(px(52.0))
+                                            .rounded_md()
+                                            .px_2()
+                                            .py_1()
+                                            .cursor_pointer()
+                                            .bg(theme.danger)
+                                            .text_color(theme.danger_foreground)
+                                            .hover(|s| s.bg(theme.danger_active))
+                                            .on_click(cx.listener(move |this, _ev, _window, cx| {
+                                                this.pending_delete_service = Some(name_delete.clone());
+                                                cx.notify();
+                                            }))
+                                            .child("삭제"),
                                     ),
                             )
                     })
@@ -295,6 +316,90 @@ pub fn render(this: &mut AppRoot, window: &mut Window, cx: &mut Context<AppRoot>
         );
     }
 
+    // ── 서비스 삭제 확인 배너 ──
+    if let Some(ref pending_name) = pending_delete {
+        let del_confirm = pending_name.clone();
+        let del_cancel = pending_name.clone();
+        root = root.child(
+            div()
+                .rounded_md()
+                .px_3()
+                .py_3()
+                .bg(theme.danger)
+                .border_1()
+                .border_color(theme.danger_active)
+                .child(
+                    v_flex()
+                        .gap_2()
+                        .child(
+                            div()
+                                .text_color(theme.danger_foreground)
+                                .child(format!(
+                                    "⚠ '{}' 서비스를 삭제하면 되돌릴 수 없습니다. 계속하시겠습니까?",
+                                    del_cancel
+                                )),
+                        )
+                        .child(
+                            h_flex()
+                                .gap_2()
+                                .child(
+                                    div()
+                                        .id("svc-confirm-delete-btn")
+                                        .rounded_md()
+                                        .px_3()
+                                        .py_1()
+                                        .cursor_pointer()
+                                        .bg(theme.background)
+                                        .border_1()
+                                        .border_color(theme.danger_foreground)
+                                        .text_color(theme.danger)
+                                        .hover(|s| s.bg(theme.secondary_hover))
+                                        .on_click(cx.listener(move |this, _ev, window, cx| {
+                                            match this.platform.delete_sys_service(&del_confirm) {
+                                                Ok(()) => {
+                                                    this.push_service_log(
+                                                        &format!("서비스 삭제: {del_confirm}"),
+                                                        window,
+                                                        cx,
+                                                    );
+                                                    this.refresh_sys_services();
+                                                }
+                                                Err(e) => {
+                                                    this.push_service_log(
+                                                        &format!("삭제 실패 ({del_confirm}): {e}"),
+                                                        window,
+                                                        cx,
+                                                    );
+                                                }
+                                            }
+                                            this.pending_delete_service = None;
+                                            cx.notify();
+                                        }))
+                                        .child("삭제 확인"),
+                                )
+                                .child(
+                                    div()
+                                        .id("svc-cancel-delete-btn")
+                                        .rounded_md()
+                                        .px_3()
+                                        .py_1()
+                                        .cursor_pointer()
+                                        .bg(theme.secondary)
+                                        .border_1()
+                                        .border_color(theme.border)
+                                        .text_color(theme.foreground)
+                                        .hover(|s| s.bg(theme.secondary_hover))
+                                        .on_click(cx.listener(|this, _ev, _window, cx| {
+                                            this.pending_delete_service = None;
+                                            cx.notify();
+                                        }))
+                                        .child("취소"),
+                                ),
+                        ),
+                ),
+        );
+    }
+
     // 검색 입력
     if let Some(inp) = search_input {
         root = root.child(
@@ -351,6 +456,13 @@ pub fn render(this: &mut AppRoot, window: &mut Window, cx: &mut Context<AppRoot>
                                     .w(px(52.0))
                                     .text_color(theme.muted_foreground)
                                     .child("중지"),
+                            )
+                            .child(div().w(px(8.0)))
+                            .child(
+                                div()
+                                    .w(px(52.0))
+                                    .text_color(theme.danger)
+                                    .child("삭제"),
                             ),
                     )
                     // 목록 본문
