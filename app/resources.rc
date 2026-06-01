@@ -3,4 +3,4 @@
 
 #include <winresrc.h>
 
-1 RT_MANIFEST "webview-ad-ban-gpui.exe.manifest"
+1 RT_MANIFEST "gpui-convenience-tools.exe.manifest"

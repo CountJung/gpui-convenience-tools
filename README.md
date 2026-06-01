@@ -1,4 +1,4 @@
-﻿# webview-ad-ban-gpui
+﻿# gpui-convenience-tools
 
 Rust + GPUI 기반 데스크톱 광고 차단 도구입니다.
 
@@ -9,9 +9,9 @@ Rust + GPUI 기반 데스크톱 광고 차단 도구입니다.
 - 앱 활성화/비활성화 전역 스위치
 - 백그라운드 플랫폼 스캐너(`tokio::spawn`) + UI 이벤트 채널 연동
 - 설정 파일 영속화
-  - Windows: `%APPDATA%/webview-ad-ban-gpui/config.json`
+  - Windows: `%APPDATA%/gpui-convenience-tools/config.json`
 - gpui-component 테마 JSON 번들 자동 로드
-  - `%APPDATA%/webview-ad-ban-gpui/themes/*.json`로 시드
+  - `%APPDATA%/gpui-convenience-tools/themes/*.json`로 시드
 - 선택한 라이트/다크 테마 이름 저장 및 재시작 복원
 
 ## 요구 사항
@@ -22,20 +22,20 @@ Rust + GPUI 기반 데스크톱 광고 차단 도구입니다.
 ## 실행
 
 ```bash
-cargo run -p webview-ad-ban-gpui
+cargo run -p gpui-convenience-tools
 ```
 
 ## 검증
 
 ```bash
-cargo check -p webview-ad-ban-gpui
-cargo test -p webview-ad-ban-gpui
+cargo check -p gpui-convenience-tools
+cargo test -p gpui-convenience-tools
 ```
 
 ## 릴리즈 빌드
 
 ```bash
-cargo build -p webview-ad-ban-gpui --release
+cargo build -p gpui-convenience-tools --release
 ```
 
 릴리즈 빌드에는 UAC 매니페스트(`requireAdministrator`)가 임베드되어  
@@ -57,7 +57,7 @@ Windows 서비스(SCM)는 Session 0(비대화형 세션)에서 실행되기 때�
 부팅
   └→ 사용자 로그온
        └→ Task Scheduler: ONLOGON 트리거 (+ /IT 인터랙티브 플래그)
-            └→ webview-ad-ban-gpui.exe --tray
+            └→ gpui-convenience-tools.exe --tray
                  ├→ 앱 정상 기동 (스캔 루프 시작)
                  ├→ 300ms 후 시스템 트레이로 자동 숨김
                  └→ EnumWindows / ShowWindow 정상 동작 (Session 1, 사용자 세션)
@@ -70,13 +70,13 @@ CLI로 직접 관리할 경우:
 
 ```powershell
 # 등록
-schtasks /Create /TN "webview-ad-ban-gpui" /TR '\"<설치경로>\webview-ad-ban-gpui.exe\" --tray' /SC ONLOGON /IT /F
+schtasks /Create /TN "gpui-convenience-tools" /TR '\"<설치경로>\gpui-convenience-tools.exe\" --tray' /SC ONLOGON /IT /F
 
 # 삭제
-schtasks /Delete /TN "webview-ad-ban-gpui" /F
+schtasks /Delete /TN "gpui-convenience-tools" /F
 
 # 즉시 실행
-schtasks /Run /TN "webview-ad-ban-gpui"
+schtasks /Run /TN "gpui-convenience-tools"
 ```
 
 ### --tray 플래그
@@ -93,15 +93,15 @@ VS Code에서 관리자 권한으로 디버깅하는 방법은 두 가지입니�
 ### 방법 1 — VS Code를 관리자로 실행
 
 1. VS Code를 우클릭 → **관리자 권한으로 실행**
-2. launch.json의 `Debug webview-ad-ban-gpui (Admin)` 구성 사용
+2. launch.json의 `Debug gpui-convenience-tools (Admin)` 구성 사용
 
 VS Code 프로세스가 관리자이면, 자식 프로세스(디버그 exe)도 관리자 권한으로 실행됩니다.
 
 ### 방법 2 — Attach 디버깅
 
-1. 관리자 권한 터미널에서 `target\debug\webview-ad-ban-gpui.exe` 직접 실행
-2. VS Code에서 launch.json의 `Attach to webview-ad-ban-gpui` 구성 사용
-3. 프로세스 목록에서 `webview-ad-ban-gpui` 선택하여 attach
+1. 관리자 권한 터미널에서 `target\debug\gpui-convenience-tools.exe` 직접 실행
+2. VS Code에서 launch.json의 `Attach to gpui-convenience-tools` 구성 사용
+3. 프로세스 목록에서 `gpui-convenience-tools` 선택하여 attach
 
 ## Windows 설치 파일(MSI) 생성
 
@@ -113,7 +113,7 @@ WiX Toolset(v3) 설치 후 아래를 실행합니다.
 
 생성 결과:
 
-- `installer/windows/webview-ad-ban-gpui.msi`
+- `installer/windows/gpui-convenience-tools.msi`
 
 ## CI / CD
 
@@ -121,9 +121,9 @@ WiX Toolset(v3) 설치 후 아래를 실행합니다.
 
 `main` / `master` 브랜치 push 또는 PR 시 자동 실행됩니다.
 
-- `cargo check -p webview-ad-ban-gpui`
-- `cargo test -p webview-ad-ban-gpui`
-- `cargo build -p webview-ad-ban-gpui --release`
+- `cargo check -p gpui-convenience-tools`
+- `cargo test -p gpui-convenience-tools`
+- `cargo build -p gpui-convenience-tools --release`
 
 ### 릴리즈 자동 게시 (`release.yml`)
 
@@ -134,7 +134,7 @@ git tag v1.0.0
 git push origin v1.0.0
 ```
 
-- Release 빌드 후 `webview-ad-ban-gpui.exe`를 릴리즈 에셋으로 첨부합니다.
+- Release 빌드 후 `gpui-convenience-tools.exe`를 릴리즈 에셋으로 첨부합니다.
 - 릴리즈 노트는 커밋 기록을 기반으로 자동 생성됩니다.
 
 ## 프로젝트 문서

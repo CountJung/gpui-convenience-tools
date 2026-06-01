@@ -6,7 +6,7 @@ argument-hint: "�м�??��??����, ??�� �α�, ??�� ????
 user-invocable: false
 agents: []
 ---
-You are an error-analysis-only subagent for webview-ad-ban-gpui.
+You are an error-analysis-only subagent for gpui-convenience-tools.
 
 ## Mission
 - Analyze code errors after implementation work.

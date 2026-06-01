@@ -29,7 +29,7 @@
 - [x] `MasterPlan.md` / `TASKS.md` / `AGENTS.md` / `copilot-instructions.md` 정리
 - [x] `.vscode/tasks.json` / `launch.json` 업데이트
 - [x] 기존 Git 저장소 제거 후 새 저장소(`gpui-convenience-tools`) 재생성
-- [x] GitHub 워크플로우 패키지명 수정 (`webview-ad-ban-gpui` → `gpui-convenience-tools`)
+- [x] GitHub 워크플로우 패키지명 수정 (`gpui-convenience-tools`로 통일)
 - [x] 릴리즈 워크플로우에 WiX 인스톨러 빌드 + MSI 아티팩트 업로드 추가
 - [x] 대시보드 재구성 (상태 배지 2개 + 통계 3개 + 최근 활동 5개)
 - [x] 타겟 목록 패널 순서 변경 (블록 타겟 테이블 → 실행 중인 프로세스)

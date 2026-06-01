@@ -68,8 +68,6 @@ gpui-convenience-tools/        ← 저장소 루트
 
 ## 진행 예정 단계
 
-### Phase A — 프로젝트 리네임 🔄
-**목표**: `webview-ad-ban-gpui` → `gpui-convenience-tools`
 
 #### 체크리스트
 - [ ] Cargo.toml (workspace 및 adblocker) package name 변경

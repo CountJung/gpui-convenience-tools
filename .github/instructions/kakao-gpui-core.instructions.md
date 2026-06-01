@@ -1,9 +1,9 @@
 ﻿---
-description: "Use when working on webview-ad-ban-gpui Rust code, GPUI UI, gpui-component theme tokens, workspace setup, phase implementation, or Windows platform integration."
+description: "Use when working on gpui-convenience-tools Rust code, GPUI UI, gpui-component theme tokens, workspace setup, phase implementation, or Windows platform integration."
 name: "Kakao GPUI Core Rules"
 applyTo: "adblocker/src/**/*.rs,**/*.toml,TASKS.md,MasterPlan.md"
 ---
-# webview-ad-ban-gpui Core Rules Bridge
+# gpui-convenience-tools Core Rules Bridge
 
 이 문서는 메인 지침으로 연결하기 위한 브리지 문서다.
 실제 규칙 정의와 변경은 다음 파일만 단일 정본으로 유지한다.
