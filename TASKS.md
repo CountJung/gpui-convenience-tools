@@ -96,6 +96,70 @@
 
 ---
 
+### Phase G — 1,000줄 규칙 도입과 구조 분할
+
+#### G-1. 지침 · 추적 문서
+
+- [x] `.github/copilot-instructions.md`에 「파일 크기 기준(1,000줄 규칙)」 추가
+      — 임계값 표(800/1,000), 분할 방법 6단계, 예외 조건
+- [x] 「프로젝트 맵 관리 기준」 추가 — 갱신 시점과 줄 수 실측 명령
+- [x] `PROJECTMAP.md` 신규 — 27개 파일의 줄 수·책임·분할 이력·다음 분할 후보
+- [x] `gpui-core.instructions.md` `applyTo`에 `PROJECTMAP.md` 추가
+- [x] `AGENTS.md` / `CLAUDE.md` / `MasterPlan.md` / `README.md` 참조 갱신
+
+#### G-2. `app.rs` 분할 (1,798줄 → 7파일, 최대 564줄)
+
+- [x] `app/mod.rs` — 구조체·생성자·사이드바·최상위 레이아웃
+- [x] `app/state.rs` — 순수 데이터 타입
+- [x] `app/background.rs` — 스캔·동기화 스레드
+- [x] `app/ops.rs` — 광고 차단·서비스·로그 설정 조작
+- [x] `app/sync_ops.rs` — 파일 동기화 작업 조작
+- [x] `app/events.rs` — 이벤트 소비·토스트 유틸
+- [x] `app/inputs.rs` — 입력 위젯 지연 생성
+- [x] 대시보드·로그 패널 렌더를 `window/dashboard.rs`, `window/log_view.rs`로 이동
+      (패널 렌더는 `window/`에 둔다는 기존 규약에 맞춤)
+
+#### G-3. `platform/windows.rs` 분할 (1,361줄 → 6파일, 최대 344줄)
+
+- [x] `windows/mod.rs` — `WindowsPlatform` + `Platform` 구현, re-export
+- [x] `windows/window_ops.rs` — 창·프로세스 열거
+- [x] `windows/tray.rs` — 시스템 트레이
+- [x] `windows/scm.rs` — Windows 서비스 등록·서비스 모드 실행
+- [x] `windows/services.rs` — 설치된 서비스 조회·제어
+- [x] `windows/task_scheduler.rs` — 로그온 자동 시작
+- [x] 공용 헬퍼 `wide_null`을 `windows/mod.rs`로 승격(tray·services 공용)
+
+#### G-4. 검증
+
+- [x] `cargo check` 통과 (경고 0)
+- [x] `cargo test` 통과 (12 passed / 1 ignored) — 분할 전과 동일
+- [x] `cargo build` (debug) 통과
+- [x] 실행 스모크 테스트 — 창 생성·로그 파일 기록 동일 확인
+- [x] 동작 변경 없음(순수 이동). 로직 수정은 포함하지 않음
+
+---
+
+### Phase H — 1,000줄 규칙을 구조 리팩터링 규칙으로 승격 (문서)
+
+기존 규칙이 "파일 자르기"로 읽혀 줄 수 지표만 내려가고 중복·오배치는 남는 문제가 있었다.
+**줄 수는 증상이고 조치는 기능 관점의 구조 재설계**임을 규칙에 명시했다. 코드 변경 없음.
+
+- [x] `.github/copilot-instructions.md` — 「파일 크기 기준」을 **「구조 리팩터링 기준(1,000줄 트리거)」**로 개편
+      — 기계적 분할 금지 명시, 절차를 **① 중복 제거 → ② 오배치 책임 이동 → ③ 책임 단위 분할** 순서로 재정의
+      (①~②에서 임계값 아래로 내려가면 ③ 생략)
+- [x] `.github/copilot-instructions.md` — **「공용 유틸 승격 기준」 신설**(1,000줄 트리거와 무관하게 상시 적용)
+      — 중복 판정(이름이 달라도 같은 일이면 중복, 인라인 반복도 중복), 2곳=후보 / 3곳=즉시 승격,
+      승격 위치 표, `cx.theme()` 직접 읽기 원칙, 원본 삭제 의무
+- [x] 「프로젝트 맵 관리 기준」 확장 — 공용 유틸 인벤토리·중복 헬퍼 추적 유지 의무 추가
+- [x] `PROJECTMAP.md` — 제목·성격을 **구조·크기·공용 유틸 추적**으로 개편,
+      **「공용 유틸 인벤토리」·「중복 헬퍼 추적」 신설**(실측 6건), 「다음 분할 후보」 → 「다음 리팩터링 후보」
+      (1순위=중복 제거, 2순위=재배치·분할), 「분할 이력」 → 「리팩터링 이력」(종류 열 추가)
+- [x] `CLAUDE.md` · `MasterPlan.md` · `AGENTS.md` · `README.md` · `gpui-core.instructions.md` 참조 갱신
+- [x] 중복 실측 — 상태 배지 3곳, 액션 버튼 3곳+, 스탯 타일 2곳, 토글 행 2곳+, 간격 표기 4곳
+      → 실행 항목은 `TODO.md`「3. 구조 개선」의 `window/ui.rs` 신설로 등록
+
+---
+
 ## 이전 완료 (요약)
 
 - Phase 1~4: workspace 초기화, `Platform` 추상화, GPUI UI, 트레이 + 작업 스케줄러 자동 시작

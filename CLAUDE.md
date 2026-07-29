@@ -41,14 +41,56 @@ cargo test -p gpui-convenience-tools -- --ignored
 ```text
 Cargo.toml          workspace (members = ["app"], 모든 의존성은 [workspace.dependencies])
 app/
-  src/app.rs        AppRoot — 유일한 Render 엔티티, 모든 패널 상태 소유
   src/config.rs     AppConfig · SyncJob · LogConfig · update_config
   src/logging.rs    롤링 파일 로거 (log::Log 구현)
   src/sync.rs       폴더 동기화 엔진 (순수 로직, UI 비의존)
-  src/platform/     Platform trait + windows.rs (Win32 전부)
+  src/app/          AppRoot — 유일한 Render 엔티티, 모든 패널 상태 소유
+    mod.rs            구조체 · 생성자 · 사이드바 · 최상위 레이아웃
+    state.rs          순수 데이터 타입      background.rs  스캔 · 동기화 스레드
+    ops.rs            광고차단·서비스·로그   sync_ops.rs    동기화 작업 조작
+    events.rs         이벤트 소비 · 토스트   inputs.rs      입력 위젯 지연 생성
+  src/platform/     Platform trait + windows/ (Win32 구현)
+    windows/          mod · window_ops · tray · scm · services · task_scheduler
   src/window/       패널 렌더 함수 + scroll_pane 헬퍼
   assets/themes/    include_str!로 바이너리에 임베드되는 테마 JSON 21종
 ```
+
+**파일별 줄 수·책임과 공용 유틸 인벤토리는 [PROJECTMAP.md](PROJECTMAP.md)를 정본으로 한다.**
+
+### 1,000줄 트리거 = 구조 리팩터링 (단순 파일 분할이 아님)
+
+**줄 수는 원인이 아니라 증상이다.** 1,000줄 초과는 "파일이 길다"가 아니라 **책임 배치가
+프로젝트 규모를 못 따라왔다**는 신호이므로, 그때 하는 일은 파일 자르기가 아니라
+**기능 관점의 구조 재설계**다. 줄 수만 맞추는 기계적 분할(`part1.rs`/`part2.rs` 류)은 금지.
+
+트리거된 파일만 보지 말고 **프로젝트 전체에서 같은 책임이 어디에 흩어져 있는지 먼저 확인**한 뒤,
+아래 순서로 처리한다. 1~2단계에서 임계값 아래로 내려가면 3단계는 하지 않는다.
+
+1. **중복 제거 → 공용 유틸 승격** (아래 절)
+2. **오배치 책임 이동** — 순수 로직은 도메인 모듈로, 패널 렌더는 `window/`로,
+   Win32 호출은 `platform/windows/`로
+3. **책임 단위 분할** — 같은 이름의 디렉터리 모듈로 전환(`app.rs` → `app/mod.rs`)
+
+800줄부터 경고이고, 나중으로 미루지 않는다. 리팩터링은 **동작 변경 없이** 수행하며
+`cargo check` + `cargo test`로 동일성을 확인하고 `PROJECTMAP.md`를 갱신한다.
+상세 규칙은 copilot-instructions의 「구조 리팩터링 기준」 절이 정본이다.
+
+### 공용 유틸 승격 (상시 적용)
+
+1,000줄 트리거와 **무관하게 항상 적용된다.** 새 헬퍼를 만들기 전에 `PROJECTMAP.md`의
+공용 유틸 인벤토리를 먼저 확인한다.
+
+- **이름이 달라도 하는 일이 같으면 중복**이다(`badge`/`state_badge`,
+  `stat_card`/`stat_tile`). 함수로 빼지 않은 인라인 스타일 체인 반복도 중복이다.
+- 2개 파일에 있으면 승격 후보(맵에 기록), **3개 파일 이상이면 즉시 승격**.
+  한 파일 안에서 같은 체인이 3회 이상이면 그 파일 안에서라도 헬퍼로 뺀다.
+- 승격 위치: GPUI 엘리먼트를 반환하면 `window/ui.rs`, 스크롤/레이아웃 래퍼는
+  `window/mod.rs`, 엘리먼트를 반환하지 않는 순수 함수는 주인이 있는 도메인 모듈
+  (`config`·`sync`·`logging`) 우선·없으면 `util.rs`, Win32 래퍼는
+  `platform/windows/mod.rs`.
+- 승격한 UI 헬퍼는 색상을 인자로 받지 말고 `cx.theme()`를 직접 읽는다.
+  호출부마다 토큰을 넘기면 의미 매핑이 흩어진다.
+- 승격 후 **원본 정의는 반드시 삭제한다.**
 
 ### 편의 기능 패널 구조 (중요)
 
@@ -107,8 +149,9 @@ app/
 조작을 모두 정의한다. 서비스 관련 메서드는 **비Windows에서 빈 결과나 에러를 반환하는 기본
 구현**을 가지므로 새 플랫폼 추가 시 전부 구현할 필요는 없다. `platform/macos.rs`는 아직 없다.
 
-Win32 구현은 [platform/windows.rs](app/src/platform/windows.rs) 하나에 모여 있고
-`#[cfg(target_os = "windows")]`로 게이트된다.
+Win32 구현은 [platform/windows/](app/src/platform/windows/) 아래에 책임별로 나뉘어 있고
+(`window_ops` · `tray` · `scm` · `services` · `task_scheduler`) `#[cfg(target_os = "windows")]`로
+게이트된다.
 
 주의할 동작: `is_target_running`은 프로세스 존재가 아니라 `find_ad_window`가 WebView 자식 창을
 찾았는지로 판정한다. 프로세스 열거도 `EnumWindows` 기반이라 **창이 없는 프로세스는 목록에

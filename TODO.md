@@ -86,6 +86,17 @@
 
 ## 3. 구조 개선
 
+- [ ] **`window/ui.rs` 신설 — 공용 UI 프리미티브 승격** *(1순위)*
+      `PROJECTMAP.md`「중복 헬퍼 추적」의 🔴 항목부터 흡수한다.
+      - 상태 배지 3곳(`ad_block::badge` · `service_view::state_badge` · `service_mgr` 인라인)
+      - 액션 버튼 3곳+(`file_sync::action_button` · `service_view::action_button` · 인라인 다수)
+      - 이어서 🟡 스탯 타일(`stat_card`/`stat_tile`), 토글 행(`option_row`)
+      - `format_interval`은 UI가 아니므로 `util.rs`로 분리
+
+      승격 헬퍼는 색을 인자로 받지 말고 `cx.theme()`를 직접 읽는다. 승격 후 원본은 삭제.
+      구현 차이(`px_2` vs `px_3`) 통일은 **별도 커밋**으로 분리해 리팩터 커밋에서 화면이 바뀌지 않게 한다.
+      *효과: 네 패널 파일이 함께 줄어 아래 분할 후보가 불필요해질 수 있으므로 분할보다 먼저 한다.*
+
 - [ ] **`AppRoot` 분할 검토**
   현재 모든 패널 상태를 `AppRoot`가 직접 소유해 필드가 25개를 넘었다.
   기능별 상태 구조체(`AdBlockState`, `SyncState`, `ServiceState`)로 묶는 것을 검토한다.

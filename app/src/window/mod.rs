@@ -1,5 +1,7 @@
 pub mod ad_block;
+pub mod dashboard;
 pub mod file_sync;
+pub mod log_view;
 pub mod service_mgr;
 pub mod service_view;
 pub mod settings;

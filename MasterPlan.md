@@ -21,13 +21,26 @@ gpui-convenience-tools/          ← 저장소 루트
 │   ├── assets/themes/           # 번들 테마 JSON 21종
 │   └── src/
 │       ├── main.rs              # 진입점: 로거 설치 → 테마 시드 → 윈도우 오픈
-│       ├── app.rs               # AppRoot(Render) · 상태 · 이벤트 루프 · 사이드바
 │       ├── config.rs            # AppConfig · SyncJob · LogConfig · update_config
 │       ├── logging.rs           # 롤링 파일 로거 (log::Log 구현)
 │       ├── sync.rs              # 폴더 동기화 엔진
+│       ├── app/                 # AppRoot(Render) · 상태 · 이벤트 루프 · 사이드바
+│       │   ├── mod.rs           #   구조체 · 생성자 · 최상위 레이아웃
+│       │   ├── state.rs         #   순수 데이터 타입
+│       │   ├── background.rs    #   스캔 · 동기화 백그라운드 스레드
+│       │   ├── ops.rs           #   광고 차단 · 서비스 · 로그 설정 조작
+│       │   ├── sync_ops.rs      #   파일 동기화 작업 조작
+│       │   ├── events.rs        #   백그라운드 → UI 이벤트 처리
+│       │   └── inputs.rs        #   입력 위젯 지연 생성
 │       ├── platform/
 │       │   ├── mod.rs           # Platform trait (창 조작 + SCM)
-│       │   └── windows.rs       # Win32 구현 · 트레이 · 작업 스케줄러 · SCM
+│       │   └── windows/         # Win32 구현
+│       │       ├── mod.rs       #   WindowsPlatform + Platform impl
+│       │       ├── window_ops.rs#   창 · 프로세스 열거
+│       │       ├── tray.rs      #   시스템 트레이
+│       │       ├── scm.rs       #   Windows 서비스 등록 · 서비스 모드
+│       │       ├── services.rs  #   설치된 서비스 조회 · 제어
+│       │       └── task_scheduler.rs # 로그온 자동 시작
 │       └── window/
 │           ├── mod.rs           # 패널 모듈 + scroll_pane 헬퍼
 │           ├── ad_block.rs      # 편의 기능: 웹뷰 광고 차단
@@ -76,6 +89,26 @@ gpui-convenience-tools/          ← 저장소 루트
 `config::update_config(|cfg| ...)` 하나만 사용한다. 읽기-수정-쓰기를 한 곳에 모아
 필드가 늘어날 때 저장 지점마다 복사 로직을 빠뜨려 값이 유실되는 문제를 막는다.
 
+### 4. 구조 리팩터링 트리거 (1,000줄)
+
+줄 수는 원인이 아니라 **증상**이다. 1,000줄 초과는 책임 배치가 프로젝트 규모를 못 따라왔다는
+신호이므로, 그 시점에 하는 일은 파일 자르기가 아니라 **기능 관점의 구조 재설계**다.
+트리거된 파일만 보지 않고 프로젝트 전체에서 같은 책임이 흩어진 곳을 함께 정리한다.
+
+순서: **① 중복 제거(공용 유틸 승격) → ② 오배치 책임 이동 → ③ 책임 단위 분할.**
+①~②에서 임계값 아래로 내려가면 ③은 하지 않는다 — 파일 개수를 늘리는 것이 목적이 아니다.
+
+### 5. 공용 유틸 단일 소유 (상시 적용)
+
+같은 일을 하는 헬퍼는 이름이 달라도 중복으로 보고 한 곳으로 합친다.
+GPUI 엘리먼트를 반환하는 UI 프리미티브는 `window/ui.rs`, 순수 함수는 주인이 있는 도메인
+모듈(`config`·`sync`·`logging`), Win32 래퍼는 `platform/windows/mod.rs`가 소유한다.
+패널 파일에는 그 기능 고유의 헬퍼만 남긴다.
+
+리팩터링은 동작 변경 없이 수행하고 결과를 `PROJECTMAP.md`에 기록한다.
+규칙 정본은 `.github/copilot-instructions.md`의 「구조 리팩터링 기준」과
+「공용 유틸 승격 기준」 절이다.
+
 ---
 
 ## 구현 완료 단계
@@ -112,6 +145,14 @@ cargo workspace, Hello World 앱 동작 확인
 - **롤링 파일 로거** 구현(개수 · 날짜 · 용량 3중 보존 기준)
 - 사용하지 않던 `window/dashboard.rs`, `target_list.rs`, `log_view.rs` 제거
 - 문서 전면 개편, `copilot-instructions.md` 인코딩 손상 복구
+
+### Phase G — 1,000줄 규칙 도입과 구조 분할 ✅
+
+- 지침에 「파일 크기 기준(1,000줄 규칙)」과 「프로젝트 맵 관리 기준」 추가
+- `PROJECTMAP.md` 신규 — 파일 구조·줄 수·책임 추적
+- `app.rs`(1,798줄) → `app/` 7파일 분할, 대시보드·로그 렌더는 `window/`로 이동
+- `platform/windows.rs`(1,361줄) → `platform/windows/` 6파일 분할
+- 결과: 최대 파일 690줄, 1,000줄 초과 파일 없음
 
 ---
 
