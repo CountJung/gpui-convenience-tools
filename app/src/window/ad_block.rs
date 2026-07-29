@@ -12,18 +12,14 @@ use gpui::{
     div, px, AnyElement, Context, InteractiveElement, IntoElement, ParentElement,
     StatefulInteractiveElement, Styled, Window,
 };
-use gpui_component::{
-    h_flex,
-    resizable::{h_resizable, resizable_panel},
-    theme::ActiveTheme,
-    v_flex,
-};
+use gpui_component::{h_flex, theme::ActiveTheme, v_flex};
 
 use crate::app::AppRoot;
-use crate::window::scroll_pane;
 use crate::window::ui::{self, Tone};
+use crate::window::{balanced_split, scroll_pane, SETTINGS_PANE_MIN_WIDTH};
 
 const INTERVAL_PRESETS: [u32; 5] = [5, 10, 30, 60, 120];
+const FEATURE_PANE_MIN_WIDTH: gpui::Pixels = px(320.0);
 
 pub fn render(this: &mut AppRoot, _window: &mut Window, cx: &mut Context<AppRoot>) -> AnyElement {
     let left_scroll = this.ad_left_scroll.clone();
@@ -32,15 +28,13 @@ pub fn render(this: &mut AppRoot, _window: &mut Window, cx: &mut Context<AppRoot
     let feature = render_status_and_targets(this, cx);
     let settings = render_settings(this, cx);
 
-    h_resizable("ad-block-split")
-        .child(
-            resizable_panel()
-                .size(px(560.0))
-                .size_range(px(340.0)..px(1000.0))
-                .child(scroll_pane("ad-block-left", &left_scroll, feature)),
-        )
-        .child(scroll_pane("ad-block-right", &right_scroll, settings))
-        .into_any_element()
+    balanced_split(
+        "ad-block-split",
+        FEATURE_PANE_MIN_WIDTH,
+        SETTINGS_PANE_MIN_WIDTH,
+        scroll_pane("ad-block-left", &left_scroll, feature),
+        scroll_pane("ad-block-right", &right_scroll, settings),
+    )
 }
 
 // ─────────────────────────────────────────────

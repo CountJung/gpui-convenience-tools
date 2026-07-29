@@ -99,6 +99,7 @@ pub struct AppRoot {
     // ── 로그 설정 ──
     pub(crate) log_config: LogConfig,
 
+    sidebar_scroll_handle: ScrollHandle,
     content_scroll_handle: ScrollHandle,
 }
 
@@ -229,6 +230,7 @@ impl AppRoot {
 
             log_config,
 
+            sidebar_scroll_handle: ScrollHandle::default(),
             content_scroll_handle: ScrollHandle::default(),
         }
     }
@@ -342,11 +344,14 @@ impl AppRoot {
 
         for (panel, label, description) in items {
             let panel = *panel;
+            let label = *label;
+            let description = *description;
             let is_active = self.active_panel == panel;
 
             item_list = item_list.child(
                 div()
                     .id(("nav-item", label.as_ptr() as usize))
+                    .debug_selector(move || format!("nav-item-{label}"))
                     .px_3()
                     .py_2()
                     .rounded_md()
@@ -363,12 +368,12 @@ impl AppRoot {
                             .child(
                                 div()
                                     .text_color(if is_active { active_fg } else { sidebar_fg })
-                                    .child(*label),
+                                    .child(label),
                             )
                             .child(
                                 div()
                                     .text_color(if is_active { active_fg } else { muted_fg })
-                                    .child(*description),
+                                    .child(description),
                             ),
                     ),
             );
@@ -455,6 +460,7 @@ impl Render for AppRoot {
                 | ActivePanel::AdBlock
                 | ActivePanel::FileSync
         );
+        let sidebar_scroll = self.sidebar_scroll_handle.clone();
         let content_scroll = self.content_scroll_handle.clone();
 
         v_flex()
@@ -487,48 +493,59 @@ impl Render for AppRoot {
                     .size_full()
                     .min_h_0()
                     .child(
-                        v_flex()
+                        div()
                             .w(px(240.0))
                             .h_full()
+                            .min_h_0()
+                            .flex_shrink_0()
                             .bg(sidebar)
                             .border_r_1()
                             .border_color(sidebar_border)
-                            .p_3()
-                            .gap_3()
-                            .child(
-                                div()
-                                    .px_2()
-                                    .py_2()
-                                    .text_color(sidebar_fg)
-                                    .child("GPUI 편의 도구"),
-                            )
-                            .child(
-                                div().rounded_md().p_2().bg(theme.sidebar_accent).child(
-                                    h_flex()
-                                        .justify_between()
-                                        .items_center()
-                                        .child(
-                                            div()
-                                                .text_color(theme.sidebar_accent_foreground)
-                                                .child("광고 차단"),
-                                        )
-                                        .child(
-                                            ui::toggle_switch(
-                                                "global-enable-switch",
-                                                app_enabled,
-                                                cx,
-                                            )
-                                            .on_click(
-                                                cx.listener(|this, checked: &bool, window, cx| {
-                                                    this.set_service_enabled(*checked, window, cx);
-                                                }),
-                                            ),
+                            .child(crate::window::scroll_pane(
+                                "sidebar-scroll",
+                                &sidebar_scroll,
+                                v_flex()
+                                    .w_full()
+                                    .p_3()
+                                    .gap_3()
+                                    .child(
+                                        div()
+                                            .px_2()
+                                            .py_2()
+                                            .text_color(sidebar_fg)
+                                            .child("GPUI 편의 도구"),
+                                    )
+                                    .child(
+                                        div().rounded_md().p_2().bg(theme.sidebar_accent).child(
+                                            h_flex()
+                                                .justify_between()
+                                                .items_center()
+                                                .child(
+                                                    div()
+                                                        .text_color(theme.sidebar_accent_foreground)
+                                                        .child("광고 차단"),
+                                                )
+                                                .child(
+                                                    ui::toggle_switch(
+                                                        "global-enable-switch",
+                                                        app_enabled,
+                                                        cx,
+                                                    )
+                                                    .on_click(cx.listener(
+                                                        |this, checked: &bool, window, cx| {
+                                                            this.set_service_enabled(
+                                                                *checked, window, cx,
+                                                            );
+                                                        },
+                                                    )),
+                                                ),
                                         ),
-                                ),
-                            )
-                            .child(nav_overview)
-                            .child(nav_tools)
-                            .child(nav_system),
+                                    )
+                                    .child(nav_overview)
+                                    .child(nav_tools)
+                                    .child(nav_system)
+                                    .into_any_element(),
+                            )),
                     )
                     .child({
                         let outer = div()
@@ -541,12 +558,20 @@ impl Render for AppRoot {
                             .border_color(border);
 
                         if fills_height {
-                            outer.child(div().id("content-area").size_full().p_4().child(panel))
+                            outer.child(
+                                div()
+                                    .id("content-area")
+                                    .debug_selector(|| "content-area".to_string())
+                                    .size_full()
+                                    .p_4()
+                                    .child(panel),
+                            )
                         } else {
                             outer
                                 .child(
                                     div()
                                         .id("content-area")
+                                        .debug_selector(|| "content-area".to_string())
                                         .size_full()
                                         .p_4()
                                         .overflow_y_scroll()
@@ -570,3 +595,6 @@ impl Render for AppRoot {
             )
     }
 }
+
+#[cfg(test)]
+mod tests;

@@ -7,7 +7,7 @@
 >
 > **새 헬퍼를 만들기 전에 「공용 유틸 인벤토리」를 먼저 확인한다.**
 
-**최종 측정**: 2026-07-29 · 총 29개 파일 · 7,883줄
+**최종 측정**: 2026-07-29 · 총 29개 파일 · 8,192줄
 
 ## 크기 기준 — 줄 수는 증상이다
 
@@ -21,7 +21,7 @@
 | 800~1,000 | 🟡 경고 | 다음 작업 전에 구조 리팩터링 |
 | 1,000 초과 | 🔴 위반 | **즉시 리팩터링.** 다른 작업보다 우선 |
 
-현재 🔴 위반 **없음**, 🟡 경고 **없음**. 최대 파일은 636줄(`window/service_mgr.rs`).
+현재 🔴 위반 **없음**, 🟡 경고 **없음**. 최대 파일은 635줄(`window/service_mgr.rs`).
 줄 수와 무관하게 처리하는 중복 헬퍼는 아래 「중복 헬퍼 추적」에서 관리한다.
 
 ### 줄 수 측정 명령
@@ -50,13 +50,14 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `sync.rs` | 460 | 폴더 동기화 엔진 (UI 비의존 순수 로직) |
 | `logging.rs` | 431 | 롤링 파일 로거 (`log::Log` 구현) |
 
-### 앱 루트 (`app/src/app/`) — 1,645줄 / 7파일
+### 앱 루트 (`app/src/app/`) — 1,939줄 / 8파일
 
 `app.rs`(1,798줄)를 책임별로 분할한 결과다.
 
 | 파일 | 줄 | 책임 |
 | --- | ---: | --- |
-| `mod.rs` | 572 | `AppRoot` 정의·생성자·사이드바·타이틀바·최상위 레이아웃(`impl Render`) |
+| `mod.rs` | 600 | `AppRoot` 정의·생성자·스크롤 사이드바·타이틀바·최상위 레이아웃 |
+| `tests.rs` | 266 | GPUI `TestAppContext` 기반 앱 셸·스플리터·사이드바 회귀 테스트 |
 | `sync_ops.rs` | 256 | 파일 동기화 작업 조작 (추가·삭제·선택·경로 적용·수동 실행) |
 | `events.rs` | 202 | `PlatformEvent` 채널 소비, 로그·토스트 유틸 |
 | `ops.rs` | 195 | 광고 차단·서비스 관리·로그 설정 조작 |
@@ -64,19 +65,19 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `inputs.rs` | 129 | 입력 위젯(`InputState`) 지연 생성과 값 동기화 |
 | `state.rs` | 121 | 순수 데이터 타입 (`AppState`, `PlatformEvent`, `ActivePanel` 등) |
 
-### 패널 (`app/src/window/`) — 3,080줄 / 9파일
+### 패널 (`app/src/window/`) — 3,107줄 / 9파일
 
 | 파일 | 줄 | 책임 |
 | --- | ---: | --- |
-| `service_mgr.rs` | 636 | 편의 기능 — Windows 서비스 (목록/제어 ↔ 검색·필터·권한) |
+| `service_mgr.rs` | 635 | 편의 기능 — Windows 서비스 (목록/제어 ↔ 검색·필터·권한) |
 | `settings.rs` | 568 | 전역 설정 — 테마 선택·로그 보관 정책 |
-| `file_sync.rs` | 560 | 편의 기능 — 파일 동기화 (작업 목록·실패 기록 ↔ 작업 설정) |
-| `ad_block.rs` | 466 | 편의 기능 — 웹뷰 광고 차단 (상태·타겟 ↔ 스캔 주기·프로세스 추가) |
+| `file_sync.rs` | 553 | 편의 기능 — 파일 동기화 (작업 목록·실패 기록 ↔ 작업 설정) |
+| `ad_block.rs` | 460 | 편의 기능 — 웹뷰 광고 차단 (상태·타겟 ↔ 스캔 주기·프로세스 추가) |
 | `service_view.rs` | 318 | 시스템 — 자동 시작(작업 스케줄러) 등록·삭제·즉시 실행 |
 | `ui.rs` | 207 | **공용 UI 프리미티브** — 상태 배지·액션 버튼·대비 보장 토글 스위치 |
 | `dashboard.rs` | 158 | 개요 — 전체 상태 요약과 최근 활동 |
 | `log_view.rs` | 119 | 시스템 — 화면 로그 가상 리스트와 로그 파일 현황 |
-| `mod.rs` | 48 | 패널 모듈 선언 + `scroll_pane` 헬퍼 |
+| `mod.rs` | 89 | 패널 모듈 선언 + `balanced_split`·`scroll_pane` 레이아웃 헬퍼 |
 
 ### 플랫폼 (`app/src/platform/`) — 1,577줄 / 7파일
 
@@ -112,6 +113,7 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `window/ui.rs` | `Tone` | 배지 의미 색 — `Success`·`Warning`·`Info`·`Muted` |
 | `window/ui.rs` | `ButtonStyle` | 버튼 의미 색 — `primary`·`neutral`·`secondary`·`danger`·`danger_outline`·`muted` (+ `border`/`hover`/`no_hover` 덮어쓰기) |
 | `window/ui.rs` | `Size` | 여백 — `Sm`(px_2 py_1) · `Md`(px_3 py_1) · `Lg`(px_4 py_2) |
+| `window/mod.rs` | `balanced_split(id, left_min, right_min, left, right)` | 양쪽 최소 폭을 보장하며 가용 너비를 균형 있게 채우는 공용 스플리터 |
 | `window/mod.rs` | `scroll_pane(id, handle, content)` | 자연 높이 컨텐츠가 넘칠 때 세로 스크롤 + 스크롤바 부여 |
 | `theme.rs` | `change_theme` · `normalize_component_palette` | 테마 변경 후 스위치 트랙·썸 최소 대비 보정 |
 | `config.rs` | `update_config(edit)` | 설정 읽기-수정-쓰기 **단일 경로** |
@@ -177,6 +179,7 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 
 | 날짜 | 대상 | 종류 | 이전 | 이후 | 비고 |
 | --- | --- | --- | ---: | --- | --- |
+| 2026-07-29 | 편의 기능 스플리터 3곳 | 공용 레이아웃 승격 | 패널별 고정 초기 폭 | `window::balanced_split` | 설정 pane 과도 축소 방지, 양쪽 가용폭 사용 |
 | 2026-07-29 | `app.rs` | 책임 단위 분할 + 재배치 | 1,798 | `app/` 7파일 (최대 564) | 대시보드·로그 렌더는 소유가 잘못돼 있어 `window/`로 이동 |
 | 2026-07-29 | `platform/windows.rs` | 책임 단위 분할 + 승격 | 1,361 | `platform/windows/` 6파일 (최대 344) | `wide_null`을 `windows/mod.rs`로 **공용 승격** |
 | 2026-07-29 | 배지·액션 버튼 | **중복 제거 (공용 승격)** | 4파일 합 2,121 | 4파일 합 1,981 + `ui.rs` 194 | 정의 4개 + 인라인 8곳 → `ui.rs` 하나로 |

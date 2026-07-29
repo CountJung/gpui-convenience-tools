@@ -186,6 +186,11 @@ cargo workspace, Hello World 앱 동작 확인
 - 번들 테마 36개 변형의 스위치 팔레트를 감사하고, 누락 토큰을 런타임 최소 대비 정책으로 보정
 - `window::ui::toggle_switch`로 스위치 외곽선 정책을 공용화하고 직접 `Switch::new` 사용 제거
 - 파일 동기화 좌·우 컨텐츠의 고정 높이(`size_full`/세로 `flex_1`)를 제거해 자동 스크롤 복구
+- 광고 차단·파일 동기화·서비스 관리의 고정 초기 폭을 공용 `balanced_split`으로 교체해
+  기능·설정 pane이 가용 너비를 함께 사용하고 설정 영역 최소 300px을 유지하도록 개선
+- 사이드바 전체를 독립 `scroll_pane`으로 감싸 작은 창에서도 마지막 시스템 항목까지 도달
+- GPUI 자체 테스트로 기본 1000×700·최소 폭 920px의 pane 너비와 920×480의 사이드바
+  wheel 스크롤·마지막 항목 도달을 검증
 - Codex·Claude 공용 정본과 GPUI 스킬에 테마·스크롤 회귀 방지 규칙 반영
 - Computer Use health check와 구현 담당자·독립 Visual Reviewer의 순차 크로스체크 계약 및
   Codex·Claude Code 에이전트 연결 추가

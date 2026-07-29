@@ -8,19 +8,14 @@ use gpui::{
     div, px, AnyElement, Context, InteractiveElement, IntoElement, ParentElement,
     StatefulInteractiveElement, Styled, Window,
 };
-use gpui_component::{
-    h_flex,
-    input::Input,
-    resizable::{h_resizable, resizable_panel},
-    theme::ActiveTheme,
-    v_flex,
-};
+use gpui_component::{h_flex, input::Input, theme::ActiveTheme, v_flex};
 
 use crate::app::AppRoot;
-use crate::window::scroll_pane;
 use crate::window::ui::{self, ButtonStyle};
+use crate::window::{balanced_split, scroll_pane, SETTINGS_PANE_MIN_WIDTH};
 
 const INTERVAL_PRESETS: [u32; 5] = [30, 60, 300, 900, 3600];
+const FEATURE_PANE_MIN_WIDTH: gpui::Pixels = px(320.0);
 
 pub fn render(this: &mut AppRoot, window: &mut Window, cx: &mut Context<AppRoot>) -> AnyElement {
     this.ensure_sync_inputs(window, cx);
@@ -31,15 +26,13 @@ pub fn render(this: &mut AppRoot, window: &mut Window, cx: &mut Context<AppRoot>
     let feature = render_job_list(this, cx);
     let settings = render_job_settings(this, cx);
 
-    h_resizable("file-sync-split")
-        .child(
-            resizable_panel()
-                .size(px(520.0))
-                .size_range(px(320.0)..px(900.0))
-                .child(scroll_pane("file-sync-left", &left_scroll, feature)),
-        )
-        .child(scroll_pane("file-sync-right", &right_scroll, settings))
-        .into_any_element()
+    balanced_split(
+        "file-sync-split",
+        FEATURE_PANE_MIN_WIDTH,
+        SETTINGS_PANE_MIN_WIDTH,
+        scroll_pane("file-sync-left", &left_scroll, feature),
+        scroll_pane("file-sync-right", &right_scroll, settings),
+    )
 }
 
 // ─────────────────────────────────────────────

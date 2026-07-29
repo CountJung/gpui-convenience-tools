@@ -11,7 +11,6 @@ use gpui::{
 use gpui_component::{
     h_flex,
     input::Input,
-    resizable::{h_resizable, resizable_panel},
     scroll::{Scrollbar, ScrollbarShow},
     theme::ActiveTheme,
     v_flex, v_virtual_list,
@@ -20,8 +19,10 @@ use std::{ops::Range, rc::Rc};
 
 use crate::app::{AppRoot, ServiceFilter};
 use crate::platform::SysServiceStatus;
-use crate::window::scroll_pane;
 use crate::window::ui::{self, ButtonStyle, Tone};
+use crate::window::{balanced_split, scroll_pane, SETTINGS_PANE_MIN_WIDTH};
+
+const FEATURE_PANE_MIN_WIDTH: gpui::Pixels = px(400.0);
 
 pub fn render(this: &mut AppRoot, window: &mut Window, cx: &mut Context<AppRoot>) -> AnyElement {
     // ensure_service_search_input은 cx를 mut으로 빌리므로 theme() 이전에 호출
@@ -31,15 +32,13 @@ pub fn render(this: &mut AppRoot, window: &mut Window, cx: &mut Context<AppRoot>
     let list = render_service_list(this, cx);
     let settings = render_view_settings(this, cx);
 
-    h_resizable("service-mgr-split")
-        .child(
-            resizable_panel()
-                .size(px(640.0))
-                .size_range(px(420.0)..px(1100.0))
-                .child(list),
-        )
-        .child(scroll_pane("service-mgr-right", &right_scroll, settings))
-        .into_any_element()
+    balanced_split(
+        "service-mgr-split",
+        FEATURE_PANE_MIN_WIDTH,
+        SETTINGS_PANE_MIN_WIDTH,
+        list,
+        scroll_pane("service-mgr-right", &right_scroll, settings),
+    )
 }
 
 fn render_service_list(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElement {
