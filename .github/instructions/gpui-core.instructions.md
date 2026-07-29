@@ -22,5 +22,8 @@ applyTo: "app/src/**/*.rs,**/*.toml,MasterPlan.md,TODO.md,PROJECTMAP.md"
 - 완료 이력은 `MasterPlan.md`, 미착수 대기열은 `TODO.md` (별도 진행 문서 없음)
 - GPUI 0.2.2, gpui-component 0.5.1 호환 사용
 - 테마 토큰 기반 UI 스타일링(`card` / `destructive` 미사용)
+- 스위치는 `window::ui::toggle_switch`, 테마 변경은 `crate::theme::change_theme` 사용
+- `scroll_pane` 컨텐츠 루트는 자연 높이 유지(`w_full`; `size_full`/세로 `flex_1` 금지)
 - 설정 저장은 `config::update_config` 단일 경로 사용
+- GPUI UI 변경 시 정본의 「GPUI 시각 검증 및 독립 크로스체크」 절 적용
 - 작업 후 Error Reviewer 기반 오류 전용 리뷰

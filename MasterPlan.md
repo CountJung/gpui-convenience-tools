@@ -172,6 +172,16 @@ cargo workspace, Hello World 앱 동작 확인
 - `service_view` 버튼이 쓰던 `sidebar_primary` → `primary` 교정(사이드바 토큰 오용)
 - 문서 정리: 완료 이력은 이 문서로, 미착수는 `TODO.md`로 모으고 `TASKS.md` 제거
 
+### Phase J — 테마 가시성·스크롤 안정화 ✅
+
+- 사이드바 그룹과 개별 항목에 `sidebar_border` 기반 경계를 적용해 비활성 항목 구분 강화
+- 번들 테마 36개 변형의 스위치 팔레트를 감사하고, 누락 토큰을 런타임 최소 대비 정책으로 보정
+- `window::ui::toggle_switch`로 스위치 외곽선 정책을 공용화하고 직접 `Switch::new` 사용 제거
+- 파일 동기화 좌·우 컨텐츠의 고정 높이(`size_full`/세로 `flex_1`)를 제거해 자동 스크롤 복구
+- Codex·Claude 공용 정본과 GPUI 스킬에 테마·스크롤 회귀 방지 규칙 반영
+- Computer Use health check와 구현 담당자·독립 Visual Reviewer의 순차 크로스체크 계약 및
+  Codex·Claude Code 에이전트 연결 추가
+
 ---
 
 ## 진행 예정 단계

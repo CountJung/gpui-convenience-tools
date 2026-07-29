@@ -12,7 +12,6 @@ use gpui_component::{
     h_flex,
     input::Input,
     resizable::{h_resizable, resizable_panel},
-    switch::Switch,
     theme::ActiveTheme,
     v_flex,
 };
@@ -114,9 +113,7 @@ fn render_job_list(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElement 
                                             .child(if enabled { "자동" } else { "수동" }),
                                     )
                                     .child(
-                                        div()
-                                            .text_color(muted_fg)
-                                            .child(format!("{interval}초")),
+                                        div().text_color(muted_fg).child(format!("{interval}초")),
                                     ),
                             )
                             .child(
@@ -163,11 +160,7 @@ fn render_job_list(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElement 
                             .flex_1()
                             .min_w_0()
                             .child(div().text_color(fg).child(failure.path.clone()))
-                            .child(
-                                div()
-                                    .text_color(theme.danger)
-                                    .child(failure.reason.clone()),
-                            ),
+                            .child(div().text_color(theme.danger).child(failure.reason.clone())),
                     )
                     .child(
                         div()
@@ -185,7 +178,11 @@ fn render_job_list(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElement 
                                 this.toggle_sync_failure_suppression(&key);
                                 cx.notify();
                             }))
-                            .child(if suppressed { "알림 꺼짐" } else { "알림 끄기" }),
+                            .child(if suppressed {
+                                "알림 꺼짐"
+                            } else {
+                                "알림 끄기"
+                            }),
                     ),
             );
         }
@@ -195,7 +192,7 @@ fn render_job_list(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElement 
     let has_failures = !this.sync_failures.is_empty();
 
     v_flex()
-        .size_full()
+        .w_full()
         .gap_3()
         .p_1()
         .child(
@@ -238,8 +235,6 @@ fn render_job_list(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElement 
         // ── 실패 기록 카드 ──
         .child(
             div()
-                .flex_1()
-                .min_h_0()
                 .rounded_lg()
                 .bg(card)
                 .border_1()
@@ -248,7 +243,6 @@ fn render_job_list(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElement 
                 .child(
                     v_flex()
                         .gap_2()
-                        .size_full()
                         .child(
                             h_flex()
                                 .justify_between()
@@ -264,8 +258,11 @@ fn render_job_list(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElement 
                                                 .child("실패 알림 표시"),
                                         )
                                         .child(
-                                            Switch::new("sync-notify-toggle")
-                                                .checked(notify_enabled)
+                                            ui::toggle_switch(
+                                                "sync-notify-toggle",
+                                                notify_enabled,
+                                                cx,
+                                            )
                                                 .on_click(cx.listener(
                                                     |this, checked: &bool, _window, cx| {
                                                         this.sync_notify_enabled = *checked;
@@ -321,7 +318,7 @@ fn render_job_settings(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElem
 
     let Some(selected) = this.selected_sync_job else {
         return v_flex()
-            .size_full()
+            .w_full()
             .p_1()
             .gap_3()
             .child(div().text_color(fg).child("작업 설정"))
@@ -359,7 +356,11 @@ fn render_job_settings(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElem
                 .bg(if is_selected { selected_bg } else { theme.list })
                 .text_color(if is_selected { selected_fg } else { fg })
                 .border_1()
-                .border_color(if is_selected { theme.primary_hover } else { border })
+                .border_color(if is_selected {
+                    theme.primary_hover
+                } else {
+                    border
+                })
                 .hover(|s| s.bg(theme.secondary_hover))
                 .on_click(cx.listener(move |this, _ev, window, cx| {
                     this.update_selected_sync_job(window, cx, |job| job.interval_secs = secs);
@@ -369,7 +370,7 @@ fn render_job_settings(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElem
     }
 
     v_flex()
-        .size_full()
+        .w_full()
         .p_1()
         .gap_3()
         .child(
@@ -402,8 +403,6 @@ fn render_job_settings(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElem
         )
         .child(
             div()
-                .flex_1()
-                .min_h_0()
                 .rounded_lg()
                 .bg(card)
                 .border_1()
@@ -483,42 +482,39 @@ fn render_job_settings(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElem
                             "자동 동기화 사용",
                             "감시 주기마다 자동으로 실행합니다.",
                             job.enabled,
-                            muted_fg,
-                            fg,
                             cx.listener(|this, checked: &bool, window, cx| {
                                 let checked = *checked;
                                 this.update_selected_sync_job(window, cx, move |job| {
                                     job.enabled = checked
                                 });
                             }),
+                            cx,
                         ))
                         .child(option_row(
                             "sync-opt-hidden",
                             "숨김·시스템 파일 포함",
                             "끄면 숨김 속성 파일을 건너뜁니다. 기본값은 전체 포함입니다.",
                             job.include_hidden,
-                            muted_fg,
-                            fg,
                             cx.listener(|this, checked: &bool, window, cx| {
                                 let checked = *checked;
                                 this.update_selected_sync_job(window, cx, move |job| {
                                     job.include_hidden = checked
                                 });
                             }),
+                            cx,
                         ))
                         .child(option_row(
                             "sync-opt-mirror",
                             "원본에서 삭제된 항목 반영",
                             "대상에만 있는 파일을 삭제합니다. 되돌릴 수 없으니 주의하세요.",
                             job.mirror_deletes,
-                            muted_fg,
-                            fg,
                             cx.listener(|this, checked: &bool, window, cx| {
                                 let checked = *checked;
                                 this.update_selected_sync_job(window, cx, move |job| {
                                     job.mirror_deletes = checked
                                 });
                             }),
+                            cx,
                         )),
                 ),
         )
@@ -534,10 +530,11 @@ fn option_row(
     title: &'static str,
     description: &'static str,
     checked: bool,
-    muted_fg: gpui::Hsla,
-    fg: gpui::Hsla,
     on_click: impl Fn(&bool, &mut Window, &mut gpui::App) + 'static,
+    cx: &gpui::App,
 ) -> AnyElement {
+    let theme = cx.theme();
+
     h_flex()
         .gap_3()
         .items_center()
@@ -545,10 +542,10 @@ fn option_row(
             v_flex()
                 .flex_1()
                 .min_w_0()
-                .child(div().text_color(fg).child(title))
-                .child(div().text_color(muted_fg).child(description)),
+                .child(div().text_color(theme.foreground).child(title))
+                .child(div().text_color(theme.muted_foreground).child(description)),
         )
-        .child(Switch::new(id).checked(checked).on_click(on_click))
+        .child(ui::toggle_switch(id, checked, cx).on_click(on_click))
         .into_any_element()
 }
 

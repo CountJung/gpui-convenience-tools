@@ -25,16 +25,14 @@ pub use state::{ActivePanel, AppState, LogEntry, SyncJobStatus, TargetApp};
 use state::{PlatformEvent, ScannerState, SyncSharedState, NAV_SYSTEM, NAV_TOOLS};
 
 use gpui::{
-    div, px, AnyElement, Context, Entity, InteractiveElement, IntoElement,
-    ParentElement, Render, ScrollHandle, StatefulInteractiveElement, Styled, Subscription, Window,
-    WindowControlArea,
+    div, px, AnyElement, Context, Entity, InteractiveElement, IntoElement, ParentElement, Render,
+    ScrollHandle, StatefulInteractiveElement, Styled, Subscription, Window, WindowControlArea,
 };
 use gpui_component::{
     h_flex,
     input::InputState,
     notification::NotificationType,
     scroll::{Scrollbar, ScrollbarShow},
-    switch::Switch,
     theme::ActiveTheme,
     v_flex, VirtualListScrollHandle, TITLE_BAR_HEIGHT,
 };
@@ -47,7 +45,9 @@ use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 use crate::config::{load_config, update_config, LogConfig, SyncJob};
 use crate::platform::{NativePlatform, Platform, SysServiceInfo};
 use crate::sync::SyncFailure;
-use crate::window::{ad_block, dashboard, file_sync, log_view, service_mgr, service_view, settings};
+use crate::window::{
+    ad_block, dashboard, file_sync, log_view, service_mgr, service_view, settings, ui,
+};
 
 #[cfg(target_os = "windows")]
 use crate::platform::{hide_main_window_to_tray, set_tray_service_active, set_tray_toggle_handler};
@@ -290,7 +290,10 @@ impl AppRoot {
                     .cursor_pointer()
                     .text_color(theme.foreground)
                     .hover(|s| s.bg(theme.danger).text_color(theme.danger_foreground))
-                    .active(|s| s.bg(theme.danger_active).text_color(theme.danger_foreground))
+                    .active(|s| {
+                        s.bg(theme.danger_active)
+                            .text_color(theme.danger_foreground)
+                    })
                     .on_click(cx.listener(|this, _, window, cx| {
                         #[cfg(target_os = "windows")]
                         {
@@ -333,25 +336,22 @@ impl AppRoot {
         let active_bg = theme.sidebar_primary;
         let active_fg = theme.sidebar_primary_foreground;
         let muted_fg = theme.muted_foreground;
+        let group_border = theme.sidebar_border;
 
-        let mut group = v_flex().gap_1().child(
-            div()
-                .px_2()
-                .py_1()
-                .text_color(muted_fg)
-                .child(title),
-        );
+        let mut item_list = v_flex().gap_1();
 
         for (panel, label, description) in items {
             let panel = *panel;
             let is_active = self.active_panel == panel;
 
-            group = group.child(
+            item_list = item_list.child(
                 div()
                     .id(("nav-item", label.as_ptr() as usize))
                     .px_3()
                     .py_2()
                     .rounded_md()
+                    .border_1()
+                    .border_color(group_border)
                     .cursor_pointer()
                     .bg(if is_active { active_bg } else { sidebar })
                     .hover(|s| s.bg(theme.sidebar_accent))
@@ -374,7 +374,18 @@ impl AppRoot {
             );
         }
 
-        group.into_any_element()
+        v_flex()
+            .gap_2()
+            .child(div().px_2().py_1().text_color(muted_fg).child(title))
+            .child(
+                div()
+                    .rounded_lg()
+                    .border_1()
+                    .border_color(group_border)
+                    .p_1()
+                    .child(item_list),
+            )
+            .into_any_element()
     }
 
     fn activate_panel(&mut self, panel: ActivePanel, window: &mut Window, cx: &mut Context<Self>) {
@@ -492,31 +503,28 @@ impl Render for AppRoot {
                                     .child("GPUI 편의 도구"),
                             )
                             .child(
-                                div()
-                                    .rounded_md()
-                                    .p_2()
-                                    .bg(theme.sidebar_accent)
-                                    .child(
-                                        h_flex()
-                                            .justify_between()
-                                            .items_center()
-                                            .child(
-                                                div()
-                                                    .text_color(theme.sidebar_accent_foreground)
-                                                    .child("광고 차단"),
+                                div().rounded_md().p_2().bg(theme.sidebar_accent).child(
+                                    h_flex()
+                                        .justify_between()
+                                        .items_center()
+                                        .child(
+                                            div()
+                                                .text_color(theme.sidebar_accent_foreground)
+                                                .child("광고 차단"),
+                                        )
+                                        .child(
+                                            ui::toggle_switch(
+                                                "global-enable-switch",
+                                                app_enabled,
+                                                cx,
                                             )
-                                            .child(
-                                                Switch::new("global-enable-switch")
-                                                    .checked(app_enabled)
-                                                    .on_click(cx.listener(
-                                                        |this, checked: &bool, window, cx| {
-                                                            this.set_service_enabled(
-                                                                *checked, window, cx,
-                                                            );
-                                                        },
-                                                    )),
+                                            .on_click(
+                                                cx.listener(|this, checked: &bool, window, cx| {
+                                                    this.set_service_enabled(*checked, window, cx);
+                                                }),
                                             ),
-                                    ),
+                                        ),
+                                ),
                             )
                             .child(nav_overview)
                             .child(nav_tools)

@@ -3,15 +3,16 @@ use gpui::{
     StatefulInteractiveElement, Styled, Window,
 };
 use gpui_component::{
+    h_flex,
     input::Input,
-    h_flex, v_flex,
-    switch::Switch,
-    IconName,
     theme::{ActiveTheme, Theme, ThemeMode, ThemeRegistry},
+    v_flex, IconName,
 };
 
 use crate::app::AppRoot;
 use crate::config::save_theme_selection;
+use crate::theme::change_theme;
+use crate::window::ui;
 
 /// 로그 보관 설정 프리셋.
 const MAX_FILES_PRESETS: [u32; 5] = [3, 5, 10, 20, 50];
@@ -51,7 +52,7 @@ fn render_theme_option(
 
             if let Some(theme) = selected {
                 Theme::global_mut(cx).apply_config(&theme);
-                Theme::change(theme.mode, Some(window), cx);
+                change_theme(theme.mode, Some(window), cx);
                 if let Err(err) = save_theme_selection(theme.mode, theme.name.as_ref()) {
                     log::error!("failed to save theme selection: {err}");
                 }
@@ -156,16 +157,34 @@ fn render_log_settings(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElem
         config.max_files,
         |v| format!("{v}개"),
         |cfg, v| cfg.max_files = v,
-        bg_card, fg, border, selected_bg, selected_fg, selected_border, hover_bg,
+        bg_card,
+        fg,
+        border,
+        selected_bg,
+        selected_fg,
+        selected_border,
+        hover_bg,
         cx,
     );
     let age_row = preset_row(
         "log-max-age",
         &MAX_AGE_PRESETS,
         config.max_age_days,
-        |v| if v == 0 { "제한 없음".to_string() } else { format!("{v}일") },
+        |v| {
+            if v == 0 {
+                "제한 없음".to_string()
+            } else {
+                format!("{v}일")
+            }
+        },
         |cfg, v| cfg.max_age_days = v,
-        bg_card, fg, border, selected_bg, selected_fg, selected_border, hover_bg,
+        bg_card,
+        fg,
+        border,
+        selected_bg,
+        selected_fg,
+        selected_border,
+        hover_bg,
         cx,
     );
     let size_row = preset_row(
@@ -174,7 +193,13 @@ fn render_log_settings(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElem
         config.max_file_size_mb,
         |v| format!("{v} MB"),
         |cfg, v| cfg.max_file_size_mb = v,
-        bg_card, fg, border, selected_bg, selected_fg, selected_border, hover_bg,
+        bg_card,
+        fg,
+        border,
+        selected_bg,
+        selected_fg,
+        selected_border,
+        hover_bg,
         cx,
     );
 
@@ -188,13 +213,11 @@ fn render_log_settings(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElem
             v_flex()
                 .gap_3()
                 .child(div().text_color(fg).child("로그 파일 보관"))
-                .child(
-                    div().text_color(muted_fg).child(format!(
-                        "저장 위치: {} · 현재 {file_count}개 · {:.1} MB",
-                        log_dir.display(),
-                        total_bytes as f64 / (1024.0 * 1024.0),
-                    )),
-                )
+                .child(div().text_color(muted_fg).child(format!(
+                    "저장 위치: {} · 현재 {file_count}개 · {:.1} MB",
+                    log_dir.display(),
+                    total_bytes as f64 / (1024.0 * 1024.0),
+                )))
                 // ── 파일 기록 사용 ──
                 .child(
                     h_flex()
@@ -212,8 +235,7 @@ fn render_log_settings(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElem
                                 ),
                         )
                         .child(
-                            Switch::new("log-file-enabled")
-                                .checked(config.file_enabled)
+                            ui::toggle_switch("log-file-enabled", config.file_enabled, cx)
                                 .on_click(cx.listener(|this, checked: &bool, _window, cx| {
                                     let checked = *checked;
                                     this.update_log_config(cx, move |cfg| {
@@ -224,11 +246,9 @@ fn render_log_settings(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElem
                 )
                 // ── 파일 개수 ──
                 .child(div().text_color(fg).child("보관 파일 수"))
-                .child(
-                    div()
-                        .text_color(muted_fg)
-                        .child("현재 파일을 포함한 최대 개수입니다. 초과분은 오래된 순으로 삭제됩니다."),
-                )
+                .child(div().text_color(muted_fg).child(
+                    "현재 파일을 포함한 최대 개수입니다. 초과분은 오래된 순으로 삭제됩니다.",
+                ))
                 .child(files_row)
                 // ── 날짜 범위 ──
                 .child(div().text_color(fg).child("보관 기간"))
@@ -464,7 +484,11 @@ pub fn render(this: &mut AppRoot, window: &mut Window, cx: &mut Context<AppRoot>
                     v_flex()
                         .gap_3()
                         .child(div().text_color(fg).child("테마 모드"))
-                        .child(div().text_color(muted_fg).child("앱의 색상 모드를 선택합니다."))
+                        .child(
+                            div()
+                                .text_color(muted_fg)
+                                .child("앱의 색상 모드를 선택합니다."),
+                        )
                         .child(
                             h_flex()
                                 .gap_2()
@@ -477,10 +501,14 @@ pub fn render(this: &mut AppRoot, window: &mut Window, cx: &mut Context<AppRoot>
                                         .bg(if !is_dark { selected_bg } else { bg_card })
                                         .text_color(if !is_dark { selected_fg } else { fg })
                                         .border_1()
-                                        .border_color(if !is_dark { selected_border } else { border })
+                                        .border_color(if !is_dark {
+                                            selected_border
+                                        } else {
+                                            border
+                                        })
                                         .id("theme-light")
                                         .on_click(cx.listener(|_this, _event, window, cx| {
-                                            Theme::change(ThemeMode::Light, Some(window), cx);
+                                            change_theme(ThemeMode::Light, Some(window), cx);
                                         }))
                                         .child("Light"),
                                 )
@@ -493,10 +521,14 @@ pub fn render(this: &mut AppRoot, window: &mut Window, cx: &mut Context<AppRoot>
                                         .bg(if is_dark { selected_bg } else { bg_card })
                                         .text_color(if is_dark { selected_fg } else { fg })
                                         .border_1()
-                                        .border_color(if is_dark { selected_border } else { border })
+                                        .border_color(if is_dark {
+                                            selected_border
+                                        } else {
+                                            border
+                                        })
                                         .id("theme-dark")
                                         .on_click(cx.listener(|_this, _event, window, cx| {
-                                            Theme::change(ThemeMode::Dark, Some(window), cx);
+                                            change_theme(ThemeMode::Dark, Some(window), cx);
                                         }))
                                         .child("Dark"),
                                 ),
@@ -514,24 +546,18 @@ pub fn render(this: &mut AppRoot, window: &mut Window, cx: &mut Context<AppRoot>
                     v_flex()
                         .gap_3()
                         .child(div().text_color(fg).child("테마 선택"))
-                        .child(
-                            div()
-                                .text_color(muted_fg)
-                                .child("gpui-component themes JSON 기반 테마를 선택해 즉시 적용합니다."),
-                        )
+                        .child(div().text_color(muted_fg).child(
+                            "gpui-component themes JSON 기반 테마를 선택해 즉시 적용합니다.",
+                        ))
                         .child(div().text_color(fg).child("검색/필터"))
                         .children(this.theme_filter_input.as_ref().map(|input| {
-                            Input::new(input)
-                                .prefix(IconName::Search)
-                                .cleanable(true)
+                            Input::new(input).prefix(IconName::Search).cleanable(true)
                         }))
                         .child(filter_controls)
-                        .child(
-                            div().text_color(muted_fg).child(format!(
-                                "현재 필터: query='{}', active_only={}",
-                                this.theme_filter_query, this.theme_filter_active_only
-                            )),
-                        )
+                        .child(div().text_color(muted_fg).child(format!(
+                            "현재 필터: query='{}', active_only={}",
+                            this.theme_filter_query, this.theme_filter_active_only
+                        )))
                         .child(div().text_color(fg).child("Light Themes"))
                         .child(light_theme_list)
                         .child(div().text_color(fg).child("Dark Themes"))

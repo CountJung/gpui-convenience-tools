@@ -116,6 +116,11 @@ app/
 5. `render`의 패널 match 분기 + **`fills_height` 목록에 추가**
    (스플리터는 높이를 스스로 채우므로 바깥 스크롤을 걸면 안 됨)
 
+스크롤 컨텐츠 루트는 자연 높이를 유지해야 한다. `size_full`/`h_full`이나 높이를 먹는
+`flex_1().min_h_0()`를 긴 목록·설정 카드에 적용하면 스크롤 범위가 뷰포트에 고정되어
+하단 내용이 잘릴 수 있다. 너비만 채울 때는 `w_full`을 사용한다. 상세 규칙은
+copilot-instructions의 「스크롤 컨텐츠 높이 규칙」 절이 정본이다.
+
 ### 상태 흐름 — 양방향 규약
 
 ```text
@@ -209,9 +214,9 @@ SCM 코드(`install_win_service` 등)는 남아 있지만 이 용도로는 쓰�
 
 - **색상은 반드시 `cx.theme().<토큰>`**. 하드코딩 색상값 금지. 의미 매핑 고정: 페이지 배경
   `background`, 텍스트 `foreground`, 주요 액션 `primary`, 카드 표면 `secondary`/`list`,
-  사이드바 `sidebar*`, 위험 `danger`. **`card`·`destructive`는 사용하지 않는다**
-  (`.github/skills/gpui-rust-ui/skill.md`에 이 둘을 쓰는 예시가 남아 있으나
-  copilot-instructions가 우선).
+  사이드바 `sidebar*`, 위험 `danger`. **`card`·`destructive`는 사용하지 않는다**.
+- 스위치는 `window::ui::toggle_switch`, 테마 모드 변경은 `crate::theme::change_theme`를
+  사용한다. 번들 테마 변경 시 전체 테마 변형의 스위치 대비 테스트를 실행한다.
 - GPUI 0.2.2 / gpui-component 0.5.1 호환 API만 사용한다.
 - `h_flex`/`v_flex` + `gap_*` 중심, 렌더 트리는 얕게. 렌더 경로에 비즈니스 로직 금지,
   UI 코드에서 `unwrap()` 지양. 클릭 가능한 `div`에는 `.id()`가 필요하다.
@@ -221,6 +226,8 @@ SCM 코드(`install_win_service` 등)는 남아 있지만 이 용도로는 쓰�
   단, context7 문서는 main 브랜치 기준이라 0.5.1과 다를 수 있으므로 **시그니처 확인은
   `~/.cargo/registry`의 로컬 크레이트 소스가 우선**이다.
 - 코드 수정 후 `cargo check`, 단계 완료 시 `cargo build` + `cargo test`.
+- GPUI UI 변경은 정본의 「GPUI 시각 검증 및 독립 크로스체크」를 적용하고, 독립 검증에는
+  [.claude/agents/ui-visual-reviewer.md](.claude/agents/ui-visual-reviewer.md)를 사용한다.
 - 작업 범위는 `MasterPlan.md` 단계 기준. **완료 이력은 `MasterPlan.md`「구현 완료 단계」,
   미착수 대기열은 `TODO.md`** 두 곳만 쓴다(체크리스트를 복제하던 `TASKS.md`는 제거됨).
 - 사용자에게 보이는 텍스트(설명, 주석, 커밋 메시지)는 한국어 또는 영어만 사용한다.

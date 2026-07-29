@@ -15,7 +15,6 @@ use gpui::{
 use gpui_component::{
     h_flex,
     resizable::{h_resizable, resizable_panel},
-    switch::Switch,
     theme::ActiveTheme,
     v_flex,
 };
@@ -114,13 +113,11 @@ fn render_status_and_targets(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> A
                             .items_center()
                             .justify_center()
                             .child(
-                                Switch::new(("target-switch", ix))
-                                    .checked(enabled)
-                                    .on_click(cx.listener(
-                                        move |this, checked: &bool, window, cx| {
-                                            this.set_target_enabled(ix, *checked, window, cx);
-                                        },
-                                    )),
+                                ui::toggle_switch(("target-switch", ix), enabled, cx).on_click(
+                                    cx.listener(move |this, checked: &bool, window, cx| {
+                                        this.set_target_enabled(ix, *checked, window, cx);
+                                    }),
+                                ),
                             ),
                     )
                     .child(
@@ -219,7 +216,12 @@ fn render_status_and_targets(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> A
                                         .text_color(muted_fg)
                                         .child("표시 이름 / 프로세스"),
                                 )
-                                .child(div().w(px(150.0)).text_color(muted_fg).child("광고 창 클래스"))
+                                .child(
+                                    div()
+                                        .w(px(150.0))
+                                        .text_color(muted_fg)
+                                        .child("광고 창 클래스"),
+                                )
                                 .child(div().w(px(56.0)).text_color(muted_fg).child("활성"))
                                 .child(div().w(px(36.0))),
                         )
@@ -257,7 +259,11 @@ fn render_settings(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElement 
                 .bg(if is_selected { selected_bg } else { theme.list })
                 .text_color(if is_selected { selected_fg } else { fg })
                 .border_1()
-                .border_color(if is_selected { theme.primary_hover } else { border })
+                .border_color(if is_selected {
+                    theme.primary_hover
+                } else {
+                    border
+                })
                 .hover(|s| s.bg(theme.secondary_hover))
                 .on_click(cx.listener(move |this, _ev, _window, cx| {
                     this.set_scan_interval(secs, cx);
@@ -366,21 +372,17 @@ fn render_settings(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElement 
                                         ),
                                 )
                                 .child(
-                                    Switch::new("ad-block-enable")
-                                        .checked(is_active)
-                                        .on_click(cx.listener(
-                                            |this, checked: &bool, window, cx| {
-                                                this.set_service_enabled(*checked, window, cx);
-                                            },
-                                        )),
+                                    ui::toggle_switch("ad-block-enable", is_active, cx).on_click(
+                                        cx.listener(|this, checked: &bool, window, cx| {
+                                            this.set_service_enabled(*checked, window, cx);
+                                        }),
+                                    ),
                                 ),
                         )
                         .child(div().text_color(fg).child("스캔 주기"))
-                        .child(
-                            div()
-                                .text_color(muted_fg)
-                                .child(format!("광고 창 감지 주기입니다. 현재: {current_interval}초")),
-                        )
+                        .child(div().text_color(muted_fg).child(format!(
+                            "광고 창 감지 주기입니다. 현재: {current_interval}초"
+                        )))
                         .child(interval_row),
                 ),
         )

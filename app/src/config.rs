@@ -196,7 +196,7 @@ impl Default for AppConfig {
     }
 }
 
-const BUNDLED_THEMES: [(&str, &str); 21] = [
+pub(crate) const BUNDLED_THEMES: [(&str, &str); 21] = [
     (
         "adventure.json",
         include_str!("../assets/themes/adventure.json"),
@@ -247,7 +247,10 @@ const BUNDLED_THEMES: [(&str, &str); 21] = [
         "mellifluous.json",
         include_str!("../assets/themes/mellifluous.json"),
     ),
-    ("molokai.json", include_str!("../assets/themes/molokai.json")),
+    (
+        "molokai.json",
+        include_str!("../assets/themes/molokai.json"),
+    ),
     (
         "solarized.json",
         include_str!("../assets/themes/solarized.json"),
@@ -256,7 +259,10 @@ const BUNDLED_THEMES: [(&str, &str); 21] = [
         "spaceduck.json",
         include_str!("../assets/themes/spaceduck.json"),
     ),
-    ("twilight.json", include_str!("../assets/themes/twilight.json")),
+    (
+        "twilight.json",
+        include_str!("../assets/themes/twilight.json"),
+    ),
 ];
 
 /// `%APPDATA%/gpui-convenience-tools` (Windows 기준) 데이터 루트.

@@ -11,17 +11,18 @@ mod config;
 mod logging;
 mod platform;
 mod sync;
+mod theme;
 mod window;
 
 use app::AppRoot;
 use gpui::*;
-use gpui_component::Root;
 use gpui_component::theme::{Theme, ThemeRegistry};
+use gpui_component::Root;
 
 use config::{ensure_bundled_themes, load_config};
 
 #[cfg(target_os = "windows")]
-use platform::{init_tray_icon, hide_main_window_to_tray, run_as_windows_service};
+use platform::{hide_main_window_to_tray, init_tray_icon, run_as_windows_service};
 
 fn main() {
     // 롤링 파일 로거 설치. 설정 파일을 읽기 전이므로 저장된 로그 설정을 먼저 조회한다.
@@ -72,7 +73,7 @@ fn main() {
 
             if has_changes {
                 let mode = Theme::global(cx).mode;
-                Theme::change(mode, None, cx);
+                theme::change_theme(mode, None, cx);
             }
         };
 
@@ -89,6 +90,8 @@ fn main() {
                 log::error!("failed to prepare bundled themes: {err}");
             }
         }
+
+        theme::normalize_component_palette(cx);
 
         #[cfg(target_os = "windows")]
         if let Err(err) = init_tray_icon() {
@@ -124,6 +127,3 @@ fn main() {
         }
     });
 }
-
-
-

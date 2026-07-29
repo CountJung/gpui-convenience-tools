@@ -191,6 +191,13 @@
   - 카드 유사 표면: `secondary` 또는 `list`
   - 위험 상태: `danger`
 - `card`, `destructive` 토큰에 의존하지 않는다.
+- 스위치는 직접 `Switch::new`로 만들지 않고 `window::ui::toggle_switch`를 사용한다.
+  번들·사용자 테마에서 `switch.*` 토큰이 빠지거나 표면색과 겹쳐도 트랙·썸·외곽선의
+  비텍스트 대비가 유지되어야 한다.
+- 테마 모드 변경은 `crate::theme::change_theme`를 사용한다. `Theme::change`를 직접 호출하면
+  컴포넌트 팔레트 대비 보정이 누락된다.
+- 번들 테마를 추가·교체하면 전체 테마 변형을 대상으로 스위치 트랙·썸·외곽선의 최소 대비
+  테스트를 갱신하고 실행한다.
 
 ## UI 구성 기준
 
@@ -199,13 +206,26 @@
 - 렌더 트리는 가능한 얕게 유지한다.
 - 렌더 경로에 비즈니스 로직을 넣지 않는다.
 - UI 코드에서 `unwrap` 사용을 지양한다.
+- 사이드바 내비게이션은 그룹 컨테이너와 개별 항목 모두 `sidebar_border` 기반 경계를 두어,
+  비활성 항목도 서로 구분되어야 한다.
+
+### 스크롤 컨텐츠 높이 규칙
+
+- 스플리터의 각 영역은 `window::scroll_pane`으로 감싸고, 표시 영역을 넘을 때 세로 스크롤과
+  스크롤바가 동작하도록 한다.
+- 스크롤 뷰포트와 그 상위 flex 체인은 `h_full`/`size_full`과 `min_h_0`로 높이를 제한한다.
+- **스크롤되는 컨텐츠 루트는 자연 높이를 유지한다.** 컨텐츠 루트에 `size_full`·`h_full`,
+  또는 높이를 먹는 `flex_1` + `min_h_0` 조합을 적용하면 스크롤 범위가 뷰포트 높이로
+  고정되어 하단 내용이 잘릴 수 있으므로 사용하지 않는다. 너비만 채울 때는 `w_full`을 쓴다.
+- 긴 목록·설정 폼은 최소 지원 창 높이에서 마지막 항목까지 스크롤되는지 확인한다.
 
 ## 상호작용 및 상태 기준
 
 - 이벤트 처리는 listener 패턴을 사용한다.
 - 로컬 상태 변경 후 필요한 경우 `cx.notify`를 호출한다.
 - `div` 클릭 상호작용은 상태 기반 interactivity 요건을 만족한다(`.id()` 필요).
-- 테마 변경은 `Theme::change(ThemeMode::Light 또는 ThemeMode::Dark, Some(window), cx)`로 처리한다.
+- 테마 변경은 `crate::theme::change_theme(ThemeMode::Light 또는 ThemeMode::Dark,
+  Some(window), cx)`로 처리한다.
 
 ## 상태 전달 기준
 
@@ -247,6 +267,71 @@
 - 단계 완료 확인 시 `cargo build`와 `cargo test`를 수행한다.
 - 새로 유입된 오류는 종료 전에 해결하거나 원인을 명시한다.
 
+## GPUI 시각 검증 및 독립 크로스체크
+
+GPUI 레이아웃, 색상·테마, 가시성, 스크롤·클리핑, 사용자 상호작용을 변경하면 정적 검사와
+단위 테스트만으로 완료하지 않는다. 다음 두 검증을 **순차적으로** 수행한다. 같은 데스크톱을
+동시에 조작하면 상태와 증거가 섞일 수 있으므로 병렬 실행하지 않는다.
+
+1. 구현 담당자가 실제 빌드의 앱을 Computer Use로 직접 조작하고 수용 기준별 캡처를 남긴다.
+2. 구현에 참여하지 않고 파일을 편집하지 않는 Visual Reviewer가 별도 검증 세션에서 같은
+   수용 기준을 독립적으로 재현하고 자체 캡처를 남긴다.
+
+- 구현 담당자의 캡처나 결론만 다시 읽는 것은 독립 크로스체크가 아니다.
+- 조작·캡처에는 성공했지만 관찰이 하나라도 수용 기준과 다르면 `FAIL`이다.
+- 필수 조작·캡처를 완료하지 못하면 `BLOCKED`다.
+- 두 검증이 모두 통과해야 종합 `PASS`다. 종합 상태 우선순위는 `FAIL` > `BLOCKED` > `PASS`다.
+  결과가 다르면 원인을 수정한 뒤 양쪽 검증을 다시 수행한다.
+- 파괴 버튼, 실제 데이터 삭제, 의도하지 않은 파일 동기화는 시각 검증에서 실행하지 않는다.
+- 별도 검증 세션은 검증자가 첫 캡처부터 직접 조작한다는 뜻이며 사용자 설정 초기화를 뜻하지
+  않는다. `%APPDATA%` 설정을 삭제·교체하지 않는다. 파일 동기화 검증은 실행·삭제 버튼과
+  옵션 값을 바꾸지 않고 탐색·스크롤만 수행한다.
+- 파일 동기화 화면을 검증할 앱 프로세스는 작업 전용 임시 루트 아래의 빈 디렉터리를
+  process-scoped `APPDATA`로 지정해 실행한다. 필요한 원본·대상 폴더도 같은 임시 루트 아래에
+  만들고 그 범위에서만 테스트 작업을 구성한다. 기존 앱 프로세스나 사용자 `%APPDATA%`를
+  재사용하지 않는다. 격리 실행이 불가능하면 해당 시나리오는 `BLOCKED`로 보고한다.
+
+Codex는 Visual Reviewer를 생성할 때 `.github/agents/ui-visual-reviewer.agent.md`를 먼저
+읽도록 위임한다. Claude Code는 `.claude/agents/ui-visual-reviewer.md`의 프로젝트
+서브에이전트를 사용한다. 두 어댑터 모두 이 문서의 같은 계약을 적용하며, 주 세션에
+Computer Use/node_repl 도구가 제공되지 않으면 독립 검증은 `BLOCKED`다.
+
+### Computer Use 시작 전 health check
+
+- 매 새 `node_repl` 세션에서 설치된 Computer Use 스킬을 먼저 읽는다.
+- 스킬이 제공하는 `<plugin-root>/scripts/computer-use-client.mjs`의
+  `setupComputerUseRuntime`으로만 초기화하고 `sky.documentation("guidance")`를 읽는다.
+- `sky.list_apps()` 또는 `sky.list_windows()`가 반환한 앱·창 객체 중 대상 창 하나를 명확히
+  선택한 뒤 `sky.get_window_state({ window: targetWindow })`의 첫 캡처까지 성공해야 앱
+  검증을 시작한다.
+- `@oai/sky` 직접 import, `codex-computer-use.exe` 직접 실행, 사용자 정의 native-pipe
+  클라이언트, PowerShell UI 자동화로의 우회는 금지한다.
+- 초기화나 첫 캡처가 실패하면 새 `node_repl` 세션에서 공식 wrapper 경로로 한 번 재시도한다.
+  네이티브 helper·pipe가 계속 없으면 현재 검증을 `BLOCKED`로 종료한다. 사용자가
+  Codex/확장 호스트를 완전히 재시작한 다음 새 세션에서 health check를 다시 수행한다.
+  현재 세션에서 직접 helper를 띄우거나 재시작을 성공한 검증으로 간주하지 않는다.
+
+### 영역별 회귀 시나리오
+
+변경한 영역 또는 관련 회귀 위험이 있는 영역의 시나리오만 적용한다.
+
+- 사이드바 변경: 활성·비활성 그룹과 개별 항목의 경계가 서로 구분되는지 확인한다.
+- 스위치·테마 변경: 기본 light/dark와 이슈가 보고된 테마에서 on/off 트랙·썸·외곽선이 모두
+  보이는지 확인한다. 자동 대비 테스트는 전체 번들 테마 변형을 대상으로 한다. 사용자 테마는
+  로드 시 런타임 팔레트 보정 후 해당 테마를 직접 시각 검증한다.
+- 파일 동기화·스크롤 변경: 최소 지원 창 높이에서 좌·우 패널의 overflow 스크롤바가 나타나고,
+  해당 패널 안에서 wheel 또는 drag로 마지막 항목까지 도달하는지 확인한다.
+
+### 증거와 차단 보고
+
+각 검증 결과에는 `Overall(PASS|FAIL|BLOCKED)`, 검증자 역할, 빌드/커밋, 도구·런타임,
+시나리오별 사전 조건(테마·창 크기·앱 상태), 동작, 기대 결과, 관찰 결과, 캡처 식별자·시각,
+결과, 검증 간 불일치, 잔여 위험을 기록한다.
+
+`BLOCKED`에는 실패 단계(import/setup/attach/capture/input), 실행한 정확한 API 또는 명령,
+원문 오류, 복구 시도, 대체 정적·자동 검증 결과, 아직 확인하지 못한 수용 기준을 함께 적는다.
+기존 스크린샷이나 구두 설명만으로 시각 검증을 통과 처리하지 않는다.
+
 ## 작업 후 오류 리뷰 기준
 
 - 각 구현 작업 직후 Error Reviewer 서브 에이전트로 오류 전용 리뷰를 수행한다.
@@ -260,6 +345,7 @@
 - 메인 지침: `.github/copilot-instructions.md`
 - 파일별 자동 적용 지침: `.github/instructions/gpui-core.instructions.md`
 - 오류 분석 서브 에이전트: `.github/agents/error-reviewer.agent.md`
+- 독립 시각 검증 서브 에이전트: `.github/agents/ui-visual-reviewer.agent.md`
 - 루트 안내 문서: `AGENTS.md`, `CLAUDE.md`
 - 계획과 완료 이력: `MasterPlan.md` / 미착수 대기열: `TODO.md`
 - 구조·크기·공용 유틸 추적: `PROJECTMAP.md`

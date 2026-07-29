@@ -13,9 +13,10 @@ use gpui::{
 };
 use gpui_component::scroll::{Scrollbar, ScrollbarShow};
 
-/// 세로 스크롤 + 항상 보이는 스크롤바를 갖는 영역으로 내용을 감싼다.
+/// 컨텐츠가 표시 영역을 넘으면 세로 스크롤할 수 있고 스크롤바가 보이는 영역으로 감싼다.
 ///
 /// 스플리터로 나뉜 각 패널은 높이가 고정되므로 내부에서 따로 스크롤해야 한다.
+/// `content` 루트는 `size_full`/`h_full`로 뷰포트 높이에 고정하지 않고 자연 높이를 유지해야 한다.
 pub fn scroll_pane(
     id: impl Into<ElementId>,
     handle: &ScrollHandle,
@@ -29,6 +30,7 @@ pub fn scroll_pane(
             div()
                 .id(id)
                 .size_full()
+                .min_h_0()
                 .overflow_y_scroll()
                 .track_scroll(handle)
                 .child(content),

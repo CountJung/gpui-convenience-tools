@@ -13,7 +13,7 @@ use gpui::{
     div, App, ClickEvent, Div, ElementId, Hsla, InteractiveElement, ParentElement, SharedString,
     Stateful, StatefulInteractiveElement, Styled, Window,
 };
-use gpui_component::theme::ActiveTheme;
+use gpui_component::{switch::Switch, theme::ActiveTheme};
 
 /// 배지·버튼의 여백 크기.
 ///
@@ -191,4 +191,17 @@ pub fn action_button(
     }
 
     el.id(id).on_click(on_click).child(label.into())
+}
+
+/// 테마에 상관없이 트랙 경계가 보이는 토글 스위치.
+///
+/// 스위치 내부 색은 앱 테마 적용 시 보정하고, 여기서는 현재 상태의 트랙과 대비되는
+/// 외곽선을 더한다. 호출부는 gpui-component `Switch`처럼 `on_click`을 이어 붙인다.
+pub fn toggle_switch(id: impl Into<ElementId>, checked: bool, cx: &App) -> Switch {
+    let outline = crate::theme::switch_outline(cx.theme(), checked);
+    Switch::new(id)
+        .checked(checked)
+        .rounded_full()
+        .border_1()
+        .border_color(outline)
 }

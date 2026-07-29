@@ -30,8 +30,8 @@ Theme is a structured JSON token system like:
 - muted
 - accent
 - border
-- card
-- destructive
+- list
+- danger
 
 ALL UI MUST be derived from these tokens.
 
@@ -46,7 +46,8 @@ Examples:
 - cx.theme().background
 - cx.theme().foreground
 - cx.theme().primary
-- cx.theme().card
+- cx.theme().secondary
+- cx.theme().list
 - cx.theme().border
 
 ---
@@ -84,10 +85,13 @@ You MUST map UI meaning to tokens:
 - Text → foreground
 - Primary action → primary
 - Secondary UI → secondary
-- Card surface → card
+- Card surface → secondary or list
 - Borders → border
 - Disabled → muted
-- Danger → destructive
+- Danger → danger
+
+Repository-specific mappings in `.github/copilot-instructions.md` are authoritative.
+Do not use the legacy `card` or `destructive` tokens in this repository.
 
 DO NOT mix meanings arbitrarily.
 
@@ -109,6 +113,25 @@ ALWAYS use:
 ## FORBIDDEN
 - margin-based layout
 - pixel magic numbers
+
+## SCROLLABLE SPLIT PANELS
+
+- Wrap each resizable split region with `window::scroll_pane`.
+- Constrain the viewport and its flex ancestors with `size_full`/`h_full` plus `min_h_0`.
+- Keep the scroll content root at natural height; use `w_full`, not `size_full`/`h_full`.
+- Do not put `flex_1().min_h_0()` on a long settings card inside a scroll pane.
+- Verify that the final control is reachable at the minimum supported window height.
+
+## SWITCH VISIBILITY
+
+- Use `window::ui::toggle_switch`, not `Switch::new` directly.
+- Change theme mode through `crate::theme::change_theme`, which reapplies the component
+  contrast palette.
+- New bundled themes must pass the all-theme switch contrast test.
+
+## VISUAL OUTPUT VALIDATION
+
+- Follow `.github/copilot-instructions.md` section `GPUI 시각 검증 및 독립 크로스체크`.
 
 ---
 
@@ -178,14 +201,14 @@ UI MUST look modern:
 Use layered surfaces:
 
 - background → page
-- card → content surface
+- secondary/list → content surface
 - secondary/muted → sub sections
 
 Example:
 
-Page → background  
-Card → card  
-Subtle section → secondary  
+- Page → background
+- Card → secondary or list
+- Subtle section → secondary
 
 ---
 
@@ -227,7 +250,7 @@ fn render(cx: &mut ViewContext<Self>) -> impl IntoElement {
                 .p_4()
                 .child(
                     div()
-                        .bg(cx.theme().card)
+                        .bg(cx.theme().secondary)
                         .border_1()
                         .border_color(cx.theme().border)
                         .rounded_md()
