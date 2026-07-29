@@ -9,11 +9,12 @@
 /// 조작할 수 없다. 작업 스케줄러의 ONLOGON + /IT 트리거는
 /// 사용자 세션(Session 1)에서 직접 실행되므로 이 문제가 없다.
 
-use gpui::{div, AnyElement, Context, Hsla, InteractiveElement, IntoElement, ParentElement,
-    StatefulInteractiveElement, Styled, Window};
+use gpui::{div, AnyElement, Context, Hsla, IntoElement, ParentElement, Styled, Window};
 use gpui_component::{h_flex, v_flex, theme::ActiveTheme};
 
 use crate::app::AppRoot;
+#[cfg(target_os = "windows")]
+use crate::window::ui::{self, ButtonStyle, Tone};
 
 #[cfg(target_os = "windows")]
 use crate::platform::{
@@ -24,23 +25,16 @@ use crate::platform::{
 // 공통 색상 스냅샷
 // ─────────────────────────────────────────────
 
+/// 이 화면이 카드·배너에 직접 쓰는 색만 복사해 둔다.
+///
+/// 배지·버튼 색은 [`crate::window::ui`]가 `cx.theme()`에서 직접 읽으므로 여기에 두지 않는다.
 #[cfg(target_os = "windows")]
 struct ThemeSnap {
     foreground: Hsla,
     muted_foreground: Hsla,
     secondary: Hsla,
     border: Hsla,
-    muted: Hsla,
-    primary: Hsla,
-    primary_fg: Hsla,
-    danger: Hsla,
-    danger_fg: Hsla,
-    success: Hsla,
-    success_fg: Hsla,
-    warning: Hsla,
-    warning_fg: Hsla,
     info: Hsla,
-    info_fg: Hsla,
 }
 
 #[cfg(target_os = "windows")]
@@ -52,17 +46,7 @@ impl ThemeSnap {
             muted_foreground: t.muted_foreground,
             secondary: t.secondary,
             border: t.border,
-            muted: t.muted,
-            primary: t.sidebar_primary,
-            primary_fg: t.sidebar_primary_foreground,
-            danger: t.danger,
-            danger_fg: t.danger_foreground,
-            success: t.success,
-            success_fg: t.success_foreground,
-            warning: t.warning,
-            warning_fg: t.warning_foreground,
             info: t.info,
-            info_fg: t.info_foreground,
         }
     }
 }
@@ -72,60 +56,35 @@ impl ThemeSnap {
 // ─────────────────────────────────────────────
 
 #[cfg(target_os = "windows")]
-fn state_badge(state: &TaskState, t: &ThemeSnap) -> AnyElement {
-    let (bg, fg, label) = match state {
-        TaskState::Ready      => (t.success, t.success_fg, "● 대기 중"),
-        TaskState::Running    => (t.info,    t.info_fg,    "▶ 실행 중"),
-        TaskState::Disabled   => (t.warning, t.warning_fg, "■ 비활성화"),
-        TaskState::NotInstalled => (t.muted, t.muted_foreground, "✕ 미등록"),
-        TaskState::Unknown    => (t.muted,   t.muted_foreground, "? 알 수 없음"),
+fn state_badge(state: &TaskState, cx: &Context<AppRoot>) -> AnyElement {
+    let (tone, label) = match state {
+        TaskState::Ready        => (Tone::Success, "● 대기 중"),
+        TaskState::Running      => (Tone::Info,    "▶ 실행 중"),
+        TaskState::Disabled     => (Tone::Warning, "■ 비활성화"),
+        TaskState::NotInstalled => (Tone::Muted,   "✕ 미등록"),
+        TaskState::Unknown      => (Tone::Muted,   "? 알 수 없음"),
     };
-    div()
-        .rounded_md()
-        .px_3()
-        .py_1()
-        .bg(bg)
-        .text_color(fg)
-        .child(label)
-        .into_any_element()
+    ui::badge(label, tone, ui::Size::Md, cx).into_any_element()
 }
 
 // ─────────────────────────────────────────────
-// 액션 버튼
+// 액션 버튼 스타일
 // ─────────────────────────────────────────────
 
+/// 작업 제어 버튼의 색.
+///
+/// 지금 의미 없는 조작(미등록 상태의 '삭제' 등)은 비활성처럼 보이게만 하고
+/// 클릭 자체는 막지 않는다 — 실패 사유를 로그로 남기는 편이 원인 파악에 낫기 때문이다.
 #[cfg(target_os = "windows")]
-fn action_button(
-    id: &'static str,
-    label: &'static str,
-    enabled: bool,
-    danger: bool,
-    t: &ThemeSnap,
-    cx: &mut Context<AppRoot>,
-    on_click: impl Fn(&mut AppRoot, &gpui::ClickEvent, &mut Window, &mut Context<AppRoot>) + 'static,
-) -> AnyElement {
-    let (bg, fg) = if danger {
-        (t.danger, t.danger_fg)
+fn task_button_style(enabled: bool, danger: bool, t: &ThemeSnap, cx: &Context<AppRoot>) -> ButtonStyle {
+    let style = if !enabled {
+        ButtonStyle::muted(cx)
+    } else if danger {
+        ButtonStyle::danger(cx)
     } else {
-        (t.primary, t.primary_fg)
+        ButtonStyle::primary(cx)
     };
-    let muted_bg = t.muted;
-    let muted_fg = t.muted_foreground;
-    let border = t.border;
-
-    div()
-        .rounded_md()
-        .px_4()
-        .py_2()
-        .cursor_pointer()
-        .bg(if enabled { bg } else { muted_bg })
-        .text_color(if enabled { fg } else { muted_fg })
-        .border_1()
-        .border_color(border)
-        .id(id)
-        .on_click(cx.listener(on_click))
-        .child(label)
-        .into_any_element()
+    style.border(t.border).no_hover()
 }
 
 // ─────────────────────────────────────────────
@@ -153,7 +112,7 @@ pub fn render(_this: &mut AppRoot, _window: &mut Window, cx: &mut Context<AppRoo
     };
 
     let t = ThemeSnap::from_cx(cx);
-    let badge = state_badge(&state, &t);
+    let badge = state_badge(&state, cx);
 
     v_flex()
         .w_full()
@@ -170,22 +129,15 @@ pub fn render(_this: &mut AppRoot, _window: &mut Window, cx: &mut Context<AppRoo
                         .text_color(t.foreground)
                         .child("자동 시작 (Task Scheduler)"),
                 )
-                .child(
-                    div()
-                        .rounded_md()
-                        .px_3()
-                        .py_1()
-                        .cursor_pointer()
-                        .bg(t.secondary)
-                        .text_color(t.foreground)
-                        .border_1()
-                        .border_color(t.border)
-                        .id("task-refresh")
-                        .on_click(cx.listener(|_this, _ev, _window, cx| {
-                            cx.notify();
-                        }))
-                        .child("↺ 새로고침"),
-                ),
+                .child(ui::action_button(
+                    "task-refresh",
+                    "↺ 새로고침",
+                    ui::Size::Md,
+                    ButtonStyle::secondary(cx).no_hover(),
+                    cx.listener(|_this, _ev, _window, cx| {
+                        cx.notify();
+                    }),
+                )),
         )
         // ── 상태 카드 ──
         .child(
@@ -264,14 +216,12 @@ pub fn render(_this: &mut AppRoot, _window: &mut Window, cx: &mut Context<AppRoo
                             h_flex()
                                 .gap_3()
                                 .flex_wrap()
-                                .child(action_button(
+                                .child(ui::action_button(
                                     "task-install",
                                     "등록",
-                                    is_not_installed,
-                                    false,
-                                    &t,
-                                    cx,
-                                    |this, _ev, window, cx| {
+                                    ui::Size::Lg,
+                                    task_button_style(is_not_installed, false, &t, cx),
+                                    cx.listener(|this, _ev, window, cx| {
                                         match install_task() {
                                             Ok(()) => this.push_service_log(
                                                 "자동 시작 작업을 등록했습니다. 다음 로그온 시 자동으로 시작됩니다.",
@@ -282,16 +232,14 @@ pub fn render(_this: &mut AppRoot, _window: &mut Window, cx: &mut Context<AppRoo
                                             ),
                                         }
                                         cx.notify();
-                                    },
+                                    }),
                                 ))
-                                .child(action_button(
+                                .child(ui::action_button(
                                     "task-run-now",
                                     "지금 실행",
-                                    is_installed,
-                                    false,
-                                    &t,
-                                    cx,
-                                    |this, _ev, window, cx| {
+                                    ui::Size::Lg,
+                                    task_button_style(is_installed, false, &t, cx),
+                                    cx.listener(|this, _ev, window, cx| {
                                         match run_task_now() {
                                             Ok(()) => this.push_service_log(
                                                 "앱을 트레이 모드로 즉시 실행했습니다.",
@@ -302,16 +250,14 @@ pub fn render(_this: &mut AppRoot, _window: &mut Window, cx: &mut Context<AppRoo
                                             ),
                                         }
                                         cx.notify();
-                                    },
+                                    }),
                                 ))
-                                .child(action_button(
+                                .child(ui::action_button(
                                     "task-uninstall",
                                     "삭제",
-                                    is_installed,
-                                    true,
-                                    &t,
-                                    cx,
-                                    |this, _ev, window, cx| {
+                                    ui::Size::Lg,
+                                    task_button_style(is_installed, true, &t, cx),
+                                    cx.listener(|this, _ev, window, cx| {
                                         match uninstall_task() {
                                             Ok(()) => this.push_service_log(
                                                 "자동 시작 작업을 삭제했습니다.",
@@ -322,7 +268,7 @@ pub fn render(_this: &mut AppRoot, _window: &mut Window, cx: &mut Context<AppRoo
                                             ),
                                         }
                                         cx.notify();
-                                    },
+                                    }),
                                 )),
                         ),
                 ),

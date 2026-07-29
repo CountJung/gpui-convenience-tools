@@ -17,9 +17,8 @@
 | `.github/instructions/gpui-core.instructions.md` | 파일별 자동 적용 브리지 |
 | `.github/agents/error-reviewer.agent.md` | 오류 분석 서브 에이전트 |
 | `.github/skills/gpui-rust-ui/skill.md` | GPUI UI 생성 스킬 (아래 주의 참조) |
-| `MasterPlan.md` | 아키텍처 원칙과 단계 계획 |
+| `MasterPlan.md` | 아키텍처 원칙 · 단계 계획 · **완료 이력** |
 | `PROJECTMAP.md` | 구조 · 크기 · 공용 유틸 추적 (1,000줄 = 구조 리팩터링 트리거) |
-| `TASKS.md` | 완료 · 진행 중 작업 |
 | `TODO.md` | 미착수 구현 대기열 |
 | `CLAUDE.md` | Claude Code용 저장소 안내 |
 | `README.md` | 사용자 문서 |

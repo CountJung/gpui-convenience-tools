@@ -180,9 +180,8 @@ git push origin v1.0.0
 
 | 문서 | 내용 |
 | --- | --- |
-| `MasterPlan.md` | 아키텍처와 단계 계획 |
+| `MasterPlan.md` | 아키텍처·단계 계획·완료 이력 |
 | `PROJECTMAP.md` | 구조·줄 수·공용 유틸 추적 (1,000줄 = 구조 리팩터링 트리거) |
-| `TASKS.md` | 작업 진행 상태 |
 | `TODO.md` | 단계적 구현 대기열(파일 동기화 후속 등) |
 | `CLAUDE.md` | Claude Code용 저장소 안내 |
 | `AGENTS.md` | 에이전트 문서 지도 |

@@ -19,6 +19,7 @@ use gpui_component::{
 
 use crate::app::AppRoot;
 use crate::window::scroll_pane;
+use crate::window::ui::{self, ButtonStyle};
 
 const INTERVAL_PRESETS: [u32; 5] = [30, 60, 300, 900, 3600];
 
@@ -53,6 +54,10 @@ fn render_job_list(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElement 
     let border = theme.border;
     let card = theme.secondary;
     let selected_idx = this.selected_sync_job;
+
+    // 이 패널의 버튼은 테두리 색을 hover 색과 같이 쓴다(승격 전 시각 유지).
+    let neutral_btn = ButtonStyle::neutral(cx).hover(border);
+    let primary_btn = ButtonStyle::primary(cx).border(theme.primary_hover);
 
     // ── 작업 행 ──
     let mut rows = v_flex();
@@ -201,22 +206,20 @@ fn render_job_list(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElement 
                 .child(
                     h_flex()
                         .gap_2()
-                        .child(action_button(
+                        .child(ui::action_button(
                             "sync-new-job",
                             "새 작업",
-                            theme.list,
-                            fg,
-                            border,
+                            ui::Size::Md,
+                            neutral_btn,
                             cx.listener(|this, _ev, window, cx| {
                                 this.add_sync_job(window, cx);
                             }),
                         ))
-                        .child(action_button(
+                        .child(ui::action_button(
                             "sync-run-all",
                             "전체 지금 동기화",
-                            theme.primary,
-                            theme.primary_foreground,
-                            theme.primary_hover,
+                            ui::Size::Md,
+                            primary_btn,
                             cx.listener(|this, _ev, window, cx| {
                                 this.request_sync_all(window, cx);
                             }),
@@ -271,12 +274,11 @@ fn render_job_list(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElement 
                                                 )),
                                         )
                                         .children(has_failures.then(|| {
-                                            action_button(
+                                            ui::action_button(
                                                 "sync-clear-failures",
                                                 "기록 지우기",
-                                                theme.list,
-                                                fg,
-                                                border,
+                                                ui::Size::Md,
+                                                neutral_btn,
                                                 cx.listener(|this, _ev, _window, cx| {
                                                     this.sync_failures.clear();
                                                     cx.notify();
@@ -311,6 +313,11 @@ fn render_job_settings(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElem
     let card = theme.secondary;
     let selected_bg = theme.primary;
     let selected_fg = theme.primary_foreground;
+
+    // 이 패널의 버튼은 테두리 색을 hover 색과 같이 쓴다(승격 전 시각 유지).
+    let neutral_btn = ButtonStyle::neutral(cx).hover(border);
+    let primary_btn = ButtonStyle::primary(cx).border(theme.primary_hover);
+    let danger_btn = ButtonStyle::danger(cx).border(theme.danger_active);
 
     let Some(selected) = this.selected_sync_job else {
         return v_flex()
@@ -373,22 +380,20 @@ fn render_job_settings(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElem
                 .child(
                     h_flex()
                         .gap_2()
-                        .child(action_button(
+                        .child(ui::action_button(
                             "sync-run-one",
                             "지금 동기화",
-                            theme.primary,
-                            theme.primary_foreground,
-                            theme.primary_hover,
+                            ui::Size::Md,
+                            primary_btn,
                             cx.listener(move |this, _ev, window, cx| {
                                 this.request_sync_job(selected, window, cx);
                             }),
                         ))
-                        .child(action_button(
+                        .child(ui::action_button(
                             "sync-delete-job",
                             "작업 삭제",
-                            theme.danger,
-                            theme.danger_foreground,
-                            theme.danger_active,
+                            ui::Size::Md,
+                            danger_btn,
                             cx.listener(move |this, _ev, window, cx| {
                                 this.remove_sync_job(selected, window, cx);
                             }),
@@ -422,12 +427,11 @@ fn render_job_settings(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElem
                                         .min_w_0()
                                         .children(source_input.as_ref().map(Input::new)),
                                 )
-                                .child(action_button(
+                                .child(ui::action_button(
                                     "sync-pick-source",
                                     "찾아보기",
-                                    theme.list,
-                                    fg,
-                                    border,
+                                    ui::Size::Md,
+                                    neutral_btn,
                                     cx.listener(|this, _ev, window, cx| {
                                         this.pick_sync_folder(true, window, cx);
                                     }),
@@ -445,12 +449,11 @@ fn render_job_settings(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElem
                                         .min_w_0()
                                         .children(target_input.as_ref().map(Input::new)),
                                 )
-                                .child(action_button(
+                                .child(ui::action_button(
                                     "sync-pick-target",
                                     "찾아보기",
-                                    theme.list,
-                                    fg,
-                                    border,
+                                    ui::Size::Md,
+                                    neutral_btn,
                                     cx.listener(|this, _ev, window, cx| {
                                         this.pick_sync_folder(false, window, cx);
                                     }),
@@ -461,12 +464,11 @@ fn render_job_settings(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElem
                                 .text_color(muted_fg)
                                 .child("경로를 직접 입력했다면 '경로 적용'을 눌러 저장하세요."),
                         )
-                        .child(action_button(
+                        .child(ui::action_button(
                             "sync-apply-paths",
                             "경로 적용",
-                            theme.list,
-                            fg,
-                            border,
+                            ui::Size::Md,
+                            neutral_btn,
                             cx.listener(|this, _ev, window, cx| {
                                 this.apply_sync_inputs(window, cx);
                             }),
@@ -526,30 +528,6 @@ fn render_job_settings(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElem
 // ─────────────────────────────────────────────
 // 공통 조각
 // ─────────────────────────────────────────────
-
-fn action_button(
-    id: &'static str,
-    label: &'static str,
-    bg: gpui::Hsla,
-    fg: gpui::Hsla,
-    accent: gpui::Hsla,
-    on_click: impl Fn(&gpui::ClickEvent, &mut Window, &mut gpui::App) + 'static,
-) -> AnyElement {
-    div()
-        .id(id)
-        .rounded_md()
-        .px_3()
-        .py_1()
-        .cursor_pointer()
-        .bg(bg)
-        .border_1()
-        .border_color(accent)
-        .text_color(fg)
-        .hover(|s| s.bg(accent))
-        .on_click(on_click)
-        .child(label)
-        .into_any_element()
-}
 
 fn option_row(
     id: &'static str,

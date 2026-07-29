@@ -22,6 +22,7 @@ use gpui_component::{
 
 use crate::app::AppRoot;
 use crate::window::scroll_pane;
+use crate::window::ui::{self, Tone};
 
 const INTERVAL_PRESETS: [u32; 5] = [5, 10, 30, 60, 120];
 
@@ -61,15 +62,15 @@ fn render_status_and_targets(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> A
     let total_targets = state.targets.len();
     let active_targets = state.targets.iter().filter(|t| t.enabled).count();
 
-    let (svc_label, svc_bg, svc_fg) = if is_active {
-        ("차단 동작 중", theme.success, theme.success_foreground)
+    let (svc_label, svc_tone) = if is_active {
+        ("차단 동작 중", Tone::Success)
     } else {
-        ("차단 중지됨", theme.warning, theme.warning_foreground)
+        ("차단 중지됨", Tone::Warning)
     };
-    let (tgt_label, tgt_bg, tgt_fg) = if is_running {
-        ("타겟 실행 중", theme.success, theme.success_foreground)
+    let (tgt_label, tgt_tone) = if is_running {
+        ("타겟 실행 중", Tone::Success)
     } else {
-        ("타겟 미실행", theme.muted, theme.muted_foreground)
+        ("타겟 미실행", Tone::Muted)
     };
 
     // ── 타겟 목록 ──
@@ -162,8 +163,8 @@ fn render_status_and_targets(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> A
                         .child(
                             h_flex()
                                 .gap_2()
-                                .child(badge(svc_label, svc_bg, svc_fg))
-                                .child(badge(tgt_label, tgt_bg, tgt_fg)),
+                                .child(ui::badge(svc_label, svc_tone, ui::Size::Md, cx))
+                                .child(ui::badge(tgt_label, tgt_tone, ui::Size::Md, cx)),
                         )
                         .child(
                             h_flex()
@@ -436,17 +437,6 @@ fn render_settings(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElement 
 // ─────────────────────────────────────────────
 // 공통 조각
 // ─────────────────────────────────────────────
-
-fn badge(label: &'static str, bg: gpui::Hsla, fg: gpui::Hsla) -> AnyElement {
-    div()
-        .rounded_md()
-        .px_3()
-        .py_1()
-        .bg(bg)
-        .text_color(fg)
-        .child(label)
-        .into_any_element()
-}
 
 fn stat_card(
     label: &'static str,

@@ -1,8 +1,11 @@
 # TODO — 단계적 구현 대기열
 
 > 이 문서는 **아직 구현되지 않은 작업**만 담는다.
-> 완료된 항목은 `TASKS.md`로 옮기고 여기서 지운다.
+> 끝낸 항목은 여기서 지우고, 결과는 `MasterPlan.md`「구현 완료 단계」에 한 단계로 적는다.
 > 단계 배경과 아키텍처 원칙은 `MasterPlan.md`, 코딩 규칙은 `.github/copilot-instructions.md`.
+>
+> **「즉시」 판정 항목(3개 파일 이상 중복, 1,000줄 초과)은 여기에 넣지 않는다** —
+> 발견한 작업 안에서 처리한다. 이 문서에 들어오는 것은 후보와 미착수 기능뿐이다.
 
 각 항목은 **한 턴/한 커밋 단위로 끝낼 수 있는 크기**로 쪼개 두었다.
 `선행` 표시가 있으면 그 항목을 먼저 끝내야 한다.
@@ -86,16 +89,18 @@
 
 ## 3. 구조 개선
 
-- [ ] **`window/ui.rs` 신설 — 공용 UI 프리미티브 승격** *(1순위)*
-      `PROJECTMAP.md`「중복 헬퍼 추적」의 🔴 항목부터 흡수한다.
-      - 상태 배지 3곳(`ad_block::badge` · `service_view::state_badge` · `service_mgr` 인라인)
-      - 액션 버튼 3곳+(`file_sync::action_button` · `service_view::action_button` · 인라인 다수)
-      - 이어서 🟡 스탯 타일(`stat_card`/`stat_tile`), 토글 행(`option_row`)
-      - `format_interval`은 UI가 아니므로 `util.rs`로 분리
+- [ ] **`window/ui.rs` 2차 승격 — 남은 🟡 후보** *(1순위)*
+      배지·액션 버튼은 승격 완료. 다음 차례는 `PROJECTMAP.md`「중복 헬퍼 추적」의 후보들이다.
+      - 스탯 타일 — `ad_block::stat_card` + `dashboard::stat_tile` → `ui::stat_tile(label, value, cx)`
+      - 토글 행 — `file_sync::option_row` + `settings.rs`·`ad_block.rs` 인라인 → `ui::option_row(..)`
+      - 선택 칩 — `settings::render_theme_option`·`render_filter_chip` + `service_mgr` 필터 행
+      - `format_interval` — UI가 아니므로 `util.rs`로 분리(`ad_block`의 `format!("{}초")` 3곳 흡수)
 
       승격 헬퍼는 색을 인자로 받지 말고 `cx.theme()`를 직접 읽는다. 승격 후 원본은 삭제.
-      구현 차이(`px_2` vs `px_3`) 통일은 **별도 커밋**으로 분리해 리팩터 커밋에서 화면이 바뀌지 않게 한다.
-      *효과: 네 패널 파일이 함께 줄어 아래 분할 후보가 불필요해질 수 있으므로 분할보다 먼저 한다.*
+
+- [ ] **`ButtonStyle` 덮어쓰기 정리** *(선행: 위 항목 아님, 독립)*
+      `PROJECTMAP.md`「승격 후 남은 덮어쓰기」 표의 3건을 기본값으로 통일한다.
+      화면이 실제로 바뀌므로 **리팩터와 섞지 말고 단독 커밋**으로 처리한다.
 
 - [ ] **`AppRoot` 분할 검토**
   현재 모든 패널 상태를 `AppRoot`가 직접 소유해 필드가 25개를 넘었다.

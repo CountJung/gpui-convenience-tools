@@ -5,6 +5,7 @@ pub mod log_view;
 pub mod service_mgr;
 pub mod service_view;
 pub mod settings;
+pub mod ui;
 
 use gpui::{
     div, AnyElement, ElementId, InteractiveElement, IntoElement, ParentElement, ScrollHandle,

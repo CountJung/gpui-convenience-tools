@@ -21,6 +21,7 @@ use std::{ops::Range, rc::Rc};
 use crate::app::{AppRoot, ServiceFilter};
 use crate::platform::SysServiceStatus;
 use crate::window::scroll_pane;
+use crate::window::ui::{self, ButtonStyle, Tone};
 
 pub fn render(this: &mut AppRoot, window: &mut Window, cx: &mut Context<AppRoot>) -> AnyElement {
     // ensure_service_search_input은 cx를 mut으로 빌리므로 theme() 이전에 호출
@@ -118,14 +119,12 @@ fn render_service_list(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElem
                             return div().h(px(52.0));
                         };
 
-                        let (badge_bg, badge_fg) = match svc.status {
-                            SysServiceStatus::Running => (theme.success, theme.success_foreground),
-                            SysServiceStatus::Stopped => (theme.muted, theme.muted_foreground),
+                        let badge_tone = match svc.status {
+                            SysServiceStatus::Running => Tone::Success,
+                            SysServiceStatus::Stopped => Tone::Muted,
                             SysServiceStatus::StartPending
-                            | SysServiceStatus::StopPending => {
-                                (theme.warning, theme.warning_foreground)
-                            }
-                            _ => (theme.muted, theme.muted_foreground),
+                            | SysServiceStatus::StopPending => Tone::Warning,
+                            _ => Tone::Muted,
                         };
                         let is_running = svc.status == SysServiceStatus::Running;
                         let status_label = svc.status.to_string();
@@ -187,38 +186,23 @@ fn render_service_list(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElem
                                     )
                                     // 상태 배지
                                     .child(
-                                        div()
-                                            .w(px(90.0))
-                                            .rounded_md()
-                                            .px_2()
-                                            .py_1()
-                                            .bg(badge_bg)
-                                            .text_color(badge_fg)
-                                            .child(status_label),
+                                        ui::badge(status_label, badge_tone, ui::Size::Sm, cx)
+                                            .w(px(90.0)),
                                     )
                                     // 시작 버튼
                                     .child(
-                                        div()
-                                            .id(("svc-start", svc_ix))
-                                            .w(px(52.0))
-                                            .rounded_md()
-                                            .px_2()
-                                            .py_1()
-                                            .cursor_pointer()
-                                            .bg(if is_running {
-                                                theme.muted
+                                        ui::action_button(
+                                            ("svc-start", svc_ix),
+                                            "시작",
+                                            ui::Size::Sm,
+                                            if is_running {
+                                                ButtonStyle::muted(cx)
+                                                    .border(theme.border)
+                                                    .hover(theme.secondary_hover)
                                             } else {
-                                                theme.list
-                                            })
-                                            .border_1()
-                                            .border_color(theme.border)
-                                            .text_color(if is_running {
-                                                theme.muted_foreground
-                                            } else {
-                                                theme.foreground
-                                            })
-                                            .hover(|s| s.bg(theme.secondary_hover))
-                                            .on_click(cx.listener(move |this, _ev, window, cx| {
+                                                ButtonStyle::neutral(cx)
+                                            },
+                                            cx.listener(move |this, _ev, window, cx| {
                                                 match this.platform.start_sys_service(&name_start) {
                                                     Ok(()) => {
                                                         this.push_service_log(
@@ -237,36 +221,22 @@ fn render_service_list(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElem
                                                     }
                                                 }
                                                 cx.notify();
-                                            }))
-                                            .child("시작"),
+                                            }),
+                                        )
+                                        .w(px(52.0)),
                                     )
                                     // 중지 버튼
                                     .child(
-                                        div()
-                                            .id(("svc-stop", svc_ix))
-                                            .w(px(52.0))
-                                            .rounded_md()
-                                            .px_2()
-                                            .py_1()
-                                            .cursor_pointer()
-                                            .bg(if is_running {
-                                                theme.danger
+                                        ui::action_button(
+                                            ("svc-stop", svc_ix),
+                                            "중지",
+                                            ui::Size::Sm,
+                                            if is_running {
+                                                ButtonStyle::danger(cx)
                                             } else {
-                                                theme.muted
-                                            })
-                                            .text_color(if is_running {
-                                                theme.danger_foreground
-                                            } else {
-                                                theme.muted_foreground
-                                            })
-                                            .hover(|s| {
-                                                if is_running {
-                                                    s.bg(theme.danger_active)
-                                                } else {
-                                                    s
-                                                }
-                                            })
-                                            .on_click(cx.listener(move |this, _ev, window, cx| {
+                                                ButtonStyle::muted(cx)
+                                            },
+                                            cx.listener(move |this, _ev, window, cx| {
                                                 match this.platform.stop_sys_service(&name_stop) {
                                                     Ok(()) => {
                                                         this.push_service_log(
@@ -285,27 +255,25 @@ fn render_service_list(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElem
                                                     }
                                                 }
                                                 cx.notify();
-                                            }))
-                                            .child("중지"),
+                                            }),
+                                        )
+                                        .w(px(52.0)),
                                     )
                                     // 삭제 버튼 (spacer + danger 스타일)
                                     .child(div().w(px(8.0)))
                                     .child(
-                                        div()
-                                            .id(("svc-delete", svc_ix))
-                                            .w(px(52.0))
-                                            .rounded_md()
-                                            .px_2()
-                                            .py_1()
-                                            .cursor_pointer()
-                                            .bg(theme.danger)
-                                            .text_color(theme.danger_foreground)
-                                            .hover(|s| s.bg(theme.danger_active))
-                                            .on_click(cx.listener(move |this, _ev, _window, cx| {
-                                                this.pending_delete_service = Some(name_delete.clone());
+                                        ui::action_button(
+                                            ("svc-delete", svc_ix),
+                                            "삭제",
+                                            ui::Size::Sm,
+                                            ButtonStyle::danger(cx),
+                                            cx.listener(move |this, _ev, _window, cx| {
+                                                this.pending_delete_service =
+                                                    Some(name_delete.clone());
                                                 cx.notify();
-                                            }))
-                                            .child("삭제"),
+                                            }),
+                                        )
+                                        .w(px(52.0)),
                                     ),
                             )
                     })
@@ -339,24 +307,16 @@ fn render_service_list(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElem
                             String::new()
                         }),
                 )
-                .child(
-                    div()
-                        .id("svc-refresh-btn")
-                        .rounded_md()
-                        .px_3()
-                        .py_1()
-                        .cursor_pointer()
-                        .bg(theme.list)
-                        .border_1()
-                        .border_color(theme.border)
-                        .text_color(theme.foreground)
-                        .hover(|s| s.bg(theme.secondary_hover))
-                        .on_click(cx.listener(|this, _ev, _window, cx| {
-                            this.refresh_sys_services();
-                            cx.notify();
-                        }))
-                        .child("새로고침"),
-                ),
+                .child(ui::action_button(
+                    "svc-refresh-btn",
+                    "새로고침",
+                    ui::Size::Md,
+                    ButtonStyle::neutral(cx),
+                    cx.listener(|this, _ev, _window, cx| {
+                        this.refresh_sys_services();
+                        cx.notify();
+                    }),
+                )),
             ),
     );
 
@@ -402,18 +362,12 @@ fn render_service_list(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElem
                             h_flex()
                                 .gap_2()
                                 .child(
-                                    div()
-                                        .id("svc-confirm-delete-btn")
-                                        .rounded_md()
-                                        .px_3()
-                                        .py_1()
-                                        .cursor_pointer()
-                                        .bg(theme.background)
-                                        .border_1()
-                                        .border_color(theme.danger_foreground)
-                                        .text_color(theme.danger)
-                                        .hover(|s| s.bg(theme.secondary_hover))
-                                        .on_click(cx.listener(move |this, _ev, window, cx| {
+                                    ui::action_button(
+                                        "svc-confirm-delete-btn",
+                                        "삭제 확인",
+                                        ui::Size::Md,
+                                        ButtonStyle::danger_outline(cx),
+                                        cx.listener(move |this, _ev, window, cx| {
                                             match this.platform.delete_sys_service(&del_confirm) {
                                                 Ok(()) => {
                                                     this.push_service_log(
@@ -433,27 +387,19 @@ fn render_service_list(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElem
                                             }
                                             this.pending_delete_service = None;
                                             cx.notify();
-                                        }))
-                                        .child("삭제 확인"),
+                                        }),
+                                    ),
                                 )
-                                .child(
-                                    div()
-                                        .id("svc-cancel-delete-btn")
-                                        .rounded_md()
-                                        .px_3()
-                                        .py_1()
-                                        .cursor_pointer()
-                                        .bg(theme.secondary)
-                                        .border_1()
-                                        .border_color(theme.border)
-                                        .text_color(theme.foreground)
-                                        .hover(|s| s.bg(theme.secondary_hover))
-                                        .on_click(cx.listener(|this, _ev, _window, cx| {
-                                            this.pending_delete_service = None;
-                                            cx.notify();
-                                        }))
-                                        .child("취소"),
-                                ),
+                                .child(ui::action_button(
+                                    "svc-cancel-delete-btn",
+                                    "취소",
+                                    ui::Size::Md,
+                                    ButtonStyle::secondary(cx),
+                                    cx.listener(|this, _ev, _window, cx| {
+                                        this.pending_delete_service = None;
+                                        cx.notify();
+                                    }),
+                                )),
                         ),
                 ),
         );

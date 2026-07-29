@@ -14,7 +14,7 @@
 ```text
 gpui-convenience-tools/          ← 저장소 루트
 ├── Cargo.toml                   # workspace (members = ["app"])
-├── MasterPlan.md / TASKS.md / TODO.md / README.md / CLAUDE.md / AGENTS.md
+├── MasterPlan.md / TODO.md / PROJECTMAP.md / README.md / CLAUDE.md / AGENTS.md
 ├── app/                         ← 유일한 크레이트 (package name = gpui-convenience-tools)
 │   ├── Cargo.toml
 │   ├── build.rs                 # /MANIFEST:NO (gpui 임베드 매니페스트 중복 방지)
@@ -153,6 +153,24 @@ cargo workspace, Hello World 앱 동작 확인
 - `app.rs`(1,798줄) → `app/` 7파일 분할, 대시보드·로그 렌더는 `window/`로 이동
 - `platform/windows.rs`(1,361줄) → `platform/windows/` 6파일 분할
 - 결과: 최대 파일 690줄, 1,000줄 초과 파일 없음
+
+### Phase H — 규칙을 구조 리팩터링 관점으로 승격 ✅
+
+기존 규칙이 "파일 자르기"로 읽혀 줄 수 지표만 내려가고 중복·오배치는 남는 문제가 있었다.
+
+- 「파일 크기 기준」 → **「구조 리팩터링 기준(1,000줄 트리거)」**: 기계적 분할 금지,
+  ① 중복 제거 → ② 오배치 책임 이동 → ③ 책임 단위 분할 순서로 재정의
+- **「공용 유틸 승격 기준」 신설** — 1,000줄과 무관하게 상시 적용, 「즉시」 판정은 즉시 처리
+- `PROJECTMAP.md`에 「공용 유틸 인벤토리」·「중복 헬퍼 추적」 추가
+
+### Phase I — 공용 UI 프리미티브 승격 ✅
+
+- `window/ui.rs` 신설 — `badge` · `action_button` + `Tone` / `ButtonStyle` / `Size`
+- 패널마다 흩어져 있던 정의 4개(`ad_block::badge`, `service_view::state_badge`,
+  `file_sync::action_button`, `service_view::action_button`)와 인라인 8곳을 흡수
+- 패널 4개 합계 140줄 감소, 색 선택은 `ui.rs`가 `cx.theme()`에서 직접 읽도록 일원화
+- `service_view` 버튼이 쓰던 `sidebar_primary` → `primary` 교정(사이드바 토큰 오용)
+- 문서 정리: 완료 이력은 이 문서로, 미착수는 `TODO.md`로 모으고 `TASKS.md` 제거
 
 ---
 

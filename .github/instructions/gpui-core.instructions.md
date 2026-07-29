@@ -1,7 +1,7 @@
 ---
 description: "Use when working on gpui-convenience-tools Rust code, GPUI UI, gpui-component theme tokens, workspace setup, phase implementation, or Windows platform integration."
 name: "GPUI Convenience Tools Core Rules"
-applyTo: "app/src/**/*.rs,**/*.toml,TASKS.md,MasterPlan.md,TODO.md,PROJECTMAP.md"
+applyTo: "app/src/**/*.rs,**/*.toml,MasterPlan.md,TODO.md,PROJECTMAP.md"
 ---
 # gpui-convenience-tools Core Rules Bridge
 
@@ -18,7 +18,8 @@ applyTo: "app/src/**/*.rs,**/*.toml,TASKS.md,MasterPlan.md,TODO.md,PROJECTMAP.md
   오배치 책임 이동 → 그래도 크면 책임 단위 분할 순서로 처리하고 `PROJECTMAP.md` 갱신
 - **중복 헬퍼는 상시 공용 유틸로 승격** — 이름이 달라도 같은 일을 하면 중복,
   3개 파일 이상이면 즉시 승격(UI 프리미티브는 `window/ui.rs`)
-- MasterPlan 단계와 TASKS 진행 상태 동기화
+- **「즉시」 판정 항목은 그 작업 안에서 처리**하고 대기열로 미루지 않는다
+- 완료 이력은 `MasterPlan.md`, 미착수 대기열은 `TODO.md` (별도 진행 문서 없음)
 - GPUI 0.2.2, gpui-component 0.5.1 호환 사용
 - 테마 토큰 기반 UI 스타일링(`card` / `destructive` 미사용)
 - 설정 저장은 `config::update_config` 단일 경로 사용
