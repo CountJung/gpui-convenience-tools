@@ -176,6 +176,9 @@
   책임이 섞였다는 신호이므로 리팩터링을 검토한다.
 - **공용 유틸 인벤토리**와 **중복 헬퍼 추적** 표를 유지한다. 새 헬퍼를 만들기 전에
   이 표를 먼저 확인해 이미 있는 것을 다시 만들지 않는다.
+- `PROJECTMAP.md`, `TODO.md` 같은 현재 상태·대기열 문서에서 처리 완료 항목을 취소선으로
+  남기지 않고 행이나 항목 자체를 삭제한다. 보존할 가치가 있는 완료 결과는 `MasterPlan.md`
+  「구현 완료 단계」 또는 `PROJECTMAP.md`「리팩터링 이력」에 한 번만 기록한다.
 
 ## GPUI 및 테마 기준
 
@@ -267,11 +270,55 @@
 - 단계 완료 확인 시 `cargo build`와 `cargo test`를 수행한다.
 - 새로 유입된 오류는 종료 전에 해결하거나 원인을 명시한다.
 
+## GPUI 자체 테스트 컨텍스트 필수 검증
+
+GPUI 레이아웃, 색상·테마, 가시성, 스크롤·클리핑, 포커스 또는 사용자 상호작용을 변경하는
+모든 작업은 GPUI 자체 테스트 컨텍스트를 사용한 회귀 테스트를 **반드시 추가하거나 갱신**한다.
+헬퍼 함수만 검사하는 순수 단위 테스트나 Computer Use 캡처만으로 이 요구를 대신할 수 없다.
+
+- `#[gpui::test]`와 `TestAppContext`/`VisualTestContext`로 실제 대상 뷰를 창에 렌더링한다.
+- `app/Cargo.toml`의 dev-dependency에서 `gpui/test-support` feature를 유지한다. 일반
+  dependency나 `--all-features`만으로 이 feature가 자동 활성화된다고 가정하지 않는다.
+- 변경 수용 기준마다 테스트 이름, 사전 상태, 창 크기, 입력, 기대 상태를 일대일로 연결한다.
+- 기본 창 크기와 변경 영역이 지원해야 할 최소 창 크기를 모두 검증한다. 최소 크기가 아직
+  정해지지 않았다면 해당 UI 변경에서 명시하고 테스트로 고정한다.
+- 크기 회귀는 `simulate_resize`, 클릭·키보드·wheel 입력은 `simulate_click`,
+  `simulate_keystrokes`, `simulate_event` 등 현재 고정된 GPUI 버전의 API로 재현한다.
+- 가능한 요소에는 안정적인 `debug_selector`를 부여하고 `debug_bounds`로 위치·크기·도달
+  가능성을 검증한다. selector로 찾을 수 있는 요소를 취약한 절대 좌표에만 의존하지 않는다.
+- 입력 뒤에는 엔티티·앱 상태, 선택·포커스 상태, 스크롤 핸들 offset, 대상 bounds 등
+  수용 기준을 나타내는 값을 단언한다. 단순히 패닉 없이 렌더링됐다는 사실만으로 통과하지 않는다.
+- UI가 테스트하기 어려우면 selector, 상태 조회 또는 테스트용 생성 경로를 같은 변경에
+  포함한다. 테스트 seam이 없다는 이유로 GPUI 테스트를 생략하지 않는다.
+
+영역별 최소 자동 검증은 다음과 같다.
+
+- 사이드바: 기본·최소 창 크기에서 그룹과 항목의 bounds가 유지되고, 활성·비활성 상태에
+  맞는 경계 토큰 정책을 별도 단언한다.
+- 스위치·테마: light/dark와 변경 관련 테마에서 실제 스위치를 on/off 조작하고 상태 전이를
+  단언한다. 팔레트 대비 순수 테스트는 전체 번들 테마를 검사하되 GPUI 렌더·입력 테스트를
+  대체하지 않는다.
+- 파일 동기화: 최소 창 높이에서 좌·우 패널을 각각 wheel 입력으로 스크롤하고 offset 변화와
+  마지막 컨트롤의 viewport 진입을 단언한다.
+
+관련 GPUI 테스트를 먼저 개별 실행한 뒤 단계 완료 전
+`cargo test --all-targets --all-features`를 통과시킨다. 완료 보고에는 테스트 이름, 창 크기,
+수행 입력, 기대·관찰 단언과 명령 결과를 기록한다. 관련 테스트가 없거나 실패하면 UI 작업은
+완료가 아니며, 아래 실제 앱 시각 검증도 `PASS`로 판정할 수 없다. OS 통합처럼 테스트
+컨텍스트가 직접 재현하지 못하는 범위는 한계를 명시하고 실제 앱에서 추가 검증하되, GPUI가
+소유한 렌더·레이아웃·입력 범위의 테스트는 여전히 필수다.
+
 ## GPUI 시각 검증 및 독립 크로스체크
 
 GPUI 레이아웃, 색상·테마, 가시성, 스크롤·클리핑, 사용자 상호작용을 변경하면 정적 검사와
-단위 테스트만으로 완료하지 않는다. 다음 두 검증을 **순차적으로** 수행한다. 같은 데스크톱을
-동시에 조작하면 상태와 증거가 섞일 수 있으므로 병렬 실행하지 않는다.
+GPUI 자체 테스트만으로 완료하지 않는다. 위 필수 테스트가 통과한 뒤 다음 두 검증을
+**순차적으로** 수행한다. 같은 데스크톱을 동시에 조작하면 상태와 증거가 섞일 수 있으므로
+병렬 실행하지 않는다.
+
+Computer Use 실행 표면은 **Windows ChatGPT 데스크톱 앱의 Work 또는 Codex**다.
+VS Code의 Codex IDE 확장은 플러그인 토글을 표시하더라도 Computer Use를 제공하지 않으므로,
+IDE 세션에서 helper·native pipe 재생성이나 확장 재시작을 반복하지 않는다. IDE 또는 Claude
+Code에서 구현했다면 빌드·커밋·수용 기준을 ChatGPT 데스크톱 검증 세션에 인계한다.
 
 1. 구현 담당자가 실제 빌드의 앱을 Computer Use로 직접 조작하고 수용 기준별 캡처를 남긴다.
 2. 구현에 참여하지 않고 파일을 편집하지 않는 Visual Reviewer가 별도 검증 세션에서 같은
@@ -293,11 +340,13 @@ GPUI 레이아웃, 색상·테마, 가시성, 스크롤·클리핑, 사용자 �
 
 Codex는 Visual Reviewer를 생성할 때 `.github/agents/ui-visual-reviewer.agent.md`를 먼저
 읽도록 위임한다. Claude Code는 `.claude/agents/ui-visual-reviewer.md`의 프로젝트
-서브에이전트를 사용한다. 두 어댑터 모두 이 문서의 같은 계약을 적용하며, 주 세션에
-Computer Use/node_repl 도구가 제공되지 않으면 독립 검증은 `BLOCKED`다.
+서브에이전트를 사용한다. 두 어댑터 모두 이 문서의 같은 계약을 적용한다. 현재 표면이
+Computer Use를 제공하지 않으면 `BLOCKED`와 함께 ChatGPT 데스크톱 인계가 필요하다고 보고한다.
 
-### Computer Use 시작 전 health check
+### ChatGPT 데스크톱 Computer Use health check
 
+- 먼저 현재 표면이 Windows ChatGPT 데스크톱 앱의 Work 또는 Codex인지 확인한다. Codex IDE
+  확장이면 wrapper를 초기화하지 않고 `BLOCKED(surface unavailable)`로 인계한다.
 - 매 새 `node_repl` 세션에서 설치된 Computer Use 스킬을 먼저 읽는다.
 - 스킬이 제공하는 `<plugin-root>/scripts/computer-use-client.mjs`의
   `setupComputerUseRuntime`으로만 초기화하고 `sky.documentation("guidance")`를 읽는다.
@@ -307,9 +356,9 @@ Computer Use/node_repl 도구가 제공되지 않으면 독립 검증은 `BLOCKE
 - `@oai/sky` 직접 import, `codex-computer-use.exe` 직접 실행, 사용자 정의 native-pipe
   클라이언트, PowerShell UI 자동화로의 우회는 금지한다.
 - 초기화나 첫 캡처가 실패하면 새 `node_repl` 세션에서 공식 wrapper 경로로 한 번 재시도한다.
-  네이티브 helper·pipe가 계속 없으면 현재 검증을 `BLOCKED`로 종료한다. 사용자가
-  Codex/확장 호스트를 완전히 재시작한 다음 새 세션에서 health check를 다시 수행한다.
-  현재 세션에서 직접 helper를 띄우거나 재시작을 성공한 검증으로 간주하지 않는다.
+  지원되는 ChatGPT 데스크톱 표면에서도 네이티브 helper·pipe가 계속 없으면 데스크톱 앱을
+  완전히 재시작한 다음 새 세션에서 다시 확인한다. 현재 세션에서 직접 helper를 띄우거나
+  재시작을 성공한 검증으로 간주하지 않는다.
 
 ### 영역별 회귀 시나리오
 
@@ -328,8 +377,9 @@ Computer Use/node_repl 도구가 제공되지 않으면 독립 검증은 `BLOCKE
 시나리오별 사전 조건(테마·창 크기·앱 상태), 동작, 기대 결과, 관찰 결과, 캡처 식별자·시각,
 결과, 검증 간 불일치, 잔여 위험을 기록한다.
 
-`BLOCKED`에는 실패 단계(import/setup/attach/capture/input), 실행한 정확한 API 또는 명령,
-원문 오류, 복구 시도, 대체 정적·자동 검증 결과, 아직 확인하지 못한 수용 기준을 함께 적는다.
+`BLOCKED`에는 실패 단계(surface/import/setup/attach/capture/input), 실행한 정확한 API 또는
+명령, 원문 오류, 복구 시도, 대체 정적·자동 검증 결과, ChatGPT 데스크톱 인계 필요 여부,
+아직 확인하지 못한 수용 기준을 함께 적는다.
 기존 스크린샷이나 구두 설명만으로 시각 검증을 통과 처리하지 않는다.
 
 ## 작업 후 오류 리뷰 기준

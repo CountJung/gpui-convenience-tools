@@ -19,5 +19,7 @@ windows-service = { workspace = true }
 
 [target.'cfg(target_os = "windows")'.build-dependencies]
 
+[dev-dependencies]
+gpui = { workspace = true, features = ["test-support"] }
 
 

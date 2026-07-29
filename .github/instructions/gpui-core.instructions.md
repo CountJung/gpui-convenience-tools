@@ -25,5 +25,6 @@ applyTo: "app/src/**/*.rs,**/*.toml,MasterPlan.md,TODO.md,PROJECTMAP.md"
 - 스위치는 `window::ui::toggle_switch`, 테마 변경은 `crate::theme::change_theme` 사용
 - `scroll_pane` 컨텐츠 루트는 자연 높이 유지(`w_full`; `size_full`/세로 `flex_1` 금지)
 - 설정 저장은 `config::update_config` 단일 경로 사용
-- GPUI UI 변경 시 정본의 「GPUI 시각 검증 및 독립 크로스체크」 절 적용
+- GPUI UI 변경 시 정본의 「GPUI 자체 테스트 컨텍스트 필수 검증」과
+  「GPUI 시각 검증 및 독립 크로스체크」 절 적용
 - 작업 후 Error Reviewer 기반 오류 전용 리뷰

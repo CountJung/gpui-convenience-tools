@@ -226,7 +226,8 @@ SCM 코드(`install_win_service` 등)는 남아 있지만 이 용도로는 쓰�
   단, context7 문서는 main 브랜치 기준이라 0.5.1과 다를 수 있으므로 **시그니처 확인은
   `~/.cargo/registry`의 로컬 크레이트 소스가 우선**이다.
 - 코드 수정 후 `cargo check`, 단계 완료 시 `cargo build` + `cargo test`.
-- GPUI UI 변경은 정본의 「GPUI 시각 검증 및 독립 크로스체크」를 적용하고, 독립 검증에는
+- GPUI UI 변경은 정본의 「GPUI 자체 테스트 컨텍스트 필수 검증」과
+  「GPUI 시각 검증 및 독립 크로스체크」를 적용하고, 독립 검증에는
   [.claude/agents/ui-visual-reviewer.md](.claude/agents/ui-visual-reviewer.md)를 사용한다.
 - 작업 범위는 `MasterPlan.md` 단계 기준. **완료 이력은 `MasterPlan.md`「구현 완료 단계」,
   미착수 대기열은 `TODO.md`** 두 곳만 쓴다(체크리스트를 복제하던 `TASKS.md`는 제거됨).

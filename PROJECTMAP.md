@@ -139,8 +139,6 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 
 | 중복 | 위치 | 판정 | 상태 |
 | --- | --- | --- | --- |
-| 상태 배지 | ~~`ad_block::badge` · `service_view::state_badge` · `service_mgr` 인라인~~ | 🔴 3곳 | ✅ **승격 완료** → `ui::badge` (2026-07-29) |
-| 액션 버튼 | ~~`file_sync::action_button` · `service_view::action_button` · `service_mgr` 인라인 6곳~~ | 🔴 3곳+ | ✅ **승격 완료** → `ui::action_button` (2026-07-29) |
 | 스탯 타일 | `ad_block.rs stat_card` · `dashboard.rs stat_tile` | 🟡 2곳 | 후보 — `ui::stat_tile(label, value, cx)` |
 | 토글 행 (설명 + `ui::toggle_switch`) | `file_sync.rs option_row` · `settings.rs` · `ad_block.rs` 인라인 | 🟡 2곳+ | 후보 — `ui::option_row(..)` |
 | 선택 칩/옵션 행 | `settings.rs render_theme_option` · `render_filter_chip` · `service_mgr.rs` 필터 행 | 🟡 2곳+ | 후보 — 선택 상태를 인자로 받는 `ui::choice_row(..)` |
@@ -202,7 +200,7 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 
 ### 1순위 — 남은 중복 제거 (줄 수 무관, 지금 처리 가능)
 
-🔴 항목은 처리했다. 남은 🟡 후보 중 **스탯 타일**과 **토글 행**이 다음 차례다.
+남은 🟡 후보 중 **스탯 타일**과 **토글 행**이 다음 차례다.
 셋 다 `ui.rs`에 흡수되며, 그만큼 아래 2순위 분할이 뒤로 밀린다. **그래서 순서가 중요하다.**
 
 ### 2순위 — 책임 재배치·분할 (중복 제거 후에도 크면)

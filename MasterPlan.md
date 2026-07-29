@@ -172,7 +172,15 @@ cargo workspace, Hello World 앱 동작 확인
 - `service_view` 버튼이 쓰던 `sidebar_primary` → `primary` 교정(사이드바 토큰 오용)
 - 문서 정리: 완료 이력은 이 문서로, 미착수는 `TODO.md`로 모으고 `TASKS.md` 제거
 
-### Phase J — 테마 가시성·스크롤 안정화 ✅
+---
+
+## 검증 재개 단계
+
+### Phase J — 테마 가시성·스크롤 안정화 🧪
+
+구현 변경은 반영되었지만 새 GPUI 자체 테스트 필수 게이트를 소급 적용해 최종 완료 판정을
+재개했다. `TODO.md`의 네이티브 테스트와 실제 화면 순차 검증을 모두 통과하기 전에는 완료로
+분류하지 않는다.
 
 - 사이드바 그룹과 개별 항목에 `sidebar_border` 기반 경계를 적용해 비활성 항목 구분 강화
 - 번들 테마 36개 변형의 스위치 팔레트를 감사하고, 누락 토큰을 런타임 최소 대비 정책으로 보정
@@ -181,6 +189,8 @@ cargo workspace, Hello World 앱 동작 확인
 - Codex·Claude 공용 정본과 GPUI 스킬에 테마·스크롤 회귀 방지 규칙 반영
 - Computer Use health check와 구현 담당자·독립 Visual Reviewer의 순차 크로스체크 계약 및
   Codex·Claude Code 에이전트 연결 추가
+- `TestAppContext`/`VisualTestContext` 기반 수용 기준별 GPUI 회귀 테스트를 모든 UI 변경의
+  필수 완료 조건으로 정본·스킬·Codex/Claude 브리지에 반영
 
 ---
 

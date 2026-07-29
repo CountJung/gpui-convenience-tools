@@ -131,7 +131,16 @@ ALWAYS use:
 
 ## VISUAL OUTPUT VALIDATION
 
-- Follow `.github/copilot-instructions.md` section `GPUI 시각 검증 및 독립 크로스체크`.
+- Follow `.github/copilot-instructions.md` sections
+  `GPUI 자체 테스트 컨텍스트 필수 검증` and `GPUI 시각 검증 및 독립 크로스체크`.
+- Every UI change MUST add or update a `#[gpui::test]` that renders the affected view through
+  `TestAppContext`/`VisualTestContext` and asserts the implementation's acceptance criteria.
+- Keep `gpui/test-support` enabled through the app's dev-dependency; `--all-features` alone
+  does not enable a feature that the application dependency did not declare.
+- Exercise applicable resize, click, keyboard, and scroll paths. Add stable `debug_selector`
+  test seams when needed; a helper-only test or a render-without-assertion smoke test is not enough.
+- Missing or failing native GPUI coverage means the UI task is incomplete. Computer Use
+  verification remains a separate required gate for visual output.
 
 ---
 

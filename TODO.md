@@ -14,6 +14,14 @@
 
 ## 0. 즉시 처리 (검증 잔여)
 
+- [ ] **Phase J GPUI 자체 테스트 및 실제 화면 순차 검증**
+  사이드바 경계, light/dark·이슈 테마의 on/off 스위치, 파일 동기화 좌·우 스크롤과 마지막
+  항목 도달을 `TestAppContext`/`VisualTestContext` 회귀 테스트로 먼저 구현·통과시킨다.
+  이어서 Windows ChatGPT 데스크톱 앱의 Work 또는 Codex에서 구현 담당자 1차 검증 후 독립
+  Visual Reviewer 2차 검증을 수행하고 각 수용 기준을 캡처한다. 파일 동기화는 임시 `APPDATA`
+  격리 환경을 사용한다. VS Code의 Codex IDE 확장은 Computer Use를 제공하지 않으므로 실제
+  화면 검증 표면으로 사용하지 않는다.
+
 - [ ] **릴리즈 빌드 링크 확인**
   실행 중인 인스턴스가 `target\release\gpui-convenience-tools.exe`를 잠그면
   `cargo build --release`가 `os error 5`로 실패한다.
@@ -90,7 +98,7 @@
 ## 3. 구조 개선
 
 - [ ] **`window/ui.rs` 2차 승격 — 남은 🟡 후보** *(1순위)*
-      배지·액션 버튼은 승격 완료. 다음 차례는 `PROJECTMAP.md`「중복 헬퍼 추적」의 후보들이다.
+      `PROJECTMAP.md`「중복 헬퍼 추적」의 후보들을 처리한다.
       - 스탯 타일 — `ad_block::stat_card` + `dashboard::stat_tile` → `ui::stat_tile(label, value, cx)`
       - 토글 행 — `file_sync::option_row` + `settings.rs`·`ad_block.rs` 인라인 → `ui::option_row(..)`
       - 선택 칩 — `settings::render_theme_option`·`render_filter_chip` + `service_mgr` 필터 행
