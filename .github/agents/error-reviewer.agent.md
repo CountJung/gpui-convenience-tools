@@ -1,8 +1,8 @@
-﻿---
+---
 description: "Use when you need post-task code error analysis, compile/lint diagnostics review, or root-cause explanation without applying fixes. Keywords: error review, diagnostics, cargo check errors, lint analysis, failure triage."
 name: "Error Reviewer"
 tools: [read, search, execute]
-argument-hint: "�м�??��??����, ??�� �α�, ??�� ??????��??��??��??��."
+argument-hint: "분석할 대상 범위, 빌드 로그, 오류 메시지를 함께 전달하세요."
 user-invocable: false
 agents: []
 ---
@@ -38,6 +38,3 @@ You are an error-analysis-only subagent for gpui-convenience-tools.
   - Cause: probable root cause
   - Suggested fix: concise next step
 - Residual Risk: what may still fail after fixes
-
-
-

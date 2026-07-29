@@ -1,131 +1,144 @@
 # GitHub Copilot Main Instructions
 
-## ����
+## 목적
 
-??����??gpui-convenience-tools ????��??�� GitHub Copilot????��????�� ���� ��??����??
-��� ����, ����, ���� ����?? ??����??��????�� ??��??��.
+이 문서는 gpui-convenience-tools 저장소의 코딩 지침 단일 정본이다.
+모든 구현, 리뷰, 문서 갱신은 이 문서를 기준으로 수행한다.
 
-## ??�� ����
+## 프로젝트 정체성
 
-- Rust ??�� �ڵ� ??��
-- GPUI UI ����
-- gpui-component ??�� ??��
-- Windows ??��????�� �ڵ�
-- ??ũ??��??�� ??�� ??��??���� ���� ����
+**GPUI 기반 다용도 데스크탑 보조 도구(convenience tools) 모음.**
 
-## ??�� ??�� ??Ģ
+하나의 앱 안에 서로 독립적인 편의 기능들을 패널 단위로 추가해 나가는 구조다.
+특정 기능(광고 차단 등)이 앱의 정체성이 아니라, **편의 기능을 담는 그릇**이 정체성이다.
+따라서 새 기능을 추가할 때 기존 기능과 결합하지 말고 독립 패널로 만든다.
 
-- ??����??�ڵ� ��ħ�� ??�� ??��??�� ??????��.
-- ??�� ����??�� ��Ģ??�ߺ� ??��???? ??��, ??����??��ũ??��.
-- ��Ģ ����?? ��?? ??����??�ݿ�???? ���� ����??��ũ????????��.
+현재 편의 기능:
 
-## ���� ��??
+| 기능 | 사이드바 명칭 | 모듈 |
+| --- | --- | --- |
+| WebView 광고 창 숨김 | 웹뷰 광고 차단 | `window/ad_block.rs` |
+| 폴더 → 폴더 주기 동기화 | 파일 동기화 | `window/file_sync.rs` |
+| Win32 서비스 제어 | Windows 서비스 | `window/service_mgr.rs` |
 
-- MasterPlan ??�� ��????�� ??�� ����??����??��.
-- ??�� ��ǥ??����??�� ??Ű??ó ����?? ??��????û????�� ????��???? ??��??
-- TASKS ���� ??��????�� ??�� ��????�� ����??��.
+## 적용 범위
 
-## GPUI ????�� ��??
+- Rust 소스 코드 수정
+- GPUI UI 구현
+- gpui-component 테마 적용
+- Windows 플랫폼 통합 코드
+- 워크스페이스 설정 파일과 진행 문서 갱신
 
-- GPUI 0.2.2, gpui-component 0.5.1 ??ȯ API????��??��.
-- ??��?? �ݵ�??cx.theme().??ū ���??�� ??��??��.
-- ??���ڵ� ??���� ??��???? ??��??
-- ???? ��� ??ū ����????????��.
-  # GitHub Copilot Main Instructions
+## 단일 정본 원칙
 
-  ## 목적
+- 이 문서를 코딩 지침의 단일 정본으로 유지한다.
+- 다른 문서에는 규칙을 중복 작성하지 않고, 이 문서를 링크한다.
+- 규칙 변경은 먼저 이 문서에 반영한 뒤, 참조 문서는 링크만 유지한다.
 
-  이 문서는 gpui-convenience-tools 저장소에서 GitHub Copilot이 따라야 하는 메인 지침 문서다.
-  모든 구현, 리뷰, 문서 갱신은 이 문서를 기준으로 수행한다.
+## 구현 기준
 
-  ## 적용 범위
+- MasterPlan 단계 기준으로 작업 범위를 결정한다.
+- 단계 목표를 벗어나는 아키텍처 변경은 사용자 요청이 없는 한 수행하지 않는다.
+- TASKS 진행 상태는 실제 완료 기준으로 갱신한다.
 
-  - Rust 소스 코드 수정
-  - GPUI UI 구현
-  - gpui-component 테마 적용
-  - Windows 플랫폼 통합 코드
-  - 워크스페이스 설정 파일과 진행 문서 갱신
+## 편의 기능 패널 구조 기준
 
-  ## 단일 정본 원칙
+새 편의 기능은 다음 구조를 따른다.
 
-  - 이 문서를 코딩 지침의 단일 정본으로 유지한다.
-  - 다른 문서에는 규칙을 중복 작성하지 않고, 이 문서를 링크한다.
-  - 규칙 변경은 먼저 이 문서에 반영한 뒤, 참조 문서는 링크만 유지한다.
+1. `ActivePanel`에 variant를 추가한다.
+2. `NAV_TOOLS`(app.rs)에 (패널, 명칭, 한 줄 설명)을 추가한다.
+   명칭은 기능을 모르는 사용자도 이해할 수 있는 한국어로 짓는다.
+3. `window/<기능>.rs`에 `pub fn render(this: &mut AppRoot, window, cx) -> AnyElement`를 만든다.
+4. 패널 내부는 **스플리터(`h_resizable`)로 기능 영역과 설정 영역을 분리**한다.
+   - 왼쪽: 기능 본체(목록, 상태, 실행 결과)
+   - 오른쪽: 그 기능의 설정
+   - 각 영역은 `window::scroll_pane`으로 감싸 자체 스크롤을 갖는다.
+5. 앱 전역 설정(테마, 로그 보관)만 `window/settings.rs`에 둔다.
+   기능별 설정을 전역 설정 페이지에 넣지 않는다.
+6. `app.rs`의 `fills_height` 목록에 새 패널을 추가한다(스플리터는 높이를 스스로 채우므로).
 
-  ## 구현 기준
+## GPUI 및 테마 기준
 
-  - MasterPlan 단계 기준으로 작업 범위를 결정한다.
-  - 단계 목표를 벗어나는 아키텍처 변경은 사용자 요청이 없는 한 수행하지 않는다.
-  - TASKS 진행 상태는 실제 완료 기준으로 갱신한다.
+- GPUI 0.2.2, gpui-component 0.5.1 호환 API만 사용한다.
+- 색상은 반드시 `cx.theme().<토큰>` 방식으로 사용한다.
+- 하드코딩 색상값을 사용하지 않는다.
+- 의미 기반 토큰 매핑을 유지한다.
+  - 페이지 배경: `background`
+  - 기본 텍스트: `foreground`
+  - 주요 액션: `primary`, `primary_foreground`
+  - 보더: `border`
+  - 사이드바: `sidebar`, `sidebar_foreground`, `sidebar_primary`, `sidebar_primary_foreground`, `sidebar_accent`
+  - 카드 유사 표면: `secondary` 또는 `list`
+  - 위험 상태: `danger`
+- `card`, `destructive` 토큰에 의존하지 않는다.
 
-  ## GPUI 및 테마 기준
+## UI 구성 기준
 
-  - GPUI 0.2.2, gpui-component 0.5.1 호환 API만 사용한다.
-  - 색상은 반드시 cx.theme().토큰 방식으로 사용한다.
-  - 하드코딩 색상값을 사용하지 않는다.
-  - 의미 기반 토큰 매핑을 유지한다.
-    - 페이지 배경: background
-    - 기본 텍스트: foreground
-    - 주요 액션: primary, primary_foreground
-    - 보더: border
-    - 사이드바: sidebar, sidebar_foreground, sidebar_primary, sidebar_primary_foreground, sidebar_accent
-    - 카드 유사 표면: secondary 또는 list
-    - 위험 상태: danger
-  - card, destructive 토큰에 의존하지 않는다.
+- `h_flex`, `v_flex` 중심으로 구성한다.
+- 간격은 `gap` 계열 규칙을 우선 사용한다.
+- 렌더 트리는 가능한 얕게 유지한다.
+- 렌더 경로에 비즈니스 로직을 넣지 않는다.
+- UI 코드에서 `unwrap` 사용을 지양한다.
 
-  ## UI 구성 기준
+## 상호작용 및 상태 기준
 
-  - h_flex, v_flex 중심으로 구성한다.
-  - 간격은 gap 계열 규칙을 우선 사용한다.
-  - 렌더 트리는 가능한 얕게 유지한다.
-  - 렌더 경로에 비즈니스 로직을 넣지 않는다.
-  - UI 코드에서 unwrap 사용을 지양한다.
+- 이벤트 처리는 listener 패턴을 사용한다.
+- 로컬 상태 변경 후 필요한 경우 `cx.notify`를 호출한다.
+- `div` 클릭 상호작용은 상태 기반 interactivity 요건을 만족한다(`.id()` 필요).
+- 테마 변경은 `Theme::change(ThemeMode::Light 또는 ThemeMode::Dark, Some(window), cx)`로 처리한다.
 
-  ## 상호작용 및 상태 기준
+## 상태 전달 기준
 
-  - 이벤트 처리는 listener 패턴을 사용한다.
-  - 로컬 상태 변경 후 필요한 경우 cx.notify를 호출한다.
-  - div 클릭 상호작용은 상태 기반 interactivity 요건을 만족한다.
-  - 테마 변경은 Theme::change(ThemeMode::Light 또는 ThemeMode::Dark, Some(window), cx)로 처리한다.
+- **UI → 백그라운드**는 공유 뮤텍스로 전달한다(`ScannerState`, `SyncSharedState`).
+  상태를 바꾼 뒤 반드시 동기화 함수를 호출한다.
+- **백그라운드 → UI**는 `PlatformEvent` 채널로만 전달한다.
+  UI 이벤트 핸들러도 상태를 직접 고치지 말고 채널을 경유한다.
+- 예외: 동기 호출이 필요한 서비스 제어(`service_mgr.rs`)는 platform 메서드를 직접 호출한다.
 
-  ## 플랫폼 및 안전 기준
+## 설정 저장 기준
 
-  - 플랫폼 종속 코드는 platform 경로 하위에 분리한다.
-  - Windows 종속 구현은 cfg(target_os = "windows") 게이트를 유지한다.
-  - 사용자 요청 없는 파괴적 git 명령은 사용하지 않는다.
-  - 관련 없는 기존 변경사항은 보존한다.
+- 설정 저장은 반드시 `config::update_config`를 사용한다.
+  읽기-수정-쓰기를 한 경로로 모아 필드 유실을 방지하기 위한 규칙이다.
+- 개별 저장 지점에서 `AppConfig`를 직접 구성하지 않는다.
+- 새 필드에는 `#[serde(default)]`를 붙여 기존 config.json 호환성을 유지한다.
 
-  ## 라이브러리 문서 조회 기준
+## 플랫폼 및 안전 기준
 
-  - GPUI, gpui-component, windows-sys 등 외부 라이브러리 API를 사용할 때는 반드시 mcp_context7을 통해 최신 문서를 조회한다.
-  - 조회 순서: `mcp_context7_resolve-library-id`로 라이브러리 ID 확인 → `mcp_context7_query-docs`로 특정 API 문서 조회.
-  - 라이브러리 버전이 명시된 경우 `/org/project/version` 형식 ID를 사용한다.
-  - 주요 라이브러리 참조:
-    - gpui-component: `/longbridge/gpui-component` (현재 버전 0.5.1)
-    - GPUI 프레임워크: gpui 관련 API는 gpui-component 문서에서 함께 조회
-    - windows-sys: Windows Win32 API 사용 전 함수/상수 이름 확인
-  - mcp_context7에서 확인한 API 패턴이 실제 빌드 결과와 다를 경우, 로컬 크레이트 소스(`~/.cargo/registry`)를 직접 확인하여 최종 판단한다.
+- 플랫폼 종속 코드는 `platform` 경로 하위에 분리한다.
+- Windows 종속 구현은 `cfg(target_os = "windows")` 게이트를 유지한다.
+- 사용자 요청 없는 파괴적 git 명령은 사용하지 않는다.
+- 관련 없는 기존 변경사항은 보존한다.
 
-  ## 검증 및 완료 보고 기준
+## 라이브러리 문서 조회 기준
 
-  - 코드 수정 후 cargo check를 수행한다.
-  - 단계 완료 확인 시 cargo build를 수행한다.
-  - 새로 유입된 오류는 종료 전에 해결하거나 원인을 명시한다.
+- GPUI, gpui-component, windows-sys 등 외부 라이브러리 API를 사용할 때는 반드시 mcp_context7을 통해 최신 문서를 조회한다.
+- 조회 순서: `mcp_context7_resolve-library-id`로 라이브러리 ID 확인 → `mcp_context7_query-docs`로 특정 API 문서 조회.
+- 라이브러리 버전이 명시된 경우 `/org/project/version` 형식 ID를 사용한다.
+- 주요 라이브러리 참조:
+  - gpui-component: `/longbridge/gpui-component` (현재 버전 0.5.1)
+  - GPUI 프레임워크: gpui 관련 API는 gpui-component 문서에서 함께 조회
+  - windows-sys: Windows Win32 API 사용 전 함수/상수 이름 확인
+- mcp_context7에서 확인한 API 패턴이 실제 빌드 결과와 다를 경우, 로컬 크레이트 소스(`~/.cargo/registry`)를 직접 확인하여 최종 판단한다.
+  context7 문서는 main 브랜치 기준이라 0.5.1과 다를 수 있으므로, 시그니처 확인은 로컬 소스가 우선이다.
 
-  ## 작업 후 오류 리뷰 기준
+## 검증 및 완료 보고 기준
 
-  - 각 구현 작업 직후 Error Reviewer 서브 에이전트로 오류 전용 리뷰를 수행한다.
-  - 리뷰 범위는 컴파일, 린트, 진단 오류로 제한한다.
-  - 완료 보고에는 아래 중 하나를 반드시 포함한다.
-    - 코드 오류 없음
-    - 오류 목록, 위치, 원인 요약
+- 코드 수정 후 `cargo check`를 수행한다.
+- 단계 완료 확인 시 `cargo build`와 `cargo test`를 수행한다.
+- 새로 유입된 오류는 종료 전에 해결하거나 원인을 명시한다.
 
-  ## 문서 구조
+## 작업 후 오류 리뷰 기준
 
-  - 메인 지침: .github/copilot-instructions.md
-  - 파일별 자동 적용 지침: .github/instructions/kakao-gpui-core.instructions.md
-  - 오류 분석 서브 에이전트: .github/agents/error-reviewer.agent.md
-  - 루트 안내 문서: AGENTS.md
+- 각 구현 작업 직후 Error Reviewer 서브 에이전트로 오류 전용 리뷰를 수행한다.
+- 리뷰 범위는 컴파일, 린트, 진단 오류로 제한한다.
+- 완료 보고에는 아래 중 하나를 반드시 포함한다.
+  - 코드 오류 없음
+  - 오류 목록, 위치, 원인 요약
 
+## 문서 구조
 
-
+- 메인 지침: `.github/copilot-instructions.md`
+- 파일별 자동 적용 지침: `.github/instructions/gpui-core.instructions.md`
+- 오류 분석 서브 에이전트: `.github/agents/error-reviewer.agent.md`
+- 루트 안내 문서: `AGENTS.md`, `CLAUDE.md`
+- 계획: `MasterPlan.md` / 진행: `TASKS.md` / 단계 구현 대기열: `TODO.md`

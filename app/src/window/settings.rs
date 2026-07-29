@@ -5,12 +5,18 @@ use gpui::{
 use gpui_component::{
     input::Input,
     h_flex, v_flex,
+    switch::Switch,
     IconName,
     theme::{ActiveTheme, Theme, ThemeMode, ThemeRegistry},
 };
 
 use crate::app::AppRoot;
 use crate::config::save_theme_selection;
+
+/// 로그 보관 설정 프리셋.
+const MAX_FILES_PRESETS: [u32; 5] = [3, 5, 10, 20, 50];
+const MAX_AGE_PRESETS: [u32; 5] = [0, 7, 14, 30, 90];
+const MAX_SIZE_PRESETS: [u32; 5] = [1, 5, 10, 50, 100];
 
 fn render_theme_option(
     id_seed: usize,
@@ -85,6 +91,165 @@ fn render_filter_chip(
         .into_any_element()
 }
 
+/// 로그 보관 설정 카드.
+///
+/// 개수·날짜·용량 세 기준이 함께 적용되며, 어느 하나라도 초과하면 오래된 파일이 지워진다.
+fn render_log_settings(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElement {
+    let theme = cx.theme();
+    let fg = theme.foreground;
+    let muted_fg = theme.muted_foreground;
+    let border = theme.border;
+    let bg_card = theme.secondary;
+    let selected_bg = theme.primary;
+    let selected_fg = theme.primary_foreground;
+    let selected_border = theme.primary_hover;
+
+    let config = this.log_config.clone();
+    let (file_count, total_bytes) = crate::logging::log_dir_stats();
+    let log_dir = crate::config::logs_path();
+
+    // 프리셋 칩 한 줄을 만든다. `apply`는 선택된 값을 LogConfig에 반영한다.
+    fn preset_row(
+        id_prefix: &'static str,
+        presets: &'static [u32],
+        current: u32,
+        label_of: fn(u32) -> String,
+        apply: fn(&mut crate::config::LogConfig, u32),
+        bg_card: gpui::Hsla,
+        fg: gpui::Hsla,
+        border: gpui::Hsla,
+        selected_bg: gpui::Hsla,
+        selected_fg: gpui::Hsla,
+        selected_border: gpui::Hsla,
+        hover_bg: gpui::Hsla,
+        cx: &mut Context<AppRoot>,
+    ) -> AnyElement {
+        let mut row = h_flex().gap_2().flex_wrap();
+        for &value in presets {
+            let is_selected = current == value;
+            row = row.child(
+                div()
+                    .id((id_prefix, value as usize))
+                    .rounded_md()
+                    .px_3()
+                    .py_2()
+                    .cursor_pointer()
+                    .bg(if is_selected { selected_bg } else { bg_card })
+                    .text_color(if is_selected { selected_fg } else { fg })
+                    .border_1()
+                    .border_color(if is_selected { selected_border } else { border })
+                    .hover(|s| s.bg(hover_bg))
+                    .on_click(cx.listener(move |this, _ev, _window, cx| {
+                        this.update_log_config(cx, |cfg| apply(cfg, value));
+                    }))
+                    .child(label_of(value)),
+            );
+        }
+        row.into_any_element()
+    }
+
+    let hover_bg = theme.secondary_hover;
+
+    let files_row = preset_row(
+        "log-max-files",
+        &MAX_FILES_PRESETS,
+        config.max_files,
+        |v| format!("{v}개"),
+        |cfg, v| cfg.max_files = v,
+        bg_card, fg, border, selected_bg, selected_fg, selected_border, hover_bg,
+        cx,
+    );
+    let age_row = preset_row(
+        "log-max-age",
+        &MAX_AGE_PRESETS,
+        config.max_age_days,
+        |v| if v == 0 { "제한 없음".to_string() } else { format!("{v}일") },
+        |cfg, v| cfg.max_age_days = v,
+        bg_card, fg, border, selected_bg, selected_fg, selected_border, hover_bg,
+        cx,
+    );
+    let size_row = preset_row(
+        "log-max-size",
+        &MAX_SIZE_PRESETS,
+        config.max_file_size_mb,
+        |v| format!("{v} MB"),
+        |cfg, v| cfg.max_file_size_mb = v,
+        bg_card, fg, border, selected_bg, selected_fg, selected_border, hover_bg,
+        cx,
+    );
+
+    div()
+        .rounded_lg()
+        .bg(bg_card)
+        .border_1()
+        .border_color(border)
+        .p_4()
+        .child(
+            v_flex()
+                .gap_3()
+                .child(div().text_color(fg).child("로그 파일 보관"))
+                .child(
+                    div().text_color(muted_fg).child(format!(
+                        "저장 위치: {} · 현재 {file_count}개 · {:.1} MB",
+                        log_dir.display(),
+                        total_bytes as f64 / (1024.0 * 1024.0),
+                    )),
+                )
+                // ── 파일 기록 사용 ──
+                .child(
+                    h_flex()
+                        .gap_3()
+                        .items_center()
+                        .child(
+                            v_flex()
+                                .flex_1()
+                                .min_w_0()
+                                .child(div().text_color(fg).child("파일로 기록"))
+                                .child(
+                                    div()
+                                        .text_color(muted_fg)
+                                        .child("끄면 화면 로그만 남고 파일에는 쓰지 않습니다."),
+                                ),
+                        )
+                        .child(
+                            Switch::new("log-file-enabled")
+                                .checked(config.file_enabled)
+                                .on_click(cx.listener(|this, checked: &bool, _window, cx| {
+                                    let checked = *checked;
+                                    this.update_log_config(cx, move |cfg| {
+                                        cfg.file_enabled = checked
+                                    });
+                                })),
+                        ),
+                )
+                // ── 파일 개수 ──
+                .child(div().text_color(fg).child("보관 파일 수"))
+                .child(
+                    div()
+                        .text_color(muted_fg)
+                        .child("현재 파일을 포함한 최대 개수입니다. 초과분은 오래된 순으로 삭제됩니다."),
+                )
+                .child(files_row)
+                // ── 날짜 범위 ──
+                .child(div().text_color(fg).child("보관 기간"))
+                .child(
+                    div()
+                        .text_color(muted_fg)
+                        .child("이 기간보다 오래된 로그 파일을 삭제합니다."),
+                )
+                .child(age_row)
+                // ── 파일 용량 ──
+                .child(div().text_color(fg).child("파일당 최대 용량"))
+                .child(
+                    div()
+                        .text_color(muted_fg)
+                        .child("이 크기를 넘으면 새 파일로 롤링합니다."),
+                )
+                .child(size_row),
+        )
+        .into_any_element()
+}
+
 pub fn render(this: &mut AppRoot, window: &mut Window, cx: &mut Context<AppRoot>) -> AnyElement {
     this.ensure_theme_filter_input(window, cx);
 
@@ -93,7 +258,6 @@ pub fn render(this: &mut AppRoot, window: &mut Window, cx: &mut Context<AppRoot>
     let active_light_theme = theme.light_theme.name.to_string();
     let active_dark_theme = theme.dark_theme.name.to_string();
     let all_themes = ThemeRegistry::global(cx).sorted_themes();
-    let current_interval = this.scan_interval_secs;
 
     let filter_query = this.theme_filter_query.trim().to_lowercase();
     let active_only = this.theme_filter_active_only;
@@ -285,45 +449,10 @@ pub fn render(this: &mut AppRoot, window: &mut Window, cx: &mut Context<AppRoot>
         .child(div().text_color(fg).child("설정"))
         .child(
             div()
-                .rounded_lg()
-                .bg(bg_card)
-                .border_1()
-                .border_color(border)
-                .p_4()
-                .child(
-                    v_flex()
-                        .gap_3()
-                        .child(div().text_color(fg).child("스캔 주기"))
-                        .child(
-                            div().text_color(muted_fg).child(format!(
-                                "광고 창 감지 주기를 설정합니다. 현재: {}초",
-                                current_interval
-                            )),
-                        )
-                        .child(
-                            h_flex()
-                                .gap_2()
-                                .children([5u32, 10, 30, 60, 120].iter().map(|&secs| {
-                                    let is_selected = current_interval == secs;
-                                    div()
-                                        .rounded_md()
-                                        .px_3()
-                                        .py_2()
-                                        .cursor_pointer()
-                                        .bg(if is_selected { selected_bg } else { bg_card })
-                                        .text_color(if is_selected { selected_fg } else { fg })
-                                        .border_1()
-                                        .border_color(if is_selected { selected_border } else { border })
-                                        .id(("interval-preset", secs as usize))
-                                        .on_click(cx.listener(move |this, _ev, _window, cx| {
-                                            this.set_scan_interval(secs, cx);
-                                        }))
-                                        .child(format!("{}s", secs))
-                                        .into_any_element()
-                                })),
-                        ),
-                ),
+                .text_color(muted_fg)
+                .child("각 편의 기능의 동작 설정은 해당 기능 페이지 오른쪽 영역에 있습니다."),
         )
+        .child(render_log_settings(this, cx))
         .child(
             div()
                 .rounded_lg()

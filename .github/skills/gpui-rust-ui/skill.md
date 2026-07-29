@@ -322,7 +322,7 @@ fn main() {
 
 ```rust
 // 릴리즈 빌드: GUI 서브시스템 → 터미널 닫아도 CTRL_CLOSE_EVENT 전달 안 됨
-// 디버그 빌드: 콘솔 연결 유지 → env_logger 출력 정상
+// 디버그 빌드: 콘솔 연결 유지 → 로거 콘솔 출력 정상
 #![cfg_attr(
     all(target_os = "windows", not(debug_assertions)),
     windows_subsystem = "windows"
@@ -331,6 +331,7 @@ fn main() {
 
 ## 주의사항
 - `#![windows_subsystem = "windows"]`를 조건 없이 적용하면 디버그 빌드에서
-  `env_logger` 콘솔 출력이 불가능해진다. 반드시 `not(debug_assertions)`와 조합.
-- 이 속성을 적용하면 해당 EXE는 콘솔 창 없이 실행되므로,
-  별도 로그 파일 출력이 필요하면 릴리즈용 로거를 파일 appender로 구성할 것.
+  로거의 콘솔 출력이 불가능해진다. 반드시 `not(debug_assertions)`와 조합.
+- 이 속성을 적용하면 해당 EXE는 콘솔 창 없이 실행된다.
+  이 저장소는 `src/logging.rs`의 롤링 파일 로거가 항상 파일에도 기록하므로
+  릴리즈 빌드에서도 `%APPDATA%\gpui-convenience-tools\logs\`에서 로그를 확인할 수 있다.

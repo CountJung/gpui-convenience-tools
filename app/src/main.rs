@@ -8,7 +8,9 @@
 
 mod app;
 mod config;
+mod logging;
 mod platform;
+mod sync;
 mod window;
 
 use app::AppRoot;
@@ -22,7 +24,13 @@ use config::{ensure_bundled_themes, load_config};
 use platform::{init_tray_icon, hide_main_window_to_tray, run_as_windows_service};
 
 fn main() {
-    env_logger::init();
+    // 롤링 파일 로거 설치. 설정 파일을 읽기 전이므로 저장된 로그 설정을 먼저 조회한다.
+    let log_config = load_config()
+        .ok()
+        .flatten()
+        .map(|cfg| cfg.log)
+        .unwrap_or_default();
+    logging::init(log_config);
 
     // ── Windows 서비스 디스패처 진입점 ──────────────────────────────────────
     // SCM이 `--service` 플래그와 함께 이 바이너리를 실행하면
