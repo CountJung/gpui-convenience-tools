@@ -78,13 +78,6 @@ pub fn render(root: &AppRoot, cx: &mut Context<AppRoot>) -> AnyElement {
                                         return div();
                                     };
 
-                                    let level_color = match entry.level.as_str() {
-                                        "SUCCESS" => cx.theme().success,
-                                        "WARN" => cx.theme().warning,
-                                        "ERROR" => cx.theme().danger,
-                                        _ => cx.theme().info,
-                                    };
-
                                     div()
                                         .h(px(28.0))
                                         .px_2()
@@ -94,12 +87,10 @@ pub fn render(root: &AppRoot, cx: &mut Context<AppRoot>) -> AnyElement {
                                         .child(
                                             h_flex()
                                                 .gap_2()
-                                                .child(
-                                                    div()
-                                                        .w(px(72.0))
-                                                        .text_color(level_color)
-                                                        .child(entry.level.clone()),
-                                                )
+                                                .child(crate::window::ui::log_level_label(
+                                                    &entry.level,
+                                                    cx,
+                                                ))
                                                 .child(
                                                     div()
                                                         .flex_1()

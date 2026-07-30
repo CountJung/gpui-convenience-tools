@@ -3,7 +3,7 @@
 //! 현재 플랫폼에서 실제로 동작하는 기능의 상태만 요약하고 최근 활동을 보여준다.
 //! 이 패널은 설정이 없어 스플리터를 쓰지 않는다.
 
-use gpui::{div, px, AnyElement, Context, IntoElement, ParentElement, Styled};
+use gpui::{div, AnyElement, Context, Div, IntoElement, ParentElement, Styled};
 use gpui_component::{h_flex, theme::ActiveTheme, v_flex};
 
 use crate::app::AppRoot;
@@ -19,21 +19,10 @@ pub fn render(root: &AppRoot, cx: &mut Context<AppRoot>) -> AnyElement {
         activity = activity.child(div().text_color(theme.muted_foreground).child("활동 없음"));
     } else {
         for entry in &recent {
-            let level_color = match entry.level.as_str() {
-                "SUCCESS" => theme.success,
-                "WARN" => theme.warning,
-                "ERROR" => theme.danger,
-                _ => theme.info,
-            };
             activity = activity.child(
                 h_flex()
                     .gap_2()
-                    .child(
-                        div()
-                            .w(px(64.0))
-                            .text_color(level_color)
-                            .child(entry.level.clone()),
-                    )
+                    .child(ui::log_level_label(&entry.level, cx))
                     .child(
                         div()
                             .flex_1()
@@ -70,18 +59,16 @@ pub fn render(root: &AppRoot, cx: &mut Context<AppRoot>) -> AnyElement {
 /// 상태 요약 카드 — 광고 차단(Win32 전용)과 파일 동기화를 함께 보여준다.
 #[cfg(target_os = "windows")]
 fn render_summary(root: &AppRoot, cx: &Context<AppRoot>) -> AnyElement {
-    let theme = cx.theme();
-
-    let (svc_label, svc_bg, svc_fg) = if root.app_state.is_active {
-        ("광고 차단: 동작 중", theme.success, theme.success_foreground)
+    let (svc_label, svc_tone) = if root.app_state.is_active {
+        ("광고 차단: 동작 중", ui::Tone::Success)
     } else {
-        ("광고 차단: 중지됨", theme.warning, theme.warning_foreground)
+        ("광고 차단: 중지됨", ui::Tone::Warning)
     };
 
-    let (tgt_label, tgt_bg, tgt_fg) = if root.app_state.is_target_running {
-        ("타겟: 실행 중", theme.success, theme.success_foreground)
+    let (tgt_label, tgt_tone) = if root.app_state.is_target_running {
+        ("타겟: 실행 중", ui::Tone::Success)
     } else {
-        ("타겟: 미실행", theme.muted, theme.muted_foreground)
+        ("타겟: 미실행", ui::Tone::Muted)
     };
 
     let active_targets = root.app_state.targets.iter().filter(|t| t.enabled).count();
@@ -92,24 +79,9 @@ fn render_summary(root: &AppRoot, cx: &Context<AppRoot>) -> AnyElement {
             .child(
                 h_flex()
                     .gap_2()
-                    .child(
-                        div()
-                            .rounded_md()
-                            .px_3()
-                            .py_1()
-                            .bg(svc_bg)
-                            .text_color(svc_fg)
-                            .child(svc_label),
-                    )
-                    .child(
-                        div()
-                            .rounded_md()
-                            .px_3()
-                            .py_1()
-                            .bg(tgt_bg)
-                            .text_color(tgt_fg)
-                            .child(tgt_label),
-                    ),
+                    .child(ui::badge(svc_label, svc_tone, ui::Size::Md, cx))
+                    .child(ui::badge(tgt_label, tgt_tone, ui::Size::Md, cx))
+                    .child(sync_badge(root, cx)),
             )
             .child(
                 h_flex()
@@ -137,10 +109,24 @@ fn render_summary(root: &AppRoot, cx: &Context<AppRoot>) -> AnyElement {
     summary_card(
         v_flex()
             .gap_3()
+            .child(h_flex().gap_2().child(sync_badge(root, cx)))
             .child(h_flex().gap_3().children(sync_tiles(root, cx)))
             .into_any_element(),
         cx,
     )
+}
+
+/// 파일 동기화가 지금 무엇을 하고 있는지 한 줄로 알려주는 배지.
+///
+/// 진행 상황 표시줄은 파일 동기화 패널에만 있어서, 다른 화면에 있으면 동기화가 도는지조차
+/// 알 수 없었다. 대시보드에서 바로 보이게 한다.
+fn sync_badge(root: &AppRoot, cx: &Context<AppRoot>) -> Div {
+    let (label, tone) = match (&root.sync_running, root.sync_enabled) {
+        (Some(running), _) => (format!("동기화 중: {}", running.label), ui::Tone::Info),
+        (None, true) => ("파일 동기화: 대기 중".to_string(), ui::Tone::Success),
+        (None, false) => ("파일 동기화: 꺼짐".to_string(), ui::Tone::Muted),
+    };
+    ui::badge(label, tone, ui::Size::Md, cx)
 }
 
 /// 두 플랫폼이 공유하는 파일 동기화 통계 타일.

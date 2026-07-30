@@ -28,6 +28,13 @@ pub struct AppConfig {
     /// 사용자가 한쪽에서 추가한 주기를 다른 쪽에서 다시 만들 이유가 없기 때문이다.
     #[serde(default = "default_interval_presets")]
     pub interval_presets: Vec<u32>,
+    /// 파일 동기화 자동 실행 전역 스위치.
+    ///
+    /// 개별 작업의 `enabled`와는 별개다. 이 스위치를 끄면 어떤 작업도 주기가 도래해도
+    /// 스스로 돌지 않는다(수동 '지금 동기화'는 그대로 동작한다). 앱을 켜두기만 해도
+    /// 동기화가 도는 기능이므로 사이드바에서 바로 끌 수 있어야 한다.
+    #[serde(default = "default_true")]
+    pub sync_enabled: bool,
     /// 파일 동기화 작업 목록.
     #[serde(default)]
     pub sync_jobs: Vec<SyncJob>,
@@ -43,6 +50,21 @@ fn default_scan_interval_secs() -> u32 {
 /// 기본 주기 프리셋: 10초 · 30초 · 1분.
 pub fn default_interval_presets() -> Vec<u32> {
     vec![10, 30, 60]
+}
+
+/// 저장하려는 작업 스냅샷에 디스크가 갖고 있던 진행 상황을 되살린다.
+///
+/// `last_run_unix`·`resume_cursor`는 동기화 엔진만 갱신하는데, UI는 자기 메모리 스냅샷을
+/// 통째로 저장한다. 그대로 두면 사용자가 설정을 만질 때마다 방금 기록한 진행 위치가
+/// 앱 시작 시점 값으로 되돌아가 "이어서 동기화"가 무력해진다.
+pub fn carry_over_engine_progress(stored: &[SyncJob], jobs: &mut [SyncJob]) {
+    for job in jobs.iter_mut() {
+        let Some(previous) = stored.iter().find(|candidate| candidate.id == job.id) else {
+            continue;
+        };
+        job.last_run_unix = previous.last_run_unix;
+        job.resume_cursor = previous.resume_cursor.clone();
+    }
 }
 
 /// 프리셋 목록을 정규화한다 — 중복 제거 후 오름차순 정렬.
@@ -85,6 +107,23 @@ pub struct SyncJob {
     /// 숨김/시스템 속성 파일도 동기화할지 여부. 기본값은 전체 동기화이므로 true.
     #[serde(default = "default_true")]
     pub include_hidden: bool,
+
+    // ── 아래 두 필드는 동기화 엔진 계층이 소유한다 ──
+    //
+    // 앱을 껐다 켜도 "처음부터 다시" 돌지 않게 하려고 실행 진행 상황을 작업 자체에 남긴다.
+    // **UI는 이 값을 쓰지 않는다.** 사용자가 설정을 저장할 때마다 UI 스냅샷으로 덮어쓰면
+    // 백그라운드가 방금 기록한 진행 상황이 날아가므로, 저장 경로에서 디스크 값을 보존한다.
+    /// 마지막 실행을 끝낸 시각(유닉스 초).
+    ///
+    /// 없으면 "한 번도 실행하지 않음"이므로 시작 직후 곧바로 실행한다.
+    #[serde(default)]
+    pub last_run_unix: Option<u64>,
+    /// 중단된 순회를 이어서 시작할 지점(원본 기준 상대 경로).
+    ///
+    /// 실행이 정상적으로 끝나면 비운다. 값이 남아 있다는 것은 중지 또는 앱 종료로
+    /// 순회가 끊겼다는 뜻이다.
+    #[serde(default)]
+    pub resume_cursor: Option<String>,
 }
 
 impl SyncJob {
@@ -135,6 +174,8 @@ impl Default for SyncJob {
             interval_secs: default_sync_interval_secs(),
             mirror_deletes: false,
             include_hidden: true,
+            last_run_unix: None,
+            resume_cursor: None,
         }
     }
 }
@@ -211,6 +252,7 @@ impl Default for AppConfig {
             scan_interval_secs: default_scan_interval_secs(),
             favorite_services: Vec::new(),
             interval_presets: default_interval_presets(),
+            sync_enabled: true,
             sync_jobs: Vec::new(),
             log: LogConfig::default(),
         }
@@ -392,6 +434,8 @@ mod tests {
         let config: AppConfig = serde_json::from_str(legacy).expect("구버전 config 파싱");
         assert_eq!(config.scan_interval_secs, 15);
         assert!(config.sync_jobs.is_empty());
+        // 스위치가 없던 config는 켜진 상태로 읽혀야 기존 동작이 유지된다.
+        assert!(config.sync_enabled);
         // 신규 필드는 기본값으로 채워진다.
         assert!(config.log.file_enabled);
         assert_eq!(config.log.max_files, default_max_files());
@@ -419,6 +463,44 @@ mod tests {
         let a = SyncJob::default();
         let b = SyncJob::default();
         assert_ne!(a.id, b.id);
+    }
+
+    /// UI 스냅샷을 저장해도 엔진이 기록한 실행 진행 상황은 살아남아야 한다.
+    #[test]
+    fn saving_ui_snapshot_keeps_engine_progress() {
+        let stored = vec![SyncJob {
+            id: "job-1".to_string(),
+            source: r"D:\a".to_string(),
+            last_run_unix: Some(1_700_000_000),
+            resume_cursor: Some(r"nested\file.txt".to_string()),
+            ..SyncJob::default()
+        }];
+
+        // UI는 진행 상황을 모른 채(=None) 이름만 바꿔서 저장한다.
+        let mut incoming = vec![SyncJob {
+            id: "job-1".to_string(),
+            name: "이름 변경".to_string(),
+            source: r"D:\a".to_string(),
+            ..SyncJob::default()
+        }];
+        carry_over_engine_progress(&stored, &mut incoming);
+
+        assert_eq!(incoming[0].name, "이름 변경", "사용자 수정은 그대로 반영된다");
+        assert_eq!(incoming[0].last_run_unix, Some(1_700_000_000));
+        assert_eq!(
+            incoming[0].resume_cursor.as_deref(),
+            Some(r"nested\file.txt"),
+            "이어서 시작할 지점이 사라지면 재시작마다 처음부터 다시 돈다"
+        );
+
+        // 저장본에 없던 새 작업은 건드리지 않는다.
+        let mut fresh = vec![SyncJob {
+            id: "job-2".to_string(),
+            ..SyncJob::default()
+        }];
+        carry_over_engine_progress(&stored, &mut fresh);
+        assert!(fresh[0].resume_cursor.is_none());
+        assert!(fresh[0].last_run_unix.is_none());
     }
 
     /// `label()`은 이름이 비었을 때 원본 폴더명으로 대체된다.

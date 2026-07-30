@@ -82,6 +82,7 @@ fn test_app_root(active_panel: ActivePanel) -> AppRoot {
         pending_delete_service: None,
         service_filter: ServiceFilter::All,
         favorite_services: Vec::new(),
+        sync_enabled: true,
         sync_jobs: Vec::new(),
         selected_sync_job: None,
         sync_status: HashMap::new(),

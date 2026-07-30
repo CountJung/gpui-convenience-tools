@@ -397,3 +397,118 @@ fn syncs_three_thousand_files_and_reports_elapsed_time() {
 
     let _ = fs::remove_dir_all(&root);
 }
+
+// ─────────────────────────────────────────────
+// 이어서 동기화
+// ─────────────────────────────────────────────
+
+/// 중지된 실행이 이어서 시작할 지점을 남기고, 다음 실행이 앞 구간을 다시 훑지 않는다.
+#[test]
+fn resuming_skips_everything_before_the_cursor() {
+    let root = temp_dir("resume-flat");
+    let src = root.join("src");
+    let dst = root.join("dst");
+    fs::create_dir_all(&src).unwrap();
+    for name in ["a.txt", "b.txt", "c.txt", "d.txt"] {
+        fs::write(src.join(name), name.as_bytes()).unwrap();
+    }
+
+    let job = job(&src, &dst);
+    let mut control = SyncControl::new().resume_from("c.txt");
+    let outcome = run_sync_job_with_control(&job, &mut control);
+
+    assert_eq!(
+        outcome.copied, 2,
+        "커서 이후(c·d)만 복사해야 한다: {:?}",
+        outcome.failures
+    );
+    assert!(outcome.resumed, "이어서 실행했다는 사실이 결과에 남아야 한다");
+    assert!(!dst.join("a.txt").exists(), "커서 앞 구간은 손대지 않는다");
+    assert!(!dst.join("b.txt").exists());
+    assert!(dst.join("c.txt").exists(), "커서가 가리킨 항목부터 처리한다");
+    assert!(dst.join("d.txt").exists());
+
+    let _ = fs::remove_dir_all(&root);
+}
+
+/// 커서가 하위 폴더를 가리키면 그 경로를 따라 내려가 이어서 시작한다.
+#[test]
+fn resuming_walks_into_the_directory_the_cursor_points_at() {
+    let root = temp_dir("resume-nested");
+    let src = root.join("src");
+    let dst = root.join("dst");
+    fs::create_dir_all(src.join("alpha")).unwrap();
+    fs::create_dir_all(src.join("beta")).unwrap();
+    fs::write(src.join("alpha/1.txt"), b"1").unwrap();
+    fs::write(src.join("alpha/2.txt"), b"2").unwrap();
+    fs::write(src.join("beta/3.txt"), b"3").unwrap();
+
+    let job = job(&src, &dst);
+    // 구분자는 기록 당시 형태 그대로 들어올 수 있으므로 `/`도 받아야 한다.
+    let mut control = SyncControl::new().resume_from("alpha/2.txt");
+    let outcome = run_sync_job_with_control(&job, &mut control);
+
+    assert_eq!(outcome.copied, 2, "failures: {:?}", outcome.failures);
+    assert!(
+        !dst.join("alpha/1.txt").exists(),
+        "커서 앞의 형제 파일은 건너뛴다"
+    );
+    assert!(dst.join("alpha/2.txt").exists());
+    assert!(
+        dst.join("beta/3.txt").exists(),
+        "커서 폴더를 지난 뒤에는 평소대로 이어서 돈다"
+    );
+
+    let _ = fs::remove_dir_all(&root);
+}
+
+/// 이어서 실행하더라도 미러 삭제가 아직 확인하지 않은 원본의 대상본을 지우면 안 된다.
+#[test]
+fn resuming_never_mirror_deletes_files_it_has_not_examined() {
+    let root = temp_dir("resume-mirror");
+    let src = root.join("src");
+    let dst = root.join("dst");
+    fs::create_dir_all(&src).unwrap();
+    fs::create_dir_all(&dst).unwrap();
+    for name in ["a.txt", "b.txt", "c.txt"] {
+        fs::write(src.join(name), name.as_bytes()).unwrap();
+        fs::write(dst.join(name), name.as_bytes()).unwrap();
+    }
+    // 원본에 없는 항목만 삭제 대상이다.
+    fs::write(dst.join("stale.txt"), b"stale").unwrap();
+
+    let mut job = job(&src, &dst);
+    job.mirror_deletes = true;
+    let mut control = SyncControl::new().resume_from("c.txt");
+    let outcome = run_sync_job_with_control(&job, &mut control);
+
+    assert!(
+        dst.join("a.txt").exists() && dst.join("b.txt").exists(),
+        "건너뛴 구간의 대상 파일이 삭제되면 데이터가 사라진다"
+    );
+    assert!(
+        !dst.join("stale.txt").exists(),
+        "원본에 없는 항목은 그대로 삭제된다"
+    );
+    assert_eq!(outcome.deleted, 1);
+
+    let _ = fs::remove_dir_all(&root);
+}
+
+/// 커서가 없으면 예전과 똑같이 전체를 훑는다.
+#[test]
+fn a_run_without_a_cursor_still_walks_everything() {
+    let root = temp_dir("resume-none");
+    let src = root.join("src");
+    let dst = root.join("dst");
+    fs::create_dir_all(&src).unwrap();
+    for name in ["a.txt", "b.txt"] {
+        fs::write(src.join(name), name.as_bytes()).unwrap();
+    }
+
+    let outcome = run_sync_job(&job(&src, &dst));
+    assert_eq!(outcome.copied, 2);
+    assert!(!outcome.resumed);
+
+    let _ = fs::remove_dir_all(&root);
+}

@@ -10,7 +10,7 @@
 //! - 반환 타입이 `Div` / `Stateful<Div>`이므로 호출부에서 폭·여백을 이어 붙일 수 있다.
 
 use gpui::{
-    div, AnyElement, App, ClickEvent, Div, ElementId, Hsla, InteractiveElement, IntoElement,
+    div, px, AnyElement, App, ClickEvent, Div, ElementId, Hsla, InteractiveElement, IntoElement,
     ParentElement, SharedString, Stateful, StatefulInteractiveElement, Styled, Window,
 };
 use gpui_component::{h_flex, switch::Switch, theme::ActiveTheme, v_flex};
@@ -70,6 +70,28 @@ pub fn badge(label: impl Into<SharedString>, tone: Tone, size: Size, cx: &App) -
         .bg(bg)
         .text_color(fg)
         .child(label.into())
+}
+
+/// 로그 한 줄의 레벨 표시 칸.
+///
+/// 대시보드「최근 활동」과 로그 패널이 같은 칸을 쓰는데 폭이 64px과 72px로 갈려 있었고,
+/// 좁은 쪽에서는 `SUCCESS`가 두 줄로 접혀 잘려 보였다. 레벨 → 색 매핑도 두 곳에
+/// 복제돼 있어 함께 모은다.
+pub fn log_level_label(level: &str, cx: &App) -> Div {
+    let t = cx.theme();
+    let color = match level {
+        "SUCCESS" => t.success,
+        "WARN" => t.warning,
+        "ERROR" => t.danger,
+        _ => t.info,
+    };
+
+    div()
+        .w(px(76.0))
+        .flex_shrink_0()
+        .whitespace_nowrap()
+        .text_color(color)
+        .child(level.to_string())
 }
 
 /// 액션 버튼의 색 구성.

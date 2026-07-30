@@ -62,6 +62,11 @@ pub fn balanced_split(
 ///
 /// 스플리터로 나뉜 각 패널은 높이가 고정되므로 내부에서 따로 스크롤해야 한다.
 /// `content` 루트는 `size_full`/`h_full`로 뷰포트 높이에 고정하지 않고 자연 높이를 유지해야 한다.
+///
+/// 가로는 `overflow_x_hidden`으로 잠근다. 세로만 스크롤로 열어 두면 가로가 `visible`로
+/// 남아, 컨텐츠가 뷰포트 폭 대신 자기 내용 폭으로 잡히는 상황이 생긴다. 그러면 카드마다
+/// 폭이 제각각이 되고(섹션마다 다른 오른쪽 끝) 페이지가 가로로 삐져나간다.
+/// 이 페이지들은 어차피 가로 스크롤을 쓰지 않으므로 폭은 뷰포트에 고정하는 것이 맞다.
 pub fn scroll_pane(id: &'static str, handle: &ScrollHandle, content: AnyElement) -> AnyElement {
     div()
         .relative()
@@ -73,6 +78,7 @@ pub fn scroll_pane(id: &'static str, handle: &ScrollHandle, content: AnyElement)
                 .debug_selector(move || id.to_string())
                 .size_full()
                 .min_h_0()
+                .overflow_x_hidden()
                 .overflow_y_scroll()
                 .track_scroll(handle)
                 .child(content),

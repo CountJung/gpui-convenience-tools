@@ -8,7 +8,9 @@
 //! 내용 해시 비교는 하지 않는다(대용량 폴더에서 비용이 크기 때문).
 
 use std::{
+    cmp::Ordering as CmpOrdering,
     collections::BTreeSet,
+    ffi::OsString,
     fs,
     path::{Path, PathBuf},
     sync::atomic::{AtomicBool, Ordering},
@@ -38,6 +40,7 @@ pub struct SyncProgress<'a> {
 pub struct SyncControl<'a> {
     cancel: Option<&'a AtomicBool>,
     on_progress: Option<&'a mut dyn FnMut(SyncProgress<'_>)>,
+    resume: Option<Resume>,
 }
 
 impl<'a> SyncControl<'a> {
@@ -57,6 +60,19 @@ impl<'a> SyncControl<'a> {
         self
     }
 
+    /// 중단된 순회를 이 상대 경로부터 이어서 시작한다.
+    ///
+    /// 지정한 경로보다 **앞서는** 항목만 건너뛴다. 경로 자체는 다시 처리하는데, 커서가
+    /// "처리 직전"에 기록되므로 그 파일이 실제로 끝났는지 알 수 없기 때문이다.
+    /// 한 파일을 다시 보는 비용은 (변경이 없으면) 건너뛰기 한 번이라 무시할 수 있다.
+    pub fn resume_from(mut self, relative_path: &str) -> Self {
+        let components = split_relative(relative_path);
+        if !components.is_empty() {
+            self.resume = Some(Resume { components });
+        }
+        self
+    }
+
     fn is_cancelled(&self) -> bool {
         self.cancel
             .is_some_and(|flag| flag.load(Ordering::Relaxed))
@@ -73,6 +89,67 @@ impl<'a> SyncControl<'a> {
             failed: outcome.failures.len() + outcome.truncated_failures,
         });
     }
+
+    /// `depth` 깊이에서 만난 `name`을 이어서 시작 지점과 견준다.
+    ///
+    /// 반환값이 `Less`면 이미 처리한 구간이므로 건너뛴다. `Greater`면 이어서 시작할
+    /// 지점을 지났다는 뜻이라 그 자리에서 탐색을 끝낸다.
+    fn resume_probe(&mut self, depth: usize, name: &OsString) -> ResumeProbe {
+        let Some(resume) = self.resume.as_ref() else {
+            return ResumeProbe::Process;
+        };
+        let Some(expected) = resume.components.get(depth) else {
+            // 커서보다 깊은 자리다. 커서 경로 위에 있으므로 정상 처리한다.
+            self.resume = None;
+            return ResumeProbe::Process;
+        };
+
+        match name.cmp(expected) {
+            CmpOrdering::Less => ResumeProbe::Skip,
+            CmpOrdering::Greater => {
+                self.resume = None;
+                ResumeProbe::Process
+            }
+            CmpOrdering::Equal => {
+                if depth + 1 >= resume.components.len() {
+                    // 커서가 가리키는 항목 자체다. 여기서부터 정상 처리한다.
+                    self.resume = None;
+                    ResumeProbe::Process
+                } else {
+                    ResumeProbe::Descend
+                }
+            }
+        }
+    }
+
+    /// 이어서 시작하는 순회인지. 미러 삭제를 미루는 판단에 쓴다.
+    fn is_resuming(&self) -> bool {
+        self.resume.is_some()
+    }
+}
+
+/// 이어서 시작할 지점을 경로 컴포넌트로 쪼갠 것.
+struct Resume {
+    components: Vec<OsString>,
+}
+
+enum ResumeProbe {
+    /// 이미 지나온 구간 — 건너뛴다.
+    Skip,
+    /// 커서 경로 위의 디렉터리 — 안으로 들어가 계속 찾는다.
+    Descend,
+    /// 이어서 시작할 지점에 도달했다 — 평소대로 처리한다.
+    Process,
+}
+
+/// 상대 경로 문자열을 컴포넌트로 쪼갠다.
+///
+/// config에 저장된 커서는 기록 당시의 구분자를 그대로 갖고 있으므로 `/`와 `\`를 모두 받는다.
+fn split_relative(path: &str) -> Vec<OsString> {
+    path.split(['/', '\\'])
+        .filter(|part| !part.is_empty() && *part != ".")
+        .map(OsString::from)
+        .collect()
 }
 
 /// 한 파일에 대한 동기화 실패 기록.
@@ -102,6 +179,10 @@ pub struct SyncOutcome {
     pub truncated_failures: usize,
     /// 사용자 중지 요청으로 중간에 끝났는지 여부.
     pub cancelled: bool,
+    /// 이전에 끊긴 지점부터 이어서 실행했는지 여부.
+    ///
+    /// 이 실행은 원본 전체를 훑지 않았으므로 요약에 그 사실을 밝힌다.
+    pub resumed: bool,
 }
 
 /// UI 목록이 무한정 길어지지 않도록 실패 기록 상한을 둔다.
@@ -132,6 +213,9 @@ impl SyncOutcome {
         let failed = self.failures.len() + self.truncated_failures;
         if failed > 0 {
             s.push_str(&format!(", 실패 {failed}건"));
+        }
+        if self.resumed {
+            s.push_str(" — 이어서 실행");
         }
         if self.cancelled {
             s.push_str(" — 중지됨");
@@ -176,22 +260,27 @@ pub fn run_sync_job_with_control(job: &SyncJob, control: &mut SyncControl<'_>) -
         return outcome;
     }
 
-    sync_dir(&source, &target, &source, job, control, &mut outcome);
+    // 이어서 시작하는 순회는 원본 일부만 훑으므로, 그 사실을 미리 붙잡아 둔다.
+    let resumed = control.is_resuming();
+    sync_dir(&source, &target, &source, 0, job, control, &mut outcome);
+    outcome.resumed = resumed;
     outcome
 }
 
 /// `source` 하위를 재귀적으로 순회하며 `target`에 반영한다.
 ///
-/// `root`는 실패 메시지에 표시할 상대 경로 계산 기준이다.
+/// `root`는 실패 메시지에 표시할 상대 경로 계산 기준, `depth`는 이어서 시작 지점을 찾을 때
+/// 견줄 경로 컴포넌트의 자리다.
 fn sync_dir(
     source: &Path,
     target: &Path,
     root: &Path,
+    depth: usize,
     job: &SyncJob,
     control: &mut SyncControl<'_>,
     outcome: &mut SyncOutcome,
 ) {
-    let entries = match fs::read_dir(source) {
+    let read_dir = match fs::read_dir(source) {
         Ok(entries) => entries,
         Err(err) => {
             outcome.fail(relative_label(source, root), describe_io_error(&err));
@@ -199,8 +288,16 @@ fn sync_dir(
         }
     };
 
+    // 이어서 시작하려면 순회 순서가 실행마다 같아야 한다. `read_dir`는 순서를 보장하지
+    // 않으므로 이름으로 정렬해 커서 비교가 성립하게 만든다.
+    let mut entries: Vec<_> = read_dir.collect();
+    entries.sort_by_key(|entry| match entry {
+        Ok(entry) => entry.file_name(),
+        Err(_) => OsString::new(),
+    });
+
     // mirror_deletes 처리를 위해 원본에 존재하는 이름을 모아둔다.
-    let mut seen_names = BTreeSet::<std::ffi::OsString>::new();
+    let mut seen_names = BTreeSet::<OsString>::new();
 
     for entry in entries {
         // 중지 요청은 파일 단위로 확인한다. 이미 복사한 파일은 되돌리지 않고 그대로 둔다.
@@ -219,8 +316,17 @@ fn sync_dir(
 
         let src_path = entry.path();
         let name = entry.file_name();
+        // 건너뛰는 항목도 이름은 남긴다. 그래야 이 디렉터리의 미러 삭제가 아직 확인하지
+        // 않은 원본 파일의 대상본을 지우지 않는다.
         seen_names.insert(name.clone());
         let dst_path = target.join(&name);
+
+        let mut resume_depth = depth;
+        match control.resume_probe(depth, &name) {
+            ResumeProbe::Skip => continue,
+            ResumeProbe::Descend => resume_depth = depth + 1,
+            ResumeProbe::Process => {}
+        }
 
         // symlink_metadata: 심볼릭 링크를 따라가지 않고 링크 자체를 본다.
         let meta = match fs::symlink_metadata(&src_path) {
@@ -251,7 +357,7 @@ fn sync_dir(
                 outcome.fail(relative_label(&dst_path, root), describe_io_error(&err));
                 continue;
             }
-            sync_dir(&src_path, &dst_path, root, job, control, outcome);
+            sync_dir(&src_path, &dst_path, root, resume_depth, job, control, outcome);
             if outcome.cancelled {
                 return;
             }
@@ -279,6 +385,10 @@ fn sync_dir(
 
     // 중지된 순회는 `seen_names`가 불완전할 수 있다. 그 상태로 미러 삭제를 돌리면
     // 아직 확인하지 않은 원본 파일의 대상본을 지우게 되므로 실행하지 않는다.
+    //
+    // 이어서 시작한 순회는 이 디렉터리의 이름을 모두 모았으므로(건너뛴 항목도 넣는다)
+    // 여기서는 안전하다. 다만 통째로 건너뛴 하위 디렉터리 안쪽은 이번에 확인하지 못했고,
+    // 그건 삭제가 다음 실행으로 미뤄질 뿐 잘못 지우는 문제가 아니다.
     if job.mirror_deletes && !outcome.cancelled {
         mirror_deletes(target, root, &seen_names, outcome);
     }

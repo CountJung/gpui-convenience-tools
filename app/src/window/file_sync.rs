@@ -418,14 +418,16 @@ fn render_job_settings(
                         .child(div().text_color(muted_fg).child(
                             "직접 입력한 값은 '설정 저장' 또는 실행 버튼을 누를 때 저장됩니다.",
                         ))
-                        .child(ui::action_button(
-                            "sync-apply-paths",
-                            "설정 저장",
-                            ui::Size::Md,
-                            neutral_btn,
-                            cx.listener(|this, _ev, window, cx| {
-                                this.apply_sync_inputs(window, cx);
-                            }),
+                        .child(div().debug_selector(|| "sync-apply-paths".to_string()).child(
+                            ui::action_button(
+                                "sync-apply-paths",
+                                "설정 저장",
+                                ui::Size::Md,
+                                neutral_btn,
+                                cx.listener(|this, _ev, window, cx| {
+                                    this.apply_sync_inputs(window, cx);
+                                }),
+                            ),
                         ))
                         // ── 감시 주기 ──
                         .child(div().text_color(fg).child("감시 주기"))

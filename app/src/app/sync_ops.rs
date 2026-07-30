@@ -8,8 +8,9 @@ use gpui::{Context, PathPromptOptions, Window};
 use gpui_component::notification::NotificationType;
 use std::sync::atomic::Ordering;
 
+use super::state::PlatformEvent;
 use super::AppRoot;
-use crate::config::{update_config, SyncJob};
+use crate::config::{carry_over_engine_progress, update_config, SyncJob};
 
 impl AppRoot {
     // ─────────────────────────────────────────────
@@ -24,7 +25,13 @@ impl AppRoot {
             return;
         }
 
-        if let Err(err) = update_config(move |cfg| cfg.sync_jobs = jobs) {
+        if let Err(err) = update_config(move |cfg| {
+            let mut jobs = jobs;
+            // 진행 상황(`last_run_unix`·`resume_cursor`)은 백그라운드가 소유한다.
+            // UI 스냅샷으로 통째로 덮어쓰면 방금 기록한 실행 위치가 사라진다.
+            carry_over_engine_progress(&cfg.sync_jobs, &mut jobs);
+            cfg.sync_jobs = jobs;
+        }) {
             log::error!("동기화 작업 저장 실패: {err}");
         }
     }
@@ -34,6 +41,61 @@ impl AppRoot {
             state.jobs = self.sync_jobs.clone();
         }
         self.persist_sync_jobs_config();
+    }
+
+    /// 원본·대상이 바뀌면 이어서 시작할 지점을 버린다.
+    ///
+    /// 다른 폴더를 가리키게 된 커서로 순회를 이어가면 새 원본의 앞부분을 통째로 건너뛴다.
+    fn invalidate_resume_cursor(&mut self, id: &str) {
+        if let Ok(mut state) = self.sync_state.lock() {
+            state.cursors.remove(id);
+        }
+        if let Some(job) = self.sync_jobs.iter_mut().find(|job| job.id == id) {
+            job.resume_cursor = None;
+        }
+
+        #[cfg(test)]
+        if !self.external_side_effects_enabled {
+            return;
+        }
+
+        let id = id.to_string();
+        if let Err(err) = update_config(move |cfg| {
+            if let Some(job) = cfg.sync_jobs.iter_mut().find(|job| job.id == id) {
+                job.resume_cursor = None;
+            }
+        }) {
+            log::warn!("이어서 시작 지점 초기화 실패: {err}");
+        }
+    }
+
+    /// 파일 동기화 자동 실행 전역 스위치.
+    pub(crate) fn set_sync_enabled(
+        &mut self,
+        enabled: bool,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let _ = self.event_tx.send(PlatformEvent::SyncAutoToggled(enabled));
+        self.process_pending_events(window, cx);
+        cx.notify();
+    }
+
+    /// 전역 스위치 상태를 공유 상태와 설정에 반영한다.
+    pub(super) fn apply_sync_enabled(&mut self) {
+        if let Ok(mut state) = self.sync_state.lock() {
+            state.auto_enabled = self.sync_enabled;
+        }
+
+        #[cfg(test)]
+        if !self.external_side_effects_enabled {
+            return;
+        }
+
+        let enabled = self.sync_enabled;
+        if let Err(err) = update_config(move |cfg| cfg.sync_enabled = enabled) {
+            log::error!("동기화 스위치 저장 실패: {err}");
+        }
     }
 
     pub(crate) fn add_sync_job(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -153,12 +215,20 @@ impl AppRoot {
             .map(|i| i.read(cx).value().to_string())
             .unwrap_or_default();
 
-        if let Some(job) = self.sync_jobs.get_mut(index) {
-            job.name = name.trim().to_string();
-            job.source = source.trim().to_string();
-            job.target = target.trim().to_string();
-        } else {
-            return false;
+        let changed_id = match self.sync_jobs.get_mut(index) {
+            Some(job) => {
+                let paths_changed =
+                    job.source != source.trim() || job.target != target.trim();
+                job.name = name.trim().to_string();
+                job.source = source.trim().to_string();
+                job.target = target.trim().to_string();
+                paths_changed.then(|| job.id.clone())
+            }
+            None => return false,
+        };
+
+        if let Some(id) = changed_id {
+            self.invalidate_resume_cursor(&id);
         }
 
         true
@@ -215,12 +285,16 @@ impl AppRoot {
                     return;
                 };
 
-                if let Some(job) = this.sync_jobs.get_mut(index) {
+                let changed_id = this.sync_jobs.get_mut(index).map(|job| {
                     if is_source {
                         job.source = picked.clone();
                     } else {
                         job.target = picked.clone();
                     }
+                    job.id.clone()
+                });
+                if let Some(id) = changed_id {
+                    this.invalidate_resume_cursor(&id);
                 }
 
                 let input = if is_source {

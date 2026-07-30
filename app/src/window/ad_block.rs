@@ -253,9 +253,14 @@ fn render_settings(
             .any(|t| t.process_name.eq_ignore_ascii_case(process_name));
         let name = process_name.clone();
 
+        // 두 상태의 폭을 맞춰야 행마다 오른쪽 끝이 흔들리지 않는다. 다만 고정 폭 64px은
+        // '+ 추가'가 들어가지 않아 글자가 잘렸다. 최소 폭으로 두어 정렬은 지키되
+        // 긴 쪽에 맞춰 늘어나게 한다.
         let action: AnyElement = if exists {
             div()
-                .w(px(64.0))
+                .min_w(px(72.0))
+                .flex_shrink_0()
+                .whitespace_nowrap()
                 .rounded_md()
                 .px_2()
                 .py_1()
@@ -266,7 +271,9 @@ fn render_settings(
         } else {
             div()
                 .id(("proc-add", ix))
-                .w(px(64.0))
+                .min_w(px(72.0))
+                .flex_shrink_0()
+                .whitespace_nowrap()
                 .rounded_md()
                 .px_2()
                 .py_1()

@@ -100,6 +100,28 @@ impl AppRoot {
                         cx,
                     );
                 }
+                PlatformEvent::SyncAutoToggled(enabled) => {
+                    self.sync_enabled = enabled;
+                    self.apply_sync_enabled();
+                    self.push_log(
+                        "INFO",
+                        if enabled {
+                            "파일 동기화 자동 실행을 켰습니다.".to_string()
+                        } else {
+                            "파일 동기화 자동 실행을 껐습니다.".to_string()
+                        },
+                    );
+                    self.notify_toast(
+                        if enabled {
+                            "파일 동기화를 켰습니다"
+                        } else {
+                            "파일 동기화를 껐습니다"
+                        },
+                        NotificationType::Info,
+                        window,
+                        cx,
+                    );
+                }
                 PlatformEvent::TargetToggled { index, enabled } => {
                     let message = if let Some(target) = self.app_state.targets.get_mut(index) {
                         target.enabled = enabled;

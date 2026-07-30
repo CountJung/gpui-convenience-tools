@@ -446,3 +446,194 @@ fn file_sync_run_button_saves_current_inputs_and_queues_selected_job(cx: &mut Te
         assert_eq!(shared.run_now, vec![job.id.clone()]);
     });
 }
+
+/// 사용자 보고: 특정 창 너비에서 섹션마다 오른쪽 끝이 달랐다.
+///
+/// 좁은 창에서는 컨텐츠가 뷰포트보다 넓어 자연히 뷰포트 폭으로 잘리므로 문제가 드러나지
+/// 않는다. 컨텐츠가 뷰포트보다 **좁아지는** 넓은 창까지 함께 확인해야 회귀를 잡는다.
+#[gpui::test]
+fn file_sync_sections_share_one_width_at_every_window_width(cx: &mut TestAppContext) {
+    initialize_components(cx);
+    let (_view, cx) = cx.add_window_view(|_, _| {
+        let mut root = test_app_root(ActivePanel::FileSync);
+        root.sync_jobs = vec![SyncJob {
+            name: "디스크백업".to_string(),
+            source: r"D:\원본".to_string(),
+            target: r"E:\대상".to_string(),
+            ..SyncJob::default()
+        }];
+        root.selected_sync_job = Some(0);
+        root
+    });
+
+    for width in [MIN_SUPPORTED_WINDOW_WIDTH, 994.0, 1280.0, 1600.0] {
+        cx.simulate_resize(size(px(width), px(DEFAULT_WINDOW_HEIGHT)));
+        refresh(cx);
+
+        let viewport = cx
+            .debug_bounds("file-sync-page")
+            .expect("File Sync viewport should be rendered");
+        let sections = [
+            "file-sync-job-list-card",
+            "file-sync-settings-card",
+            "file-sync-failures-card",
+        ]
+        .map(|selector| {
+            (
+                selector,
+                cx.debug_bounds(selector)
+                    .unwrap_or_else(|| panic!("{selector} should be rendered at {width}px")),
+            )
+        });
+
+        for (selector, bounds) in &sections {
+            assert!(
+                bounds.size.width >= viewport.size.width - px(24.0)
+                    && bounds.size.width <= viewport.size.width,
+                "{selector} should fill the viewport width at {width}px: \
+                 viewport={viewport:?}, section={bounds:?}"
+            );
+        }
+
+        let (first_selector, first) = &sections[0];
+        for (selector, bounds) in &sections[1..] {
+            assert!(
+                (bounds.size.width - first.size.width).abs() <= px(1.0)
+                    && (bounds.origin.x - first.origin.x).abs() <= px(1.0),
+                "sections must not disagree on where the page ends at {width}px: \
+                 {first_selector}={first:?}, {selector}={bounds:?}"
+            );
+        }
+    }
+}
+
+/// 사이드바 스위치로 자동 동기화를 끄면 백그라운드가 스스로 돌지 않는다.
+#[gpui::test]
+fn sidebar_switch_turns_automatic_sync_off_and_on(cx: &mut TestAppContext) {
+    initialize_components(cx);
+    let (view, cx) = cx.add_window_view(|_, _| {
+        let mut root = test_app_root(ActivePanel::Dashboard);
+        root.sync_jobs = vec![SyncJob::default()];
+        root.selected_sync_job = Some(0);
+        // 이 테스트는 상태 전이만 본다. 토스트는 gpui-component `Root`가 필요해 띄울 수 없다.
+        root.sync_notify_enabled = false;
+        root
+    });
+
+    cx.simulate_resize(size(px(DEFAULT_WINDOW_WIDTH), px(DEFAULT_WINDOW_HEIGHT)));
+    refresh(cx);
+
+    cx.update(|_, app| {
+        let root = view.read(app);
+        assert!(root.sync_enabled, "기본값은 켜짐이다");
+        assert!(
+            root.sync_state
+                .lock()
+                .expect("sync shared state")
+                .auto_enabled
+        );
+    });
+
+    click_debug_element(cx, "global-sync-switch");
+
+    cx.update(|_, app| {
+        let root = view.read(app);
+        assert!(!root.sync_enabled, "스위치를 누르면 꺼져야 한다");
+        assert!(
+            !root
+                .sync_state
+                .lock()
+                .expect("sync shared state")
+                .auto_enabled,
+            "백그라운드가 보는 공유 상태까지 꺼져야 실제로 멈춘다"
+        );
+    });
+
+    click_debug_element(cx, "global-sync-switch");
+    cx.update(|_, app| {
+        let root = view.read(app);
+        assert!(root.sync_enabled);
+        assert!(
+            root.sync_state
+                .lock()
+                .expect("sync shared state")
+                .auto_enabled
+        );
+    });
+}
+
+/// 원본·대상을 바꾸면 이어서 시작할 지점을 버려야 한다.
+#[gpui::test]
+fn changing_the_folders_drops_the_resume_cursor(cx: &mut TestAppContext) {
+    initialize_components(cx);
+    let (view, cx) = cx.add_window_view(|_, _| {
+        let mut root = test_app_root(ActivePanel::FileSync);
+        root.sync_jobs = vec![SyncJob {
+            source: r"D:\원본".to_string(),
+            target: r"E:\대상".to_string(),
+            ..SyncJob::default()
+        }];
+        root.selected_sync_job = Some(0);
+        root.sync_notify_enabled = false;
+        root
+    });
+
+    cx.simulate_resize(size(px(DEFAULT_WINDOW_WIDTH), px(DEFAULT_WINDOW_HEIGHT)));
+    refresh(cx);
+
+    let id = cx.update(|_, app| {
+        let root = view.read(app);
+        let id = root.sync_jobs[0].id.clone();
+        root.sync_state
+            .lock()
+            .expect("sync shared state")
+            .cursors
+            .insert(id.clone(), r"nested\file.txt".to_string());
+        id
+    });
+
+    // 이름만 바꾸는 저장은 위치를 유지한다.
+    cx.update(|window, app| {
+        view.update(app, |root, cx| {
+            let name = root.sync_name_input.clone().expect("name input");
+            name.update(cx, |state, cx| state.set_value("이름만 변경", window, cx));
+        });
+    });
+    refresh(cx);
+    click_debug_element(cx, "sync-apply-paths");
+    cx.update(|_, app| {
+        assert!(
+            view.read(app)
+                .sync_state
+                .lock()
+                .expect("sync shared state")
+                .cursors
+                .contains_key(&id),
+            "경로가 그대로면 이어서 시작 지점을 버릴 이유가 없다"
+        );
+    });
+
+    // 원본 폴더를 바꾸면 버린다.
+    cx.update(|window, app| {
+        view.update(app, |root, cx| {
+            let source = root.sync_source_input.clone().expect("source input");
+            source.update(cx, |state, cx| state.set_value(r"D:\다른원본", window, cx));
+        });
+    });
+    refresh(cx);
+    click_debug_element(cx, "sync-apply-paths");
+
+    cx.update(|_, app| {
+        let root = view.read(app);
+        assert!(
+            !root
+                .sync_state
+                .lock()
+                .expect("sync shared state")
+                .cursors
+                .contains_key(&id),
+            "다른 폴더를 가리키는 커서로 이어서 돌면 새 원본의 앞부분을 통째로 건너뛴다"
+        );
+        assert!(root.sync_jobs[0].resume_cursor.is_none());
+    });
+}

@@ -19,7 +19,10 @@ $visualTests = @(
     "file_sync_status_bar_stays_visible_at_compact_height_while_running",
     "file_sync_stop_button_requests_cancellation_and_clears_pending_queue",
     "sync_failures_log_one_summary_line_instead_of_one_entry_per_file",
-    "background_sync_event_wakes_render_without_additional_user_input"
+    "background_sync_event_wakes_render_without_additional_user_input",
+    "file_sync_sections_share_one_width_at_every_window_width",
+    "sidebar_switch_turns_automatic_sync_off_and_on",
+    "changing_the_folders_drops_the_resume_cursor"
 )
 
 function Invoke-CheckedCommand {

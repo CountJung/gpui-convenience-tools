@@ -21,19 +21,23 @@ gpui-convenience-tools/          ← 저장소 루트
 │   ├── assets/themes/           # 번들 테마 JSON 21종
 │   └── src/
 │       ├── main.rs              # 진입점: 로거 설치 → 테마 시드 → 윈도우 오픈
-│       ├── config.rs            # AppConfig · SyncJob · LogConfig · update_config
+│       ├── config.rs            # AppConfig · SyncJob · LogConfig · 주기 프리셋 · update_config
 │       ├── logging.rs           # 롤링 파일 로거 (log::Log 구현)
-│       ├── sync.rs              # 폴더 동기화 엔진
+│       ├── util.rs              # 주인 없는 순수 헬퍼 (format_interval · interval_to_secs)
+│       ├── sync/                # 폴더 동기화 엔진 (mod · tests)
 │       ├── app/                 # AppRoot(Render) · 상태 · 이벤트 루프 · 사이드바
-│       │   ├── mod.rs           #   구조체 · 생성자 · 최상위 레이아웃
+│       │   ├── mod.rs           #   구조체 · 생성자 · 최상위 레이아웃 · 전역 스위치
 │       │   ├── state.rs         #   순수 데이터 타입
-│       │   ├── background.rs    #   스캔 · 동기화 백그라운드 스레드
+│       │   ├── background.rs    #   스캔 · 동기화 백그라운드 스레드 (실행 위치 영속화)
 │       │   ├── ops.rs           #   광고 차단 · 서비스 · 로그 설정 조작
 │       │   ├── sync_ops.rs      #   파일 동기화 작업 조작
+│       │   ├── interval.rs      #   주기 선택 상태 · 프리셋 조작
 │       │   ├── events.rs        #   백그라운드 → UI 이벤트 처리
-│       │   └── inputs.rs        #   입력 위젯 지연 생성
+│       │   ├── inputs.rs        #   입력 위젯 지연 생성
+│       │   └── tests/           #   GPUI 회귀 테스트 5파일
 │       ├── platform/
 │       │   ├── mod.rs           # Platform trait (창 조작 + SCM)
+│       │   ├── fallback.rs      # 비Windows 구현
 │       │   └── windows/         # Win32 구현
 │       │       ├── mod.rs       #   WindowsPlatform + Platform impl
 │       │       ├── window_ops.rs#   창 · 프로세스 열거
@@ -42,10 +46,14 @@ gpui-convenience-tools/          ← 저장소 루트
 │       │       ├── services.rs  #   설치된 서비스 조회 · 제어
 │       │       └── task_scheduler.rs # 로그온 자동 시작
 │       └── window/
-│           ├── mod.rs           # 패널 모듈 + scroll_pane 헬퍼
+│           ├── mod.rs           # 패널 모듈 + balanced_split · scroll_pane 헬퍼
+│           ├── ui.rs            # 공용 UI 프리미티브 (배지 · 버튼 · 스위치 · 칩 …)
 │           ├── ad_block.rs      # 편의 기능: 웹뷰 광고 차단
 │           ├── file_sync.rs     # 편의 기능: 파일 동기화
 │           ├── service_mgr.rs   # 편의 기능: Windows 서비스
+│           ├── interval.rs      # 주기 선택 렌더 (두 패널 공용)
+│           ├── dashboard.rs     # 개요: 전체 상태 요약
+│           ├── log_view.rs      # 시스템: 화면 로그
 │           ├── service_view.rs  # 시스템: 자동 시작(작업 스케줄러)
 │           └── settings.rs      # 시스템: 전역 설정(테마 · 로그 보관)
 └── installer/windows/
@@ -189,10 +197,9 @@ cargo workspace, Hello World 앱 동작 확인
 
 ## 검증 재개 단계
 
-### Phase J — 테마 가시성·스크롤 안정화 🧪
+### Phase J — 테마 가시성·스크롤 안정화 ✅
 
-구현 변경과 GPUI 자체 테스트 필수 게이트는 통과했다. `TODO.md`의 실제 화면 순차 검증을
-통과하기 전에는 완료로 분류하지 않는다.
+실제 화면 검증은 Phase N에서 마무리했다(아래 「Phase J / J-3 — 실제 화면 검증 완료」).
 
 - 사이드바 그룹과 개별 항목에 `sidebar_border` 기반 경계를 적용해 비활성 항목 구분 강화
 - 번들 테마 36개 변형의 스위치 팔레트를 감사하고, 누락 토큰을 런타임 최소 대비 정책으로 보정
@@ -217,10 +224,10 @@ cargo workspace, Hello World 앱 동작 확인
 - `scripts/Verify-Workspace.ps1`와 VS Code 작업으로 GPUI 개별 테스트·전체 테스트·릴리즈
   빌드·SHA-256 manifest 생성을 단일화하고, ChatGPT 데스크톱은 해시 고정 바이너리와
   격리 `GPUI_CONVENIENCE_TOOLS_DATA_DIR` 프로세스만 검증하도록 분리
-- 실제 화면 1차·2차 검증은 `target/visual-validation/handoff.json`을 생성한 뒤 Windows
-  ChatGPT 데스크톱 앱에서 재개
+- 실제 화면 1차·2차 검증은 Phase J-2의 `CLAUDE_LOCAL` 하네스로 대체됐다
+  (ChatGPT 데스크톱 인계는 `IDE` 표면에서만 사용)
 
-### Phase J-3 — 앱 셸 리사이즈·파일 동기화 조작 흐름 개선 🧪
+### Phase J-3 — 앱 셸 리사이즈·파일 동기화 조작 흐름 개선 ✅
 
 - 앱 셸 좌측 사이드바를 200~360px 범위의 `h_resizable` pane으로 전환
 - 파일 동기화의 작업 목록·설정·실패 기록을 전체 너비 단일 스크롤 페이지로 통합
@@ -230,7 +237,7 @@ cargo workspace, Hello World 앱 동작 확인
   갱신되도록 보완
 - GPUI 테스트에서 사이드바 divider drag, 920×480 단일 페이지 overflow/마지막 기록 도달,
   실행 버튼의 입력 저장·공유 상태·큐 등록, 백그라운드 완료 이벤트의 무입력 UI 반영을 검증
-- 실제 화면 독립 검증은 Phase J의 데스크톱 인계 절차에서 계속 수행
+- 실제 화면 검증은 Phase N에서 `CLAUDE_LOCAL` 하네스로 완료
 
 ### Phase J-2 — Claude Code 로컬 시각 검증 표면(`CLAUDE_LOCAL`) 도입 ✅
 
@@ -340,6 +347,56 @@ Windows 쪽은 34개 테스트 통과와 실제 앱 캡처로 회귀 없음을 �
 - 검증: 단위 테스트 5종 + GPUI 회귀 6종(기본 프리셋·추가·잘못된 입력·패널 간 공유·마지막
   프리셋 보호·프리셋 밖 현재값) 추가, 전체 45개 통과. 실제 앱에서 드롭다운을 열어 `1분`을
   고르고 `scan_interval_secs: 60`이 저장되는 것까지 확인
+
+### Phase N — 이어서 동기화 · 전역 스위치 · 스크롤 너비 고정 ✅
+
+사용자 스크린샷에서 나온 세 가지를 처리했다.
+
+- **이어서 동기화** — 앱을 켤 때마다 원본 전체를 다시 훑어 「건너뜀」만 쌓이던 문제.
+  - `SyncJob`에 `last_run_unix`·`resume_cursor` 추가. **엔진 계층이 소유**하고 UI는 쓰지 않는다.
+    UI 스냅샷 저장이 덮어쓰지 않도록 `config::carry_over_engine_progress`로 디스크 값을 되살린다
+  - 백그라운드가 시작할 때 `last_run_unix`로 주기를 이어받아, **재시작 직후 전부 실행되던
+    동작이 사라졌다**
+  - 실행 중 5초마다 위치를 config에 남긴다. 트레이에서 강제 종료돼도 다음 실행이 이어진다
+  - 엔진: `read_dir` 결과를 이름순 정렬(순서가 실행마다 같아야 커서가 성립)하고
+    `SyncControl::resume_from`으로 커서 앞 구간을 건너뛴다. 커서 항목 자체는 다시 처리한다
+    (기록 시점이 "처리 직전"이라 완료 여부를 알 수 없음)
+  - 안전장치: 건너뛴 항목도 `seen_names`에 넣어 **미러 삭제가 확인하지 않은 파일을 지우지
+    않게** 했고, 원본·대상 경로가 바뀌면 커서를 버린다. 완주한 실행은 커서를 비운다
+  - 실측: 커서 `icu_collections-…`에서 중지 후 재시작하니 `js-sys-…`부터 이어졌고
+    건너뜀이 1건이었다(이어서 시작이 없으면 수만 건)
+- **파일 동기화 전역 스위치** — 사이드바에 광고 차단과 같은 모양으로 추가(`config.sync_enabled`).
+  자동 실행만 막고 수동 '지금 동기화'는 그대로 둔다. 스위치 렌더는
+  `AppRoot::render_sidebar_switch`로 공용화했다. 대시보드에도 상태 배지를 추가해
+  패널에 들어가지 않아도 동기화 여부가 보인다
+- **스크롤 컨텐츠 너비 고정** — `scroll_pane`에 `overflow_x_hidden` 추가.
+  세로만 스크롤로 열어 두면 가로가 `visible`로 남아 컨텐츠가 뷰포트 폭 대신 자기 내용 폭으로
+  잡히는 상황이 생긴다. **이 증상은 재현하지 못했고**(신규 실행·리사이즈·최소화 복원·디버그
+  빌드·스크롤·동기화 중·트레이 복원·넓은 창 8종 모두 정상), 스크린샷의 섹션별 폭 차이에서
+  역산한 가설 기반 대응이다
+- **가로 잘림 3건 수정** — 위 변경으로 드러났거나 이미 잘려 있던 것.
+  `+ 추가` 버튼(고정 64px에 글자가 안 들어가 두 줄로 접힘) → 최소 폭 + `whitespace_nowrap`,
+  로그 레벨 칸이 대시보드 64px·로그 패널 72px로 갈려 `SUCCESS`가 접히던 것 →
+  `ui::log_level_label`로 승격(레벨 → 색 매핑 중복도 함께 제거)
+- 검증: 테스트 45 → **53개** 통과(엔진 이어서 실행 4종, config 보존 1종, GPUI 3종),
+  `cargo check --all-targets` 경고 0, 실제 앱에서 스위치 on/off·config 저장·이어서 실행·
+  1500px 폭 레이아웃 확인
+
+### Phase J / J-3 — 실제 화면 검증 완료 ✅
+
+`TODO.md`에 남아 있던 「Phase J 실제 화면 순차 검증」 대기 항목을 정리했다. Phase J-2에서
+`CLAUDE_LOCAL` 하네스가 생긴 뒤 D-2·L·M·N을 거치며 해당 수용 기준이 모두 실제 캡처로
+확인됐다.
+
+- 사이드바 경계·overflow 스크롤, 독립 탐색형 스플리터(광고 차단·서비스 관리),
+  파일 동기화 전체 너비 단일 페이지·스크롤·실행 결과 — 실제 앱 캡처로 확인
+- 테마별 스위치 — `rendered_switch_toggles_in_light_dark_and_missing_switch_token_theme`
+- **하네스 한계**: divider 드래그와 키보드 텍스트 입력은 `Invoke-ClaudeVisualCheck.ps1`가
+  지원하지 않는다. 두 항목은 GPUI 테스트
+  (`sidebar_divider_drag_resizes_navigation_and_content`,
+  `file_sync_run_button_saves_current_inputs_and_queues_selected_job`)로만 검증된 상태다
+- 앞으로 실제 화면 검증은 대기열에 쌓지 않고 UI를 바꾼 작업에서 그때 수행한다
+  (정본: copilot-instructions「실행 표면 하드 게이트」)
 
 ---
 

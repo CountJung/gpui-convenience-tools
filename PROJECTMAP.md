@@ -7,7 +7,7 @@
 >
 > **새 헬퍼를 만들기 전에 「공용 유틸 인벤토리」를 먼저 확인한다.**
 
-**최종 측정**: 2026-07-30 · 총 38개 파일 · 10,642줄
+**최종 측정**: 2026-07-30 · 총 38개 파일 · 11,422줄
 
 ## 크기 기준 — 줄 수는 증상이다
 
@@ -21,7 +21,7 @@
 | 800~1,000 | 🟡 경고 | 다음 작업 전에 구조 리팩터링 |
 | 1,000 초과 | 🔴 위반 | **즉시 리팩터링.** 다른 작업보다 우선 |
 
-현재 🔴 위반 **없음**, 🟡 경고 **없음**. 최대 파일은 675줄(`app/mod.rs`).
+현재 🔴 위반 **없음**, 🟡 경고 **없음**. 최대 파일은 723줄(`app/mod.rs`).
 줄 수와 무관하게 처리하는 중복 헬퍼는 아래 「중복 헬퍼 추적」에서 관리한다.
 
 ### 줄 수 측정 명령
@@ -46,61 +46,61 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | --- | ---: | --- |
 | `main.rs` | 129 | 진입점 — 로거 설치 → 테마 시드 → 윈도우 오픈, `--service`/`--tray` 플래그 분기 |
 | `theme.rs` | 143 | 테마 모드 적용과 스위치 팔레트 최소 대비 보정·번들 테마 감사 테스트 |
-| `config.rs` | 440 | `AppConfig`·`SyncJob`·`LogConfig`·주기 프리셋 정의, `update_config` 단일 저장 경로, 데이터 루트 오버라이드 |
+| `config.rs` | 522 | `AppConfig`·`SyncJob`·`LogConfig`·주기 프리셋 정의, `update_config` 단일 저장 경로, 데이터 루트 오버라이드 |
 | `logging.rs` | 560 | 롤링 파일 로거 (`log::Log` 구현, 테스트용 출력 경로 주입) |
 | `util.rs` | 139 | 도메인 주인이 없는 순수 헬퍼 — `format_interval`·`interval_to_secs`·`TimeUnit` |
 
-### 동기화 엔진 (`app/src/sync/`) — 834줄 / 2파일
+### 동기화 엔진 (`app/src/sync/`) — 1,059줄 / 2파일
 
 `sync.rs`(831줄, 🟡)를 본문과 테스트로 나눈 결과다.
 
 | 파일 | 줄 | 책임 |
 | --- | ---: | --- |
-| `mod.rs` | 435 | 폴더 동기화 엔진 (UI 비의존 순수 로직) — 진행 보고·중지 제어 포함 |
-| `tests.rs` | 399 | 복사·건너뜀·미러 삭제·실패 사유·진행 보고·중지 단위 테스트 |
+| `mod.rs` | 545 | 폴더 동기화 엔진 (UI 비의존 순수 로직) — 진행 보고·중지·이어서 시작 제어 포함 |
+| `tests.rs` | 514 | 복사·건너뜀·미러 삭제·실패 사유·진행 보고·중지·이어서 시작 단위 테스트 |
 
-### 앱 루트 (`app/src/app/`) — 2,350줄 / 8파일
+### 앱 루트 (`app/src/app/`) — 2,617줄 / 8파일
 
 `app.rs`(1,798줄)를 책임별로 분할한 결과다.
 
 | 파일 | 줄 | 책임 |
 | --- | ---: | --- |
-| `mod.rs` | 675 | `AppRoot` 정의·생성자·백그라운드 UI wake·리사이즈/스크롤 사이드바·최상위 레이아웃 |
-| `sync_ops.rs` | 362 | 파일 동기화 작업 조작 (추가·삭제·선택·입력 저장·원자적 수동 실행 큐·중지 요청) |
+| `mod.rs` | 723 | `AppRoot` 정의·생성자·백그라운드 UI wake·사이드바(전역 스위치 2개 포함)·최상위 레이아웃 |
+| `sync_ops.rs` | 436 | 파일 동기화 작업 조작 (추가·삭제·선택·입력 저장·수동 실행 큐·중지·전역 스위치·커서 무효화) |
 | `interval.rs` | 313 | 주기 선택 상태(`IntervalPicker`)와 조작 — 프리셋 추가·삭제·드롭다운 동기화 |
-| `events.rs` | 249 | `PlatformEvent` 채널 소비, 진행 상태 반영, 로그·토스트 유틸 |
-| `background.rs` | 220 | 스캔 스레드와 동기화 스레드 (진행 이벤트 빈도 제한·중지 처리) |
-| `state.rs` | 207 | 순수 데이터 타입 (`AppState`, `PlatformEvent`, `SyncRunning`, `ActivePanel`, 타깃별 `NAV_*`) |
+| `events.rs` | 271 | `PlatformEvent` 채널 소비, 진행 상태 반영, 로그·토스트 유틸 |
+| `background.rs` | 320 | 스캔 스레드와 동기화 스레드 (진행 이벤트 빈도 제한·중지·실행 위치 영속화) |
+| `state.rs` | 230 | 순수 데이터 타입 (`AppState`, `PlatformEvent`, `SyncRunning`, `ActivePanel`, 타깃별 `NAV_*`) |
 | `ops.rs` | 195 | 광고 차단·서비스 관리·로그 설정 조작 |
 | `inputs.rs` | 129 | 입력 위젯(`InputState`) 지연 생성과 값 동기화 |
 
-### GPUI 회귀 테스트 (`app/src/app/tests/`) — 1,172줄 / 5파일
+### GPUI 회귀 테스트 (`app/src/app/tests/`) — 1,369줄 / 5파일
 
 `app/tests.rs`(929줄, 🟡)를 시나리오별로 나눈 결과다. 픽스처는 `mod.rs`가 단독 소유하고
 하위 모듈은 `use super::*`로 가져다 쓴다.
 
 | 파일 | 줄 | 책임 |
 | --- | ---: | --- |
-| `file_sync.rs` | 448 | 동기화 조작·진행 표시줄·중지·로그 요약 |
+| `file_sync.rs` | 639 | 동기화 조작·진행 표시줄·중지·로그 요약·섹션 너비·전역 스위치·커서 무효화 |
 | `layout.rs` | 251 | 사이드바·스플리터·divider drag·스크롤 |
 | `interval.rs` | 226 | 주기 드롭다운·프리셋 추가/삭제·패널 간 공유 |
-| `mod.rs` | 162 | 공용 픽스처 (`test_app_root`·`TestPlatform`·`refresh`·`click_debug_element` 등) |
+| `mod.rs` | 168 | 공용 픽스처 (`test_app_root`·`TestPlatform`·`refresh`·`click_debug_element` 등) |
 | `theme.rs` | 85 | 테마 전환과 스위치 가시성 |
 
-### 패널 (`app/src/window/`) — 3,120줄 / 10파일
+### 패널 (`app/src/window/`) — 3,244줄 / 10파일
 
 | 파일 | 줄 | 책임 |
 | --- | ---: | --- |
 | `service_mgr.rs` | 635 | 편의 기능 — Windows 서비스 (목록/제어 ↔ 검색·필터·권한) |
-| `file_sync.rs` | 610 | 편의 기능 — 파일 동기화 (작업 목록 → 설정 → 실패 기록 + 하단 고정 진행 표시줄) |
+| `file_sync.rs` | 612 | 편의 기능 — 파일 동기화 (작업 목록 → 설정 → 실패 기록 + 하단 고정 진행 표시줄) |
 | `settings.rs` | 444 | 전역 설정 — 테마 선택·로그 보관 정책 |
-| `ad_block.rs` | 393 | 편의 기능 — 웹뷰 광고 차단 (상태·타겟 ↔ 스캔 주기·프로세스 추가) |
+| `ad_block.rs` | 400 | 편의 기능 — 웹뷰 광고 차단 (상태·타겟 ↔ 스캔 주기·프로세스 추가) |
 | `service_view.rs` | 318 | 시스템 — 자동 시작(작업 스케줄러) 등록·삭제·즉시 실행 |
-| `ui.rs` | 300 | **공용 UI 프리미티브** — 배지·액션 버튼·토글 스위치·통계 타일·설정 행·선택 칩 |
-| `dashboard.rs` | 175 | 개요 — 전체 상태 요약과 최근 활동 (플랫폼별 요약 카드) |
+| `ui.rs` | 322 | **공용 UI 프리미티브** — 배지·액션 버튼·토글 스위치·통계 타일·설정 행·선택 칩·로그 레벨 칸 |
+| `dashboard.rs` | 161 | 개요 — 전체 상태 요약과 최근 활동 (플랫폼별 요약 카드 + 동기화 상태 배지) |
 | `interval.rs` | 146 | 주기 선택 렌더 — 드롭다운 + (값·단위·추가) 행 + 등록된 프리셋 목록 |
-| `log_view.rs` | 119 | 시스템 — 화면 로그 가상 리스트와 로그 파일 현황 |
-| `mod.rs` | 90 | 패널 모듈 선언 + `balanced_split`·`scroll_pane` 레이아웃 헬퍼 |
+| `log_view.rs` | 110 | 시스템 — 화면 로그 가상 리스트와 로그 파일 현황 |
+| `mod.rs` | 96 | 패널 모듈 선언 + `balanced_split`·`scroll_pane` 레이아웃 헬퍼 |
 
 ### 플랫폼 (`app/src/platform/`) — 1,639줄 / 8파일
 
@@ -127,7 +127,7 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 
 | 파일 | 줄 | 책임 |
 | --- | ---: | --- |
-| `scripts/Verify-Workspace.ps1` | 163 | VS Code용 Rust/GPUI 자동 검증과 ChatGPT 데스크톱 handoff manifest·해시 고정 빌드 생성 |
+| `scripts/Verify-Workspace.ps1` | 166 | VS Code용 Rust/GPUI 자동 검증과 ChatGPT 데스크톱 handoff manifest·해시 고정 빌드 생성 |
 | `scripts/Invoke-ClaudeVisualCheck.ps1` | 450 | `CLAUDE_LOCAL` 시각 검증 하네스 — 격리 실행(`-SeedConfig`로 상태 재현)·창 캡처(`PrintWindow`)·입력(`SendInput`)·정리 |
 | `scripts/Start-DesktopVisualValidation.ps1` | 126 | manifest 해시 검증 후 단일 임시 데이터 루트 격리 프로세스·세션 파일 생성과 실패 롤백 |
 | `scripts/Stop-DesktopVisualValidation.ps1` | 75 | 기록된 검증 PID·시작 시각과 작업 전용 임시 루트만 검증 후 정리 |
@@ -155,11 +155,14 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `window/ui.rs` | `stat_tile(label, value, cx)` | 숫자 하나를 강조하는 통계 타일(`flex_1` 포함) |
 | `window/ui.rs` | `option_row(id, title, description, checked, on_click, cx)` | 제목·설명 + 토글 스위치 설정 행. `{id}-row`/`{id}` debug_selector 부여 |
 | `window/ui.rs` | `choice_chip(id, label, selected, cx)` | 프리셋 선택 칩. 호출부가 `.on_click(cx.listener(..))`를 이어 붙인다 |
+| `window/ui.rs` | `log_level_label(level, cx)` | 로그 한 줄의 레벨 칸. 레벨 → 색 매핑 포함, 폭 고정 + 줄바꿈 금지 |
 | `window/ui.rs` | `Tone` | 배지 의미 색 — `Success`·`Warning`·`Info`·`Muted` |
 | `window/ui.rs` | `ButtonStyle` | 버튼 의미 색 — `primary`·`neutral`·`secondary`·`danger`·`danger_outline`·`muted` (+ `border`/`hover`/`no_hover` 덮어쓰기) |
 | `window/ui.rs` | `Size` | 여백 — `Sm`(px_2 py_1) · `Md`(px_3 py_1) · `Lg`(px_4 py_2) |
 | `window/mod.rs` | `balanced_split(id, left_min, right_min, left, right)` | 양쪽 최소 폭을 보장하며 가용 너비를 균형 있게 채우는 공용 스플리터 |
-| `window/mod.rs` | `scroll_pane(id, handle, content)` | 자연 높이 컨텐츠가 넘칠 때 세로 스크롤 + 스크롤바 부여 |
+| `window/mod.rs` | `scroll_pane(id, handle, content)` | 자연 높이 컨텐츠가 넘칠 때 세로 스크롤 + 스크롤바 부여. **가로는 잠근다**(`overflow_x_hidden`) |
+| `config.rs` | `carry_over_engine_progress(stored, jobs)` | UI 스냅샷 저장 시 엔진이 기록한 `last_run_unix`·`resume_cursor`를 디스크에서 되살린다 |
+| `sync/mod.rs` | `SyncControl::resume_from(path)` | 끊긴 순회를 그 상대 경로부터 이어서 시작 (앞 구간만 건너뜀) |
 | `theme.rs` | `change_theme` · `normalize_component_palette` | 테마 변경 후 스위치 트랙·썸 최소 대비 보정 |
 | `config.rs` | `update_config(edit)` | 설정 읽기-수정-쓰기 **단일 경로** |
 | `config.rs` | `data_dir` · `config_path` · `themes_path` · `logs_path` | 데이터 루트 하위 경로 계산 (`GPUI_CONVENIENCE_TOOLS_DATA_DIR`로 재지정 가능) |
@@ -201,10 +204,14 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 달랐고, 토글 행은 `file_sync`·`settings`·`ad_block` **3개 파일**(즉시 승격 기준), 프리셋 칩은
 `ad_block`·`file_sync`·`settings` **3개 파일**에 같은 스타일 체인이 복제돼 있었다.
 
-**중복이 아니었던 항목** — 이전 표의 「초 단위 간격 표기」는 오판이었다.
-`file_sync::format_interval`은 60초를 `1분`으로 접지만 `ad_block`은 프리셋에 60·120초가 있어
-`60초`·`120초`로 표기해야 한다. 합치면 화면이 바뀌므로 승격 대상이 아니다.
-(`ad_block.rs`의 해당 지점에 사유를 주석으로 남겼다.)
+**「초 단위 간격 표기」 판정 정정 (2026-07-30)** — 한때 "합치면 화면이 바뀌므로 승격 대상이
+아니다"라고 적었으나, 이는 잘못된 기준이었다. **같은 값을 화면마다 다르게 찍는 것 자체가
+결함**이므로 화면 변경은 보류 사유가 되지 않는다. `util::format_interval`로 통일했고,
+이 판단 기준은 정본의 「구현 기준」 첫 항목에 규칙으로 올렸다.
+
+**로그 레벨 칸** — 대시보드 64px·로그 패널 72px로 갈려 있었고 좁은 쪽에서 `SUCCESS`가 두 줄로
+접혀 잘렸다. 레벨 → 색 매핑까지 두 곳에 복제돼 있어 `ui::log_level_label`로 승격했다(2곳이지만
+한쪽이 실제로 깨져 있어 즉시 처리).
 
 **이름이 다르다고 다른 헬퍼가 아니다.** `badge`/`state_badge`, `stat_card`/`stat_tile`처럼
 한쪽은 색을 인자로 받고 한쪽은 `cx.theme()`에서 읽는 정도의 차이는 같은 헬퍼로 본다.
@@ -249,6 +256,9 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | 2026-07-30 | `sync.rs` | 책임 단위 분할 | 831 🟡 | `sync/` 2파일 (435 / 399) | 본문과 단위 테스트 분리 |
 | 2026-07-30 | `app/tests.rs` | 책임 단위 분할 | 929 🟡 | `app/tests/` 4파일 (최대 448) | 픽스처는 `mod.rs`가 단독 소유, 시나리오별 하위 모듈 |
 | 2026-07-30 | 주기 선택 UI | **기능 재설계 + 통일** | 패널별 고정 프리셋 칩 | `app/interval.rs` + `window/interval.rs` + `util.rs` | 드롭다운 + 사용자 정의 프리셋. 칩 패딩·주기 표기도 함께 통일(화면 변경 의도됨) |
+| 2026-07-30 | 사이드바 전역 스위치 | 공용 승격 | 광고 차단 전용 인라인 | `AppRoot::render_sidebar_switch` | 파일 동기화 스위치를 같은 모양으로 추가하며 승격 |
+| 2026-07-30 | 로그 레벨 칸 | **중복 제거 (공용 승격)** | `dashboard` 64px / `log_view` 72px | `ui::log_level_label` (76px) | 좁은 쪽에서 `SUCCESS`가 접혀 잘렸다. 레벨→색 매핑 중복도 함께 흡수 |
+| 2026-07-30 | `scroll_pane` | 레이아웃 고정 | 세로만 스크롤, 가로 `visible` | `overflow_x_hidden` 추가 | 컨텐츠가 뷰포트 폭 대신 내용 폭으로 잡히는 경로 차단(가설 기반) |
 
 앞의 두 작업은 **동작 변경 없이** 수행했다. 세 번째 작업은 아래 한 건을 제외하면 화면이 동일하다.
 
@@ -280,16 +290,23 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 
 ### 1순위 — 남은 중복 제거 (줄 수 무관, 지금 처리 가능)
 
-남은 🟡 후보 중 **스탯 타일**과 **토글 행**이 다음 차례다.
-셋 다 `ui.rs`에 흡수되며, 그만큼 아래 2순위 분할이 뒤로 밀린다. **그래서 순서가 중요하다.**
+**추적 중인 승격 후보 없음.** 새로 발견하면 「중복 헬퍼 추적」 표에 먼저 적는다.
+
+다만 **`debug_selector` 래퍼**는 관찰 대상이다. `ui::action_button`(`Stateful<Div>`)과
+`ui::toggle_switch`(`Switch`)가 debug_selector를 달지 않아, 테스트에서 클릭해야 하는 곳마다
+`div().debug_selector(..)`로 감싸는 한 줄이 14곳에 복제돼 있다. 헬퍼 안으로 옮기려면 `id`를
+`impl Into<ElementId>`에서 문자열로 좁혀야 하는데, `("svc-start", ix)`처럼 튜플 id를 쓰는
+호출부 3곳이 걸린다. **한 줄짜리 관용구라 지금은 승격하지 않는다.** id 체계를 손볼 일이
+생기면 함께 처리한다.
 
 ### 2순위 — 책임 재배치·분할 (중복 제거 후에도 크면)
 
-- **`window/service_mgr.rs` (636)** — 가상 리스트 행 렌더가 큰 비중을 차지한다.
+- **`app/mod.rs` (723)** — 최대 파일이며 800줄 경고까지 77줄 남았다. `AppRoot` 필드가 30개에
+  가깝다. `TODO.md`의 「`AppRoot` 분할 검토」와 같은 항목이다. 다음에 커지면 사이드바 렌더를
+  `app/sidebar.rs`로 떼는 것이 가장 자연스럽다.
+- **`app/tests/file_sync.rs` (639)** — 시나리오가 늘어 두 번째로 크다. 800줄에 닿으면
+  레이아웃/조작/영속화로 다시 나눈다.
+- **`window/service_mgr.rs` (635)** — 가상 리스트 행 렌더가 큰 비중을 차지한다.
   800줄에 닿으면 행 렌더를 `service_mgr/row.rs`로, 보기 설정을 `service_mgr/settings.rs`로 분리한다.
-- **`window/file_sync.rs` (568)** — `TODO.md`의 제외 패턴·진행률 UI가 들어가면 커진다.
+- **`window/file_sync.rs` (612)** — `TODO.md`의 제외 패턴·진행률 UI가 들어가면 커진다.
   작업 선택·설정·실패 기록의 렌더 책임을 의미별 하위 모듈로 나누는 것이 자연스럽다.
-  `format_interval`은 그 전에 `util.rs`로 승격한다.
-- **`window/settings.rs` (542)** — 유일하게 이번 승격에서 줄지 않은 패널이다.
-  선택 칩·테마 옵션이 자체 헬퍼로 남아 있어 🟡 「선택 칩/옵션 행」 승격 대상이며,
-  기능별 설정이 흘러들어오지 않았는지(패널 구조 규약 위반) 함께 점검한다.

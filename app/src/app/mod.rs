@@ -89,6 +89,8 @@ pub struct AppRoot {
     pub(crate) favorite_services: Vec<String>,
 
     // ── 파일 동기화 ──
+    /// 자동 동기화 전역 스위치. 사이드바에서 바로 끌 수 있다.
+    pub(crate) sync_enabled: bool,
     pub(crate) sync_jobs: Vec<SyncJob>,
     pub(crate) selected_sync_job: Option<usize>,
     /// 작업 ID → 최근 실행 결과. 인덱스 대신 ID로 매칭해 삭제 시 어긋나지 않게 한다.
@@ -136,8 +138,10 @@ impl AppRoot {
         let mut favorite_services = Vec::new();
         let mut log_config = LogConfig::default();
         let mut initial_interval_presets = default_interval_presets();
+        let mut sync_enabled = true;
 
         if let Ok(Some(cfg)) = load_config() {
+            sync_enabled = cfg.sync_enabled;
             app_state.is_active = cfg.service_enabled;
             if !cfg.targets.is_empty() {
                 app_state.targets = cfg.targets;
@@ -175,10 +179,20 @@ impl AppRoot {
             targets: app_state.targets.clone(),
             scan_interval_secs: initial_scan_interval_secs,
         }));
+        // 끊긴 지점은 작업에 저장돼 있다. 실행 중에는 공유 상태가 정본이므로 여기로 옮긴다.
+        let cursors = sync_jobs
+            .iter()
+            .filter_map(|job| {
+                job.resume_cursor
+                    .clone()
+                    .map(|cursor| (job.id.clone(), cursor))
+            })
+            .collect();
         let sync_state = Arc::new(Mutex::new(SyncSharedState {
             jobs: sync_jobs.clone(),
-            run_now: Vec::new(),
-            cancel: Arc::default(),
+            auto_enabled: sync_enabled,
+            cursors,
+            ..SyncSharedState::default()
         }));
 
         #[cfg(target_os = "windows")]
@@ -238,6 +252,7 @@ impl AppRoot {
             service_filter: ServiceFilter::All,
             favorite_services,
 
+            sync_enabled,
             sync_jobs,
             selected_sync_job,
             sync_status: HashMap::new(),
@@ -292,42 +307,73 @@ impl AppRoot {
         &self.app_state
     }
 
-    /// 사이드바 상단의 광고 차단 전역 스위치.
+    /// 사이드바 상단의 전역 스위치 한 줄.
     ///
-    /// Win32 창 조작 전용 기능이라 다른 OS에서는 스위치 자체를 두지 않는다.
-    #[cfg(target_os = "windows")]
-    fn render_ad_block_toggle(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
+    /// 앱을 켜두기만 해도 스스로 도는 기능은 패널에 들어가지 않고도 끌 수 있어야 하므로
+    /// 여기에 모은다. 광고 차단과 파일 동기화가 같은 모양을 쓴다.
+    fn render_sidebar_switch(
+        &self,
+        id: &'static str,
+        label: &'static str,
+        enabled: bool,
+        on_toggle: impl Fn(&mut Self, bool, &mut Window, &mut Context<Self>) + 'static,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
         let theme = cx.theme();
         let accent = theme.sidebar_accent;
         let accent_foreground = theme.sidebar_accent_foreground;
-        let enabled = self.app_state.is_active;
 
-        Some(
-            div()
-                .rounded_md()
-                .p_2()
-                .bg(accent)
-                .child(
-                    h_flex()
-                        .justify_between()
-                        .items_center()
-                        .child(div().text_color(accent_foreground).child("광고 차단"))
-                        .child(
-                            ui::toggle_switch("global-enable-switch", enabled, cx).on_click(
-                                cx.listener(|this, checked: &bool, window, cx| {
-                                    this.set_service_enabled(*checked, window, cx);
-                                }),
-                            ),
-                        ),
-                )
-                .into_any_element(),
-        )
+        div()
+            .rounded_md()
+            .p_2()
+            .bg(accent)
+            .child(
+                h_flex()
+                    .justify_between()
+                    .items_center()
+                    .child(div().text_color(accent_foreground).child(label))
+                    // `Switch`는 debug_selector를 직접 받지 않으므로 감싼 div가 대신 단다.
+                    .child(
+                        div()
+                            .debug_selector(move || id.to_string())
+                            .child(ui::toggle_switch(id, enabled, cx).on_click(cx.listener(
+                                move |this, checked: &bool, window, cx| {
+                                    on_toggle(this, *checked, window, cx);
+                                },
+                            ))),
+                    ),
+            )
+            .into_any_element()
+    }
+
+    /// 광고 차단 전역 스위치. Win32 창 조작 전용이라 다른 OS에는 두지 않는다.
+    #[cfg(target_os = "windows")]
+    fn render_ad_block_toggle(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
+        Some(self.render_sidebar_switch(
+            "global-enable-switch",
+            "광고 차단",
+            self.app_state.is_active,
+            |this, checked, window, cx| this.set_service_enabled(checked, window, cx),
+            cx,
+        ))
     }
 
     #[cfg(not(target_os = "windows"))]
     fn render_ad_block_toggle(&self, _cx: &mut Context<Self>) -> Option<AnyElement> {
         None
     }
+
+    /// 파일 동기화 자동 실행 전역 스위치. 모든 플랫폼에 있다.
+    fn render_file_sync_toggle(&self, cx: &mut Context<Self>) -> AnyElement {
+        self.render_sidebar_switch(
+            "global-sync-switch",
+            "파일 동기화",
+            self.sync_enabled,
+            |this, checked, window, cx| this.set_sync_enabled(checked, window, cx),
+            cx,
+        )
+    }
+
     fn render_window_controls(&self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme();
         let is_maximized = window.is_maximized();
@@ -533,6 +579,7 @@ impl Render for AppRoot {
         let nav_tools = self.render_nav_group("편의 기능", &NAV_TOOLS, cx);
         let nav_system = self.render_nav_group("시스템", &NAV_SYSTEM, cx);
         let ad_block_toggle = self.render_ad_block_toggle(cx);
+        let file_sync_toggle = self.render_file_sync_toggle(cx);
 
         let theme = cx.theme();
         let background = theme.background;
@@ -610,6 +657,7 @@ impl Render for AppRoot {
                                                     .child("GPUI 편의 도구"),
                                             )
                                             .children(ad_block_toggle)
+                                            .child(file_sync_toggle)
                                             .child(nav_overview)
                                             .child(nav_tools)
                                             .child(nav_system)

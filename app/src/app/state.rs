@@ -3,6 +3,7 @@
 //! 렌더링·I/O 로직 없이 상태 표현만 담는다.
 
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::sync::{atomic::AtomicBool, Arc};
 
 use crate::config::SyncJob;
@@ -59,6 +60,8 @@ pub(crate) enum PlatformEvent {
     AdBlocked,
     TargetStatusChanged(bool),
     ServiceToggled(bool),
+    /// 파일 동기화 자동 실행 전역 스위치 변경.
+    SyncAutoToggled(bool),
     TargetToggled { index: usize, enabled: bool },
     TargetRemoved { index: usize },
     SyncStarted {
@@ -84,16 +87,36 @@ pub(crate) struct ScannerState {
 }
 
 /// 동기화 스레드와 UI가 공유하는 상태.
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub(crate) struct SyncSharedState {
     pub(crate) jobs: Vec<SyncJob>,
+    /// 자동 실행 전역 스위치. 꺼져 있으면 주기가 도래해도 스스로 돌지 않는다.
+    /// 수동 요청(`run_now`)은 스위치와 무관하게 실행한다.
+    pub(crate) auto_enabled: bool,
     /// 사용자가 '지금 동기화'로 요청한 작업 ID 큐.
     pub(crate) run_now: Vec<String>,
+    /// 작업 ID → 이어서 시작할 지점(원본 기준 상대 경로).
+    ///
+    /// 실행 중에는 백그라운드가 갱신하고, 원본·대상 경로가 바뀌면 UI가 지운다.
+    /// 앱을 껐다 켜도 이어지도록 config에도 함께 기록한다.
+    pub(crate) cursors: HashMap<String, String>,
     /// 실행 중인 작업의 중지 요청 플래그.
     ///
     /// 동기화 스레드는 실행 중 뮤텍스를 잡고 있지 않으므로 중지 신호는 뮤텍스가 아니라
     /// 이 원자 플래그로 전달한다. 엔진이 파일 단위로 확인한다.
     pub(crate) cancel: Arc<AtomicBool>,
+}
+
+impl Default for SyncSharedState {
+    fn default() -> Self {
+        Self {
+            jobs: Vec::new(),
+            auto_enabled: true,
+            run_now: Vec::new(),
+            cursors: HashMap::new(),
+            cancel: Arc::default(),
+        }
+    }
 }
 
 /// 지금 실행 중인 동기화 작업의 진행 상황.

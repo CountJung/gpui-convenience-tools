@@ -10,22 +10,10 @@
 각 항목은 **한 턴/한 커밋 단위로 끝낼 수 있는 크기**로 쪼개 두었다.
 `선행` 표시가 있으면 그 항목을 먼저 끝내야 한다.
 
----
-
-## 0. 실제 화면 검증 대기
-
-- [ ] **Phase J 실제 화면 순차 검증**
-  캡처 범위에는 사이드바 경계·divider 리사이즈·overflow 스크롤, 독립 탐색형 스플리터,
-  테마별 스위치, 파일 동기화 전체 너비 단일 페이지·스크롤·실행 결과를 포함한다.
-  구현 담당자 1차 검증 후 독립 Visual Reviewer 2차 검증을 수행한다.
-  - **Windows Claude Code(`CLAUDE_LOCAL`)**: 인계 없이
-    `scripts/Invoke-ClaudeVisualCheck.ps1`으로 두 검증을 모두 수행하고 `PASS`/`FAIL`/
-    `BLOCKED`를 판정한다. 하네스가 커버하지 못하는 항목(키보드 텍스트 입력 등)은 한계로
-    분리해 적고 그 항목을 근거로 `PASS`를 내지 않는다.
-  - **VS Code Codex·Copilot(`IDE`)**: Computer Use를 시도하지 않는다.
-    `GPUI: Prepare ChatGPT desktop handoff`로 해시 고정 빌드를 준비해 Windows ChatGPT
-    데스크톱 앱의 Work 또는 Codex로 인계한다. `DESKTOP_PENDING`은 정상 인계 상태이므로
-    native pipe를 재시도하거나 `BLOCKED(surface)`를 반복 기록하지 않는다.
+> **실제 화면 검증은 여기 쌓지 않는다.** 표면별 절차와 판정 기준은
+> `.github/copilot-instructions.md`의 「실행 표면 하드 게이트」와
+> 「GPUI 시각 검증 및 독립 크로스체크」가 정본이고, UI를 바꾼 작업마다 그 자리에서
+> 수행한다. 대기열에 남겨 두면 무엇이 이미 확인됐는지 알 수 없게 된다.
 
 ---
 
