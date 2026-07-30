@@ -20,11 +20,19 @@
 | `.claude/agents/ui-visual-reviewer.md` | Claude Code(`CLAUDE_LOCAL`) 독립 시각 검증 어댑터 |
 | `scripts/Invoke-ClaudeVisualCheck.ps1` | Claude Code용 로컬 창 캡처·입력 시각 검증 하네스 |
 | `.github/skills/gpui-rust-ui/skill.md` | GPUI UI 생성 스킬 (아래 주의 참조) |
+| `.github/skills/gpui-visual-check/SKILL.md` | GPUI 시각·레이아웃 검증 **실행 절차**(공통 정본) |
+| `.claude/skills/gpui-visual-check/SKILL.md` | 위 절차의 Claude Code 어댑터 (`/gpui-visual-check`) |
 | `MasterPlan.md` | 아키텍처 원칙 · 단계 계획 · **완료 이력** |
 | `PROJECTMAP.md` | 구조 · 크기 · 공용 유틸 추적 (1,000줄 = 구조 리팩터링 트리거) |
 | `TODO.md` | 미착수 구현 대기열 |
 | `CLAUDE.md` | Claude Code용 저장소 안내 |
 | `README.md` | 사용자 문서 |
+
+## 스킬과 정본의 역할 분담
+
+`.github/skills/`의 스킬 문서는 **절차(어떻게)** 만 담는다. 규칙과 판정 기준(무엇을·왜)은
+`.github/copilot-instructions.md`가 정본이며 스킬에 복제하지 않는다. 스킬을 고치다 규칙을
+바꿔야 한다는 판단이 서면 정본을 먼저 고친다.
 
 ## 주의: 문서 간 우선순위
 

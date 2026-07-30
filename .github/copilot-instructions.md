@@ -298,6 +298,10 @@ GPUI 레이아웃, 색상·테마, 가시성, 스크롤·클리핑, 포커스 �
 모든 작업은 GPUI 자체 테스트 컨텍스트를 사용한 회귀 테스트를 **반드시 추가하거나 갱신**한다.
 헬퍼 함수만 검사하는 순수 단위 테스트나 Computer Use 캡처만으로 이 요구를 대신할 수 없다.
 
+레이아웃 이상을 조사할 때는 화면을 띄우기 전에 임시 `debug_bounds` 진단 테스트로 좌표를
+먼저 재는 것이 빠르다. 작성 요령과 되돌리기는 `.github/skills/gpui-visual-check/SKILL.md`
+「`debug_bounds` 진단 테스트」 절을 따른다.
+
 - `#[gpui::test]`와 `TestAppContext`/`VisualTestContext`로 실제 대상 뷰를 창에 렌더링한다.
 - `app/Cargo.toml`의 dev-dependency에서 `gpui/test-support` feature를 유지한다. 일반
   dependency나 `--all-features`만으로 이 feature가 자동 활성화된다고 가정하지 않는다.
@@ -388,6 +392,10 @@ scripts\Invoke-ClaudeVisualCheck.ps1 -Action Wheel -X 0.12 -Y 0.65 -Delta -8
 scripts\Invoke-ClaudeVisualCheck.ps1 -Action Capture -Name sidebar-after
 scripts\Invoke-ClaudeVisualCheck.ps1 -Action Stop
 ```
+
+**실행 절차와 함정**(좌표 지정, `-SeedConfig` 상태 재현, `Stop`이 격리 데이터까지 지우는 점,
+release 빌드 파일 잠금, 정리 확인)은 `.github/skills/gpui-visual-check/SKILL.md`가 정본이다.
+이 절에는 절차를 복제하지 않는다.
 
 이 표면의 한계는 그대로 보고한다. 한계를 넘는 수용 기준은 `PASS`로 판정하지 않는다.
 
