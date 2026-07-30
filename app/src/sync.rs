@@ -64,10 +64,7 @@ impl SyncOutcome {
 
     /// 로그 한 줄 요약.
     pub fn summary(&self) -> String {
-        let mut s = format!(
-            "복사 {}건, 건너뜀 {}건",
-            self.copied, self.skipped
-        );
+        let mut s = format!("복사 {}건, 건너뜀 {}건", self.copied, self.skipped);
         if self.deleted > 0 {
             s.push_str(&format!(", 삭제 {}건", self.deleted));
         }
@@ -120,13 +117,7 @@ pub fn run_sync_job(job: &SyncJob) -> SyncOutcome {
 /// `source` 하위를 재귀적으로 순회하며 `target`에 반영한다.
 ///
 /// `root`는 실패 메시지에 표시할 상대 경로 계산 기준이다.
-fn sync_dir(
-    source: &Path,
-    target: &Path,
-    root: &Path,
-    job: &SyncJob,
-    outcome: &mut SyncOutcome,
-) {
+fn sync_dir(source: &Path, target: &Path, root: &Path, job: &SyncJob, outcome: &mut SyncOutcome) {
     let entries = match fs::read_dir(source) {
         Ok(entries) => entries,
         Err(err) => {
@@ -161,7 +152,7 @@ fn sync_dir(
             }
         };
 
-        if !job.include_hidden && is_hidden(&src_path, &meta) {
+        if !job.include_hidden && has_hidden_or_system_attribute(&src_path, &meta) {
             outcome.skipped += 1;
             continue;
         }
@@ -290,14 +281,15 @@ fn clear_readonly(path: &Path) {
 
 /// 숨김 속성 여부.
 #[cfg(target_os = "windows")]
-fn is_hidden(_path: &Path, meta: &fs::Metadata) -> bool {
+fn has_hidden_or_system_attribute(_path: &Path, meta: &fs::Metadata) -> bool {
     use std::os::windows::fs::MetadataExt;
     const FILE_ATTRIBUTE_HIDDEN: u32 = 0x2;
-    meta.file_attributes() & FILE_ATTRIBUTE_HIDDEN != 0
+    const FILE_ATTRIBUTE_SYSTEM: u32 = 0x4;
+    meta.file_attributes() & (FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_SYSTEM) != 0
 }
 
 #[cfg(not(target_os = "windows"))]
-fn is_hidden(path: &Path, _meta: &fs::Metadata) -> bool {
+fn has_hidden_or_system_attribute(path: &Path, _meta: &fs::Metadata) -> bool {
     path.file_name()
         .and_then(|n| n.to_str())
         .is_some_and(|n| n.starts_with('.'))
@@ -357,7 +349,14 @@ mod tests {
     use super::*;
 
     fn temp_dir(name: &str) -> PathBuf {
-        let dir = std::env::temp_dir().join(format!("gct-sync-test-{name}"));
+        use std::sync::atomic::{AtomicU64, Ordering};
+
+        static SEQUENCE: AtomicU64 = AtomicU64::new(0);
+        let sequence = SEQUENCE.fetch_add(1, Ordering::Relaxed);
+        let dir = std::env::temp_dir().join(format!(
+            "gct-sync-test-{name}-{}-{sequence}",
+            std::process::id()
+        ));
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).expect("temp dir");
         dir
@@ -409,7 +408,10 @@ mod tests {
         fs::write(src.join("a.txt"), b"a much longer content").unwrap();
         let outcome = run_sync_job(&job);
         assert_eq!(outcome.copied, 1);
-        assert_eq!(fs::read(dst.join("a.txt")).unwrap(), b"a much longer content");
+        assert_eq!(
+            fs::read(dst.join("a.txt")).unwrap(),
+            b"a much longer content"
+        );
 
         let _ = fs::remove_dir_all(&root);
     }
@@ -454,6 +456,183 @@ mod tests {
         let root = temp_dir("missing");
         let outcome = run_sync_job(&job(&root.join("nope"), &root.join("dst")));
         assert!(outcome.has_failures());
+
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn locked_source_reports_windows_sharing_violation_code_32() {
+        use std::fs::OpenOptions;
+        use std::os::windows::fs::OpenOptionsExt;
+
+        let root = temp_dir("sharing-violation");
+        let src = root.join("src");
+        let dst = root.join("dst");
+        fs::create_dir_all(&src).unwrap();
+        let source_file = src.join("open.xlsx");
+        fs::write(&source_file, b"locked workbook").unwrap();
+        let lock = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .share_mode(0)
+            .open(&source_file)
+            .expect("open source without sharing");
+
+        let blocked = run_sync_job(&job(&src, &dst));
+        assert_eq!(blocked.copied, 0);
+        assert!(
+            blocked
+                .failures
+                .iter()
+                .any(|failure| failure.reason.contains("공유 위반")
+                    && failure.reason.contains("(code 32)")),
+            "locked source should expose the actionable Windows reason: {:?}",
+            blocked.failures
+        );
+
+        drop(lock);
+        let recovered = run_sync_job(&job(&src, &dst));
+        assert_eq!(recovered.copied, 1, "failures: {:?}", recovered.failures);
+        assert_eq!(fs::read(dst.join("open.xlsx")).unwrap(), b"locked workbook");
+
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn hidden_and_system_file_is_copied_when_included_and_skipped_when_disabled() {
+        use std::os::windows::fs::MetadataExt;
+        use std::process::Command;
+
+        const FILE_ATTRIBUTE_HIDDEN: u32 = 0x2;
+        const FILE_ATTRIBUTE_SYSTEM: u32 = 0x4;
+
+        let root = temp_dir("hidden-system");
+        let src = root.join("src");
+        let included_dst = root.join("included");
+        let excluded_dst = root.join("excluded");
+        fs::create_dir_all(&src).unwrap();
+        let source_file = src.join("protected.dat");
+        fs::write(&source_file, b"hidden-system-content").unwrap();
+
+        let status = Command::new("attrib")
+            .args(["+h", "+s"])
+            .arg(&source_file)
+            .status()
+            .expect("run attrib");
+        assert!(
+            status.success(),
+            "attrib should set hidden and system flags"
+        );
+        let attributes = fs::metadata(&source_file).unwrap().file_attributes();
+        assert_ne!(attributes & FILE_ATTRIBUTE_HIDDEN, 0);
+        assert_ne!(attributes & FILE_ATTRIBUTE_SYSTEM, 0);
+
+        let included = run_sync_job(&job(&src, &included_dst));
+        assert_eq!(included.copied, 1, "failures: {:?}", included.failures);
+        assert_eq!(
+            fs::read(included_dst.join("protected.dat")).unwrap(),
+            b"hidden-system-content"
+        );
+
+        let mut excluded_job = job(&src, &excluded_dst);
+        excluded_job.include_hidden = false;
+        let excluded = run_sync_job(&excluded_job);
+        assert_eq!(excluded.copied, 0, "failures: {:?}", excluded.failures);
+        assert_eq!(excluded.skipped, 1);
+        assert!(!excluded_dst.join("protected.dat").exists());
+
+        let _ = Command::new("attrib")
+            .args(["-h", "-s"])
+            .arg(&source_file)
+            .status();
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn path_over_260_characters_is_copied_or_reports_code_206() {
+        use std::os::windows::ffi::OsStrExt;
+
+        let root = temp_dir("long-path");
+        let src = root.join("src");
+        let dst = root.join("dst");
+        let mut relative = PathBuf::new();
+        while src.join(&relative).as_os_str().encode_wide().count() <= 280 {
+            relative.push("segment-0123456789abcdef0123456789");
+        }
+        let deep_source = src.join(&relative);
+        fs::create_dir_all(&deep_source).expect("create source path longer than 260 chars");
+        let source_file = deep_source.join("long-path.txt");
+        fs::write(&source_file, b"long path content").expect("write long path source");
+        assert!(
+            source_file.as_os_str().encode_wide().count() > 260,
+            "test path should exceed the legacy MAX_PATH limit"
+        );
+
+        let outcome = run_sync_job(&job(&src, &dst));
+        if outcome.copied == 1 {
+            assert_eq!(
+                fs::read(dst.join(&relative).join("long-path.txt")).unwrap(),
+                b"long path content"
+            );
+            println!("260자 초과 경로가 현재 Windows/Rust 환경에서 정상 복사됨");
+        } else {
+            assert!(
+                outcome
+                    .failures
+                    .iter()
+                    .any(|failure| failure.reason.contains("(code 206)")),
+                "long-path failure should retain the mapped Windows reason: {:?}",
+                outcome.failures
+            );
+            println!("260자 초과 경로가 code 206으로 차단됨");
+        }
+
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn windows_long_path_error_code_has_actionable_reason() {
+        let error = std::io::Error::from_raw_os_error(206);
+        let reason = describe_io_error(&error);
+        assert!(reason.contains("경로가 너무 깁니다"));
+        assert!(reason.contains("(code 206)"));
+    }
+
+    #[test]
+    #[ignore = "manual performance validation with 3,000 real files"]
+    fn syncs_three_thousand_files_and_reports_elapsed_time() {
+        use std::time::Instant;
+
+        const FILE_COUNT: usize = 3_000;
+        let root = temp_dir("performance-3000");
+        let src = root.join("src");
+        let dst = root.join("dst");
+        fs::create_dir_all(&src).unwrap();
+        for index in 0..FILE_COUNT {
+            fs::write(
+                src.join(format!("file-{index:04}.txt")),
+                format!("payload-{index}"),
+            )
+            .unwrap();
+        }
+
+        let started = Instant::now();
+        let outcome = run_sync_job(&job(&src, &dst));
+        let elapsed = started.elapsed();
+        assert_eq!(
+            outcome.copied, FILE_COUNT,
+            "failures: {:?}",
+            outcome.failures
+        );
+        assert!(!outcome.has_failures());
+        println!(
+            "3,000개 파일 1회 동기화: {:.3}초 ({:.0} files/sec)",
+            elapsed.as_secs_f64(),
+            FILE_COUNT as f64 / elapsed.as_secs_f64()
+        );
 
         let _ = fs::remove_dir_all(&root);
     }

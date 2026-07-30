@@ -37,6 +37,8 @@ struct LoggerInner {
 
 pub struct RollingLogger {
     inner: Mutex<LoggerInner>,
+    /// 로그 출력 디렉터리. 운영 환경은 `logs_path()`, 테스트는 격리 경로를 주입한다.
+    log_dir: PathBuf,
     /// 콘솔 출력 최소 레벨.
     console_level: LevelFilter,
     /// 파일 기록 최소 레벨.
@@ -62,15 +64,12 @@ pub fn init(config: LogConfig) {
     // 파일은 기본적으로 Debug까지만 받되, RUST_LOG로 더 낮은 레벨을 요청하면 따른다.
     let file_level = console_level.max(DEFAULT_FILE_LEVEL);
 
-    let logger: &'static RollingLogger = Box::leak(Box::new(RollingLogger {
-        inner: Mutex::new(LoggerInner {
-            config,
-            file: None,
-            written: 0,
-        }),
+    let logger: &'static RollingLogger = Box::leak(Box::new(RollingLogger::new(
+        config,
         console_level,
         file_level,
-    }));
+        logs_path(),
+    )));
 
     if LOGGER.set(logger).is_err() {
         return;
@@ -143,9 +142,27 @@ pub fn log_dir_stats() -> (usize, u64) {
 }
 
 impl RollingLogger {
+    fn new(
+        config: LogConfig,
+        console_level: LevelFilter,
+        file_level: LevelFilter,
+        log_dir: PathBuf,
+    ) -> Self {
+        Self {
+            inner: Mutex::new(LoggerInner {
+                config,
+                file: None,
+                written: 0,
+            }),
+            log_dir,
+            console_level,
+            file_level,
+        }
+    }
+
     fn open_file(&self) {
-        let dir = logs_path();
-        if fs::create_dir_all(&dir).is_err() {
+        let dir = &self.log_dir;
+        if fs::create_dir_all(dir).is_err() {
             return;
         }
 
@@ -170,7 +187,7 @@ impl RollingLogger {
 
     /// 현재 파일을 타임스탬프 이름으로 옮기고 새 파일을 연다.
     fn roll(&self) {
-        let dir = logs_path();
+        let dir = &self.log_dir;
         let current = dir.join(LOG_FILE_NAME);
         let (y, mo, d, h, mi, s) = local_time_parts();
         let rolled = dir.join(format!(
@@ -210,8 +227,8 @@ impl RollingLogger {
             inner.config.clone()
         };
 
-        let dir = logs_path();
-        let Ok(entries) = fs::read_dir(&dir) else {
+        let dir = &self.log_dir;
+        let Ok(entries) = fs::read_dir(dir) else {
             return;
         };
 
@@ -350,12 +367,7 @@ fn local_time_parts() -> (u16, u16, u16, u16, u16, u16) {
         GetLocalTime(&mut st as *mut SYSTEMTIME);
     }
     (
-        st.wYear,
-        st.wMonth,
-        st.wDay,
-        st.wHour,
-        st.wMinute,
-        st.wSecond,
+        st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond,
     )
 }
 
@@ -398,6 +410,7 @@ fn civil_from_days(z: i64) -> (i64, u32, u32) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use filetime::{set_file_mtime, FileTime};
 
     #[test]
     fn rolled_file_detection_excludes_current_file() {
@@ -427,5 +440,121 @@ mod tests {
         assert!((1..=12).contains(&mo), "month out of range: {mo}");
         assert!((1..=31).contains(&d), "day out of range: {d}");
         assert!(h < 24 && mi < 60 && s < 60);
+    }
+
+    fn temp_log_dir(name: &str) -> PathBuf {
+        use std::sync::atomic::{AtomicU64, Ordering};
+
+        static SEQUENCE: AtomicU64 = AtomicU64::new(0);
+        let sequence = SEQUENCE.fetch_add(1, Ordering::Relaxed);
+        let dir = std::env::temp_dir().join(format!(
+            "gct-logging-test-{name}-{}-{sequence}",
+            std::process::id()
+        ));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).expect("create isolated log directory");
+        dir
+    }
+
+    fn test_logger(dir: &Path, config: LogConfig) -> RollingLogger {
+        let logger = RollingLogger::new(
+            config,
+            LevelFilter::Off,
+            LevelFilter::Debug,
+            dir.to_path_buf(),
+        );
+        logger.open_file();
+        logger
+    }
+
+    #[test]
+    fn one_mb_volume_rolls_and_enforces_file_count() {
+        let dir = temp_log_dir("size-count");
+        let logger = test_logger(
+            &dir,
+            LogConfig {
+                file_enabled: true,
+                max_files: 3,
+                max_age_days: 0,
+                max_file_size_mb: 1,
+            },
+        );
+        let chunk = format!("{}\n", "x".repeat(600 * 1024));
+
+        for _ in 0..8 {
+            if logger.write_line(&chunk) {
+                logger.roll();
+            }
+        }
+
+        let mut log_files = fs::read_dir(&dir)
+            .expect("read log directory")
+            .flatten()
+            .map(|entry| entry.path())
+            .filter(|path| is_log_file(path))
+            .collect::<Vec<_>>();
+        log_files.sort();
+        let rolled = log_files
+            .iter()
+            .filter(|path| is_rolled_log_file(path))
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            log_files.len(),
+            3,
+            "max_files includes app.log and should retain two rolled files: {log_files:?}"
+        );
+        assert_eq!(
+            rolled.len(),
+            2,
+            "rolled log retention should keep two files"
+        );
+        assert!(
+            dir.join(LOG_FILE_NAME).exists(),
+            "current log should remain"
+        );
+        assert!(
+            rolled.iter().all(|path| fs::metadata(path)
+                .map(|metadata| metadata.len() >= 1024 * 1024)
+                .unwrap_or(false)),
+            "every retained rolled file should have crossed the 1 MB threshold"
+        );
+
+        drop(logger);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn retention_deletes_expired_rolled_logs() {
+        let dir = temp_log_dir("age");
+        let old = dir.join("app-20200101-000000.log");
+        let recent = dir.join("app-20990101-000000.log");
+        fs::write(&old, b"old").expect("write old rolled log");
+        fs::write(&recent, b"recent").expect("write recent rolled log");
+        let old_time = SystemTime::now()
+            .checked_sub(Duration::from_secs(3 * 86_400))
+            .expect("old timestamp");
+        set_file_mtime(&old, FileTime::from(old_time)).expect("set old modification time");
+
+        let logger = test_logger(
+            &dir,
+            LogConfig {
+                file_enabled: true,
+                max_files: 10,
+                max_age_days: 1,
+                max_file_size_mb: 1,
+            },
+        );
+        logger.enforce_retention();
+
+        assert!(!old.exists(), "expired rolled log should be deleted");
+        assert!(recent.exists(), "recent rolled log should be retained");
+        assert!(
+            dir.join(LOG_FILE_NAME).exists(),
+            "current log is never removed by retention"
+        );
+
+        drop(logger);
+        let _ = fs::remove_dir_all(&dir);
     }
 }

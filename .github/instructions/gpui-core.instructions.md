@@ -27,4 +27,6 @@ applyTo: "app/src/**/*.rs,**/*.toml,MasterPlan.md,TODO.md,PROJECTMAP.md"
 - 설정 저장은 `config::update_config` 단일 경로 사용
 - GPUI UI 변경 시 정본의 「GPUI 자체 테스트 컨텍스트 필수 검증」과
   「GPUI 시각 검증 및 독립 크로스체크」 절 적용
+- 실행 표면 하드 게이트를 먼저 적용: VS Code/Claude Code에서는 Computer Use를 호출하지
+  않고 `IDE_VERIFIED / DESKTOP_PENDING`으로 ChatGPT 데스크톱에 인계
 - 작업 후 Error Reviewer 기반 오류 전용 리뷰

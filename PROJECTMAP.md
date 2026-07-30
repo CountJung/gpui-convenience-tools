@@ -47,8 +47,8 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `main.rs` | 129 | 진입점 — 로거 설치 → 테마 시드 → 윈도우 오픈, `--service`/`--tray` 플래그 분기 |
 | `theme.rs` | 143 | 테마 모드 적용과 스위치 팔레트 최소 대비 보정·번들 테마 감사 테스트 |
 | `config.rs` | 406 | `AppConfig`·`SyncJob`·`LogConfig` 정의와 `update_config` 단일 저장 경로 |
-| `sync.rs` | 460 | 폴더 동기화 엔진 (UI 비의존 순수 로직) |
-| `logging.rs` | 431 | 롤링 파일 로거 (`log::Log` 구현) |
+| `sync.rs` | 639 | 폴더 동기화 엔진 (UI 비의존 순수 로직) |
+| `logging.rs` | 560 | 롤링 파일 로거 (`log::Log` 구현, 테스트용 출력 경로 주입) |
 
 ### 앱 루트 (`app/src/app/`) — 1,939줄 / 8파일
 
@@ -98,6 +98,15 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | 파일 | 줄 | 책임 |
 | --- | ---: | --- |
 | `app/build.rs` | 12 | `/MANIFEST:NO` 링커 인자 (gpui 임베드 매니페스트 중복 방지) |
+
+### 개발·검증 도구
+
+| 파일 | 줄 | 책임 |
+| --- | ---: | --- |
+| `scripts/Verify-Workspace.ps1` | 163 | VS Code용 Rust/GPUI 자동 검증과 ChatGPT 데스크톱 handoff manifest·해시 고정 빌드 생성 |
+| `scripts/Start-DesktopVisualValidation.ps1` | 115 | manifest 해시 검증 후 단일 임시 `APPDATA` 격리 프로세스·세션 파일 생성과 실패 롤백 |
+| `scripts/Stop-DesktopVisualValidation.ps1` | 58 | 기록된 검증 PID·시작 시각과 작업 전용 임시 루트만 검증 후 정리 |
+| `.vscode/tasks.json` | 71 | IDE 전용 검증과 ChatGPT 데스크톱 인계 준비 작업 |
 
 ---
 

@@ -132,7 +132,12 @@ ALWAYS use:
 ## VISUAL OUTPUT VALIDATION
 
 - Follow `.github/copilot-instructions.md` sections
-  `GPUI 자체 테스트 컨텍스트 필수 검증` and `GPUI 시각 검증 및 독립 크로스체크`.
+  `실행 표면 하드 게이트`, `GPUI 자체 테스트 컨텍스트 필수 검증`, and
+  `GPUI 시각 검증 및 독립 크로스체크`.
+- In VS Code, Cursor, Claude Code, or a terminal, never initialize or retry Computer Use.
+  Run `scripts/Verify-Workspace.ps1`; report `IDE_VERIFIED / DESKTOP_PENDING`, then stop.
+- Only Windows ChatGPT desktop Work or Codex may consume the generated handoff manifest and
+  perform Computer Use validation.
 - Every UI change MUST add or update a `#[gpui::test]` that renders the affected view through
   `TestAppContext`/`VisualTestContext` and asserts the implementation's acceptance criteria.
 - Keep `gpui/test-support` enabled through the app's dev-dependency; `--all-features` alone

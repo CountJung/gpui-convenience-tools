@@ -12,24 +12,17 @@
 
 ---
 
-## 0. 즉시 처리 (검증 잔여)
+## 0. ChatGPT 데스크톱 검증 대기
 
-- [ ] **Phase J 실제 화면 순차 검증**
+- [ ] **Phase J 실제 화면 순차 검증 — `DESKTOP_PENDING`**
+  VS Code에서는 Computer Use를 시도하지 않는다. 먼저
+  `GPUI: Prepare ChatGPT desktop handoff` 작업으로 자동 검증과 해시 고정 빌드 준비를 끝내고,
   Windows ChatGPT 데스크톱 앱의 Work 또는 Codex에서 구현 담당자 1차 검증 후 독립
   Visual Reviewer 2차 검증을 수행한다. 캡처 범위에는 사이드바 경계·overflow 스크롤,
-  균형 스플리터, 테마별 스위치, 파일 동기화 스크롤을 포함한다. 파일 동기화는 임시
-  `APPDATA` 격리 환경을 사용한다. VS Code의 Codex IDE 확장은 실제 화면 검증 표면으로
-  사용하지 않는다.
-
-- [ ] **파일 동기화 실사용 검증**
-  - 대용량 폴더(수천 개 파일)에서 1회 동기화 소요 시간 측정
-  - 사용 중인 파일(예: 열려 있는 xlsx)에서 `공유 위반(code 32)` 사유가 뜨는지 확인
-  - 숨김/시스템 속성 파일이 실제로 복사되는지 확인(`attrib +h +s`로 테스트 파일 생성)
-  - 260자 초과 경로에서 `code 206` 사유가 뜨는지 확인
-
-- [ ] **로그 롤링 실사용 검증**
-  용량을 1MB로 낮추고 로그를 대량 발생시켜 `app-YYYYMMDD-HHMMSS.log` 생성과
-  개수·기간 초과분 삭제가 동작하는지 확인한다.
+  균형 스플리터, 테마별 스위치, 파일 동기화 스크롤을 포함한다. 데스크톱 검증은
+  `target/visual-validation/handoff.json`과 임시 `APPDATA` 격리 프로세스를 사용한다.
+  `DESKTOP_PENDING`은 정상 인계 상태이므로 VS Code에서 native pipe를 재시도하거나
+  `BLOCKED(surface)`를 반복 기록하지 않는다.
 
 ---
 
@@ -127,7 +120,4 @@
 ## 4. 테스트
 
 - [ ] `sync.rs` — 읽기 전용 대상 파일 덮어쓰기 테스트
-- [ ] `sync.rs` — 숨김 속성 파일 포함/제외 테스트(Windows 전용, `attrib` 사용)
-- [ ] `logging.rs` — 용량 초과 롤링 및 개수 초과 삭제 테스트(임시 디렉터리 주입 필요,
-      현재 `logs_path()`가 하드코딩이라 테스트를 위해 경로 주입 구조로 리팩터 필요)
 - [ ] `config.rs` — `update_config`가 다른 필드를 보존하는지 회귀 테스트

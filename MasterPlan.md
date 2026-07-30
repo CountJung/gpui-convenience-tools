@@ -172,6 +172,19 @@ cargo workspace, Hello World 앱 동작 확인
 - `service_view` 버튼이 쓰던 `sidebar_primary` → `primary` 교정(사이드바 토큰 오용)
 - 문서 정리: 완료 이력은 이 문서로, 미착수는 `TODO.md`로 모으고 `TASKS.md` 제거
 
+### 파일 동기화·로그 롤링 실사용 안정성 검증 ✅
+
+- 사용자 데이터와 분리된 임시 디렉터리에서 3,000개 파일을 3.657초(약 820 files/sec)에
+  동기화하고 결과 3,000건·실패 0건 확인
+- 공유를 허용하지 않고 연 `open.xlsx`가 `공유 위반(code 32)`로 기록되고, 핸들 해제 후
+  정상 복사되는 복구 경로 확인
+- `attrib +h +s` 파일이 포함 설정에서는 복사되고 제외 설정에서는 건너뛰도록
+  SYSTEM 속성까지 필터 판정에 포함
+- 260자 초과 경로는 현재 Windows/Rust 환경에서 정상 복사됨을 확인하고, OS에서 거부할
+  경우를 위한 `code 206` 사용자 사유 매핑 회귀 테스트 유지
+- `RollingLogger`에 테스트용 로그 디렉터리 주입 경로를 추가하고 1MB 용량 롤링,
+  현재 파일 포함 최대 3개 보존, 1일 초과 파일 삭제를 실제 파일로 검증
+
 ---
 
 ## 검증 재개 단계
@@ -198,6 +211,14 @@ cargo workspace, Hello World 앱 동작 확인
   Codex·Claude Code 에이전트 연결 추가
 - `TestAppContext`/`VisualTestContext` 기반 수용 기준별 GPUI 회귀 테스트를 모든 UI 변경의
   필수 완료 조건으로 정본·스킬·Codex/Claude 브리지에 반영
+- 과거 VS Code에서 Computer Use native pipe를 반복 확인하던 흐름을 폐기하고 실행 표면
+  하드 게이트를 도입. VS Code/Claude Code는 wrapper를 초기화하지 않고
+  `IDE_VERIFIED / DESKTOP_PENDING`으로 정상 인계
+- `scripts/Verify-Workspace.ps1`와 VS Code 작업으로 GPUI 개별 테스트·전체 테스트·릴리즈
+  빌드·SHA-256 manifest 생성을 단일화하고, ChatGPT 데스크톱은 해시 고정 바이너리와
+  격리 `APPDATA` 프로세스만 검증하도록 분리
+- 실제 화면 1차·2차 검증은 `target/visual-validation/handoff.json`을 생성한 뒤 Windows
+  ChatGPT 데스크톱 앱에서 재개
 
 ---
 

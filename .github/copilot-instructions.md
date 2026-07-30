@@ -308,6 +308,50 @@ GPUI 레이아웃, 색상·테마, 가시성, 스크롤·클리핑, 포커스 �
 컨텍스트가 직접 재현하지 못하는 범위는 한계를 명시하고 실제 앱에서 추가 검증하되, GPUI가
 소유한 렌더·레이아웃·입력 범위의 테스트는 여전히 필수다.
 
+## 실행 표면 하드 게이트
+
+이 판정은 **모든 Computer Use 초기화와 실제 앱 실행보다 먼저** 수행한다. 플러그인 토글의
+표시 여부가 아니라 현재 요청을 실행하는 제품 표면을 기준으로 한다.
+
+| 현재 표면 | 판정 | 허용되는 검증 |
+| --- | --- | --- |
+| VS Code/Cursor의 Codex·Copilot 확장, Claude Code, 일반 터미널 | `IDE` | 정적 검사, Rust/GPUI 테스트, 데스크톱 인계 준비 |
+| Windows ChatGPT 데스크톱 앱의 Work 또는 Codex | `DESKTOP` | 인계된 빌드의 Computer Use 실제 화면 검증 |
+| 제품 표면을 확정할 수 없음 | `IDE` | 안전하게 IDE 절차만 수행 |
+
+### IDE 표면
+
+- Computer Use 플러그인 토글이 보여도 지원 표면으로 간주하지 않는다.
+- Computer Use 스킬·wrapper를 초기화하거나 `sky.*`를 호출하지 않는다. native helper·pipe
+  확인, 재생성, 직접 실행, 확장·IDE 재시작도 시도하지 않는다.
+- `.vscode/tasks.json`의 `GPUI: Verify in VS Code (no Computer Use)` 또는
+  `scripts/Verify-Workspace.ps1`로 자동 검증을 수행한다.
+- 자동 검증이 통과하면 구현 상태를 `IDE_VERIFIED`, 실제 화면 상태를 `DESKTOP_PENDING`으로
+  보고한다. `DESKTOP_PENDING`은 정상 인계 상태이며 오류나 `BLOCKED`가 아니다.
+- 실제 화면 검증이 필요하면 `GPUI: Prepare ChatGPT desktop handoff` 작업으로
+  `target/visual-validation/handoff.json`과 해시 고정 바이너리를 생성한다. IDE 작업은 여기서
+  종료하며 같은 요청에서 Computer Use를 재시도하지 않는다.
+- 과거 `native pipe` 오류를 `MasterPlan.md`나 `TODO.md`에 반복 기록하지 않는다.
+
+### DESKTOP 표면
+
+- `target/visual-validation/handoff.json`의 `state`, 커밋·dirty 상태, 바이너리 경로와 SHA-256을
+  먼저 확인한다. manifest가 없거나 해시가 다르면 실제 화면 검증을 시작하지 않고 IDE 인계
+  준비를 요청한다.
+- `scripts/Start-DesktopVisualValidation.ps1`로 manifest의 해시 고정 바이너리를 작업 전용
+  임시 `APPDATA`에서 실행한다. 출력이 보이지 않아도
+  `target/visual-validation/last-session.json`에서 PID·창 대상·격리 경로를 읽은 뒤
+  Computer Use health check와 실제 화면 검증을 수행한다.
+- 검증이 끝나면 `scripts/Stop-DesktopVisualValidation.ps1`로 기록된 PID와 작업 전용 임시
+  루트만 정리한다.
+- 이 표면에서만 `PASS`, `FAIL`, `BLOCKED`를 판정한다.
+
+상태 의미는 다음과 같다.
+
+- `IDE_VERIFIED`: 코드·GPUI 자동 검증 통과. IDE 구현 작업은 완료해 인계할 수 있다.
+- `DESKTOP_PENDING`: 실제 화면 검증 대기. 시각·릴리즈 수용은 아직 `PASS`가 아니다.
+- `PASS` / `FAIL` / `BLOCKED`: DESKTOP 표면에서 실제 조작을 시도한 결과에만 사용한다.
+
 ## GPUI 시각 검증 및 독립 크로스체크
 
 GPUI 레이아웃, 색상·테마, 가시성, 스크롤·클리핑, 사용자 상호작용을 변경하면 정적 검사와
@@ -315,10 +359,9 @@ GPUI 자체 테스트만으로 완료하지 않는다. 위 필수 테스트가 �
 **순차적으로** 수행한다. 같은 데스크톱을 동시에 조작하면 상태와 증거가 섞일 수 있으므로
 병렬 실행하지 않는다.
 
-Computer Use 실행 표면은 **Windows ChatGPT 데스크톱 앱의 Work 또는 Codex**다.
-VS Code의 Codex IDE 확장은 플러그인 토글을 표시하더라도 Computer Use를 제공하지 않으므로,
-IDE 세션에서 helper·native pipe 재생성이나 확장 재시작을 반복하지 않는다. IDE 또는 Claude
-Code에서 구현했다면 빌드·커밋·수용 기준을 ChatGPT 데스크톱 검증 세션에 인계한다.
+Computer Use 실행 표면은 위 하드 게이트에서 `DESKTOP`으로 판정된 경우뿐이다. IDE에서
+구현했다면 `Verify-Workspace.ps1 -PrepareDesktopHandoff`가 만든 manifest와 해시 고정
+바이너리, 수용 기준을 ChatGPT 데스크톱 검증 세션에 인계한다.
 
 1. 구현 담당자가 실제 빌드의 앱을 Computer Use로 직접 조작하고 수용 기준별 캡처를 남긴다.
 2. 구현에 참여하지 않고 파일을 편집하지 않는 Visual Reviewer가 별도 검증 세션에서 같은
@@ -341,12 +384,13 @@ Code에서 구현했다면 빌드·커밋·수용 기준을 ChatGPT 데스크톱
 Codex는 Visual Reviewer를 생성할 때 `.github/agents/ui-visual-reviewer.agent.md`를 먼저
 읽도록 위임한다. Claude Code는 `.claude/agents/ui-visual-reviewer.md`의 프로젝트
 서브에이전트를 사용한다. 두 어댑터 모두 이 문서의 같은 계약을 적용한다. 현재 표면이
-Computer Use를 제공하지 않으면 `BLOCKED`와 함께 ChatGPT 데스크톱 인계가 필요하다고 보고한다.
+`IDE`이면 Visual Reviewer를 실행하지 않고 `DESKTOP_PENDING`으로 인계한다.
 
 ### ChatGPT 데스크톱 Computer Use health check
 
-- 먼저 현재 표면이 Windows ChatGPT 데스크톱 앱의 Work 또는 Codex인지 확인한다. Codex IDE
-  확장이면 wrapper를 초기화하지 않고 `BLOCKED(surface unavailable)`로 인계한다.
+- 먼저 「실행 표면 하드 게이트」가 `DESKTOP`인지 확인한다. `IDE`이면 wrapper를 초기화하지
+  않고 `DESKTOP_PENDING`으로 종료한다.
+- handoff manifest의 바이너리 SHA-256을 다시 계산해 일치하는지 확인한다.
 - 매 새 `node_repl` 세션에서 설치된 Computer Use 스킬을 먼저 읽는다.
 - 스킬이 제공하는 `<plugin-root>/scripts/computer-use-client.mjs`의
   `setupComputerUseRuntime`으로만 초기화하고 `sky.documentation("guidance")`를 읽는다.
@@ -373,7 +417,8 @@ Computer Use를 제공하지 않으면 `BLOCKED`와 함께 ChatGPT 데스크톱 
 
 ### 증거와 차단 보고
 
-각 검증 결과에는 `Overall(PASS|FAIL|BLOCKED)`, 검증자 역할, 빌드/커밋, 도구·런타임,
+DESKTOP 검증 결과에는 `Overall(PASS|FAIL|BLOCKED)`, 검증자 역할, 빌드/커밋·SHA-256,
+도구·런타임,
 시나리오별 사전 조건(테마·창 크기·앱 상태), 동작, 기대 결과, 관찰 결과, 캡처 식별자·시각,
 결과, 검증 간 불일치, 잔여 위험을 기록한다.
 
@@ -381,6 +426,10 @@ Computer Use를 제공하지 않으면 `BLOCKED`와 함께 ChatGPT 데스크톱 
 명령, 원문 오류, 복구 시도, 대체 정적·자동 검증 결과, ChatGPT 데스크톱 인계 필요 여부,
 아직 확인하지 못한 수용 기준을 함께 적는다.
 기존 스크린샷이나 구두 설명만으로 시각 검증을 통과 처리하지 않는다.
+
+IDE 보고에는 `IDE_VERIFIED` 또는 자동 검증 실패, `DESKTOP_PENDING`, 실행한 VS Code
+작업/명령, handoff manifest 경로만 기록한다. IDE 표면 자체는 `BLOCKED(surface)`로 보고하지
+않으며 native pipe 오류를 만들기 위한 호출도 하지 않는다.
 
 ## 작업 후 오류 리뷰 기준
 
