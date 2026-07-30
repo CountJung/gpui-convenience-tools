@@ -2,6 +2,9 @@
 //!
 //! 작업 선택, 실행, 설정, 실패 기록을 하나의 세로 흐름으로 배치한다.
 //! 페이지 전체가 하나의 스크롤 영역을 사용하므로 좁은 창에서도 설정 pane이 눌리지 않는다.
+//!
+//! 진행 상태 표시줄은 스크롤 영역 **밖** 하단에 고정한다. 스크롤되는 컨텐츠 안에 두면
+//! 실행 중에 아래로 내려가야 현재 파일이 보이므로 진행 표시의 의미가 없다.
 
 use gpui::{
     div, AnyElement, Context, InteractiveElement, IntoElement, ParentElement,
@@ -22,19 +25,94 @@ pub fn render(this: &mut AppRoot, window: &mut Window, cx: &mut Context<AppRoot>
     let jobs = render_job_list(this, cx);
     let settings = render_job_settings(this, cx);
     let failures = render_failures(this, cx);
+    let status_bar = render_status_bar(this, cx);
 
-    scroll_pane(
-        "file-sync-page",
-        &page_scroll,
-        v_flex()
-            .w_full()
-            .gap_4()
-            .p_1()
-            .child(jobs)
-            .child(settings)
-            .child(failures)
-            .into_any_element(),
-    )
+    v_flex()
+        .size_full()
+        .min_h_0()
+        .gap_2()
+        .child(
+            // 스크롤 영역만 남은 높이를 가져가고, 아래 표시줄은 자연 높이를 유지한다.
+            div().flex_1().min_h_0().child(scroll_pane(
+                "file-sync-page",
+                &page_scroll,
+                v_flex()
+                    .w_full()
+                    .gap_4()
+                    .p_1()
+                    // 세로 스크롤바가 오른쪽 위에 겹쳐 그려지므로, 그만큼 비워 두지 않으면
+                    // 행 끝의 버튼(중지·작업 삭제) 테두리가 가려진다.
+                    .pr_3()
+                    .child(jobs)
+                    .child(settings)
+                    .child(failures)
+                    .into_any_element(),
+            )),
+        )
+        .child(status_bar)
+        .into_any_element()
+}
+
+// ─────────────────────────────────────────────
+// 하단 진행 상태 표시줄
+// ─────────────────────────────────────────────
+
+fn render_status_bar(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElement {
+    let theme = cx.theme();
+    let fg = theme.foreground;
+    let muted_fg = theme.muted_foreground;
+    let border = theme.border;
+
+    let bar = h_flex()
+        .debug_selector(|| "file-sync-status-bar".to_string())
+        .w_full()
+        .gap_3()
+        .items_center()
+        .rounded_lg()
+        .bg(theme.secondary)
+        .border_1()
+        .border_color(border)
+        .px_3()
+        .py_2();
+
+    let Some(running) = this.sync_running.clone() else {
+        return bar
+            .child(ui::badge("대기 중", ui::Tone::Muted, ui::Size::Sm, cx))
+            .child(
+                div()
+                    .debug_selector(|| "file-sync-current-file".to_string())
+                    .flex_1()
+                    .min_w_0()
+                    .text_color(muted_fg)
+                    .child("실행 중인 동기화가 없습니다."),
+            )
+            .into_any_element();
+    };
+
+    let (tone, state_label) = if running.stopping {
+        (ui::Tone::Warning, "중지 중")
+    } else {
+        (ui::Tone::Info, "동기화 중")
+    };
+
+    bar.child(ui::badge(state_label, tone, ui::Size::Sm, cx))
+        .child(
+            v_flex()
+                .flex_1()
+                .min_w_0()
+                .child(
+                    div()
+                        .debug_selector(|| "file-sync-current-file".to_string())
+                        .text_color(fg)
+                        .child(running.display_path()),
+                )
+                .child(
+                    div()
+                        .text_color(muted_fg)
+                        .child(format!("{} — {}", running.label, running.counters())),
+                ),
+        )
+        .into_any_element()
 }
 
 // ─────────────────────────────────────────────
@@ -52,6 +130,16 @@ fn render_job_list(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElement 
     // 이 패널의 버튼은 테두리 색을 hover 색과 같이 쓴다(승격 전 시각 유지).
     let neutral_btn = ButtonStyle::neutral(cx).hover(border);
     let primary_btn = ButtonStyle::primary(cx).border(theme.primary_hover);
+    let is_running = this.sync_running.is_some();
+    let stopping = this
+        .sync_running
+        .as_ref()
+        .is_some_and(|running| running.stopping);
+    let stop_btn = if is_running {
+        ButtonStyle::danger(cx).border(theme.danger_active)
+    } else {
+        ButtonStyle::muted(cx).border(border)
+    };
 
     // ── 작업 행 ──
     let mut rows = v_flex();
@@ -158,7 +246,22 @@ fn render_job_list(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElement 
                             cx.listener(|this, _ev, window, cx| {
                                 this.request_sync_all(window, cx);
                             }),
-                        )),
+                        ))
+                        // 중지는 실행 중일 때만 위험 색으로 강조한다. 유휴 상태에서도
+                        // 버튼을 숨기지 않아 실행 직후 위치가 밀리지 않게 한다.
+                        .child(
+                            div()
+                                .debug_selector(|| "sync-stop".to_string())
+                                .child(ui::action_button(
+                                    "sync-stop",
+                                    if stopping { "중지 중…" } else { "중지" },
+                                    ui::Size::Md,
+                                    stop_btn,
+                                    cx.listener(|this, _ev, window, cx| {
+                                        this.request_sync_stop(window, cx);
+                                    }),
+                                )),
+                        ),
                 ),
         )
         // ── 작업 목록 카드 ──

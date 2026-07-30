@@ -16,6 +16,9 @@ $visualTests = @(
     "rendered_switch_toggles_in_light_dark_and_missing_switch_token_theme",
     "file_sync_unified_page_uses_full_width_and_scrolls_to_last_record",
     "file_sync_run_button_saves_current_inputs_and_queues_selected_job",
+    "file_sync_status_bar_stays_visible_at_compact_height_while_running",
+    "file_sync_stop_button_requests_cancellation_and_clears_pending_queue",
+    "sync_failures_log_one_summary_line_instead_of_one_entry_per_file",
     "background_sync_event_wakes_render_without_additional_user_input"
 )
 
@@ -79,7 +82,9 @@ try {
         Write-Host ""
         Write-Host "IDE_VERIFIED"
         Write-Host "DESKTOP_PENDING"
-        Write-Host "Run the VS Code task 'GPUI: Prepare ChatGPT desktop handoff' when a visual handoff is required."
+        Write-Host "Real-screen verification: on Windows Claude Code (CLAUDE_LOCAL) run"
+        Write-Host "  scripts\Invoke-ClaudeVisualCheck.ps1 -Action Start"
+        Write-Host "Otherwise run the VS Code task 'GPUI: Prepare ChatGPT desktop handoff'."
         exit 0
     }
 

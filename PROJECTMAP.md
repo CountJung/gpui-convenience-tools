@@ -7,7 +7,7 @@
 >
 > **새 헬퍼를 만들기 전에 「공용 유틸 인벤토리」를 먼저 확인한다.**
 
-**최종 측정**: 2026-07-29 · 총 29개 파일 · 8,192줄
+**최종 측정**: 2026-07-30 · 총 29개 파일 · 9,799줄
 
 ## 크기 기준 — 줄 수는 증상이다
 
@@ -21,7 +21,16 @@
 | 800~1,000 | 🟡 경고 | 다음 작업 전에 구조 리팩터링 |
 | 1,000 초과 | 🔴 위반 | **즉시 리팩터링.** 다른 작업보다 우선 |
 
-현재 🔴 위반 **없음**, 🟡 경고 **없음**. 최대 파일은 635줄(`window/service_mgr.rs`).
+현재 🔴 위반 **없음**. 🟡 경고 **2건** — `app/tests.rs`(921줄), `sync.rs`(831줄).
+동기화 진행 표시·중지 기능을 추가하면서 두 파일이 경고 구간에 들어왔다. 규칙상
+**다음 작업 전에 구조 리팩터링을 수행한다.** 기능 변경과 같은 커밋에 섞지 않기 위해
+이번 작업에서는 처리하지 않고 아래 계획만 고정한다(`TODO.md` 3번 항목).
+
+| 파일 | 줄 | 리팩터링 계획 |
+| --- | ---: | --- |
+| `app/tests.rs` | 921 | 책임 단위 디렉터리 모듈로 전환 — `tests/mod.rs`(공용 픽스처·헬퍼) + `tests/layout.rs`(사이드바·스플리터·스크롤) + `tests/file_sync.rs`(동기화 조작·상태 표시줄·로그) |
+| `sync.rs` | 831 | 본문 313줄 + 테스트 518줄. 먼저 테스트를 `sync/tests.rs`로 분리하고, 그래도 크면 순회(`sync_dir`·`mirror_deletes`)와 판정(`needs_copy`·`describe_io_error`)을 나눈다 |
+
 줄 수와 무관하게 처리하는 중복 헬퍼는 아래 「중복 헬퍼 추적」에서 관리한다.
 
 ### 줄 수 측정 명령
@@ -46,8 +55,8 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | --- | ---: | --- |
 | `main.rs` | 129 | 진입점 — 로거 설치 → 테마 시드 → 윈도우 오픈, `--service`/`--tray` 플래그 분기 |
 | `theme.rs` | 143 | 테마 모드 적용과 스위치 팔레트 최소 대비 보정·번들 테마 감사 테스트 |
-| `config.rs` | 406 | `AppConfig`·`SyncJob`·`LogConfig` 정의와 `update_config` 단일 저장 경로 |
-| `sync.rs` | 639 | 폴더 동기화 엔진 (UI 비의존 순수 로직) |
+| `config.rs` | 419 | `AppConfig`·`SyncJob`·`LogConfig` 정의, `update_config` 단일 저장 경로, 데이터 루트 오버라이드 |
+| `sync.rs` | 831 🟡 | 폴더 동기화 엔진 (UI 비의존 순수 로직) — 진행 보고·중지 제어 포함 |
 | `logging.rs` | 560 | 롤링 파일 로거 (`log::Log` 구현, 테스트용 출력 경로 주입) |
 
 ### 앱 루트 (`app/src/app/`) — 2,457줄 / 8파일
@@ -56,14 +65,14 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 
 | 파일 | 줄 | 책임 |
 | --- | ---: | --- |
-| `mod.rs` | 650 | `AppRoot` 정의·생성자·백그라운드 UI wake·리사이즈/스크롤 사이드바·최상위 레이아웃 |
-| `tests.rs` | 652 | GPUI `TestAppContext` 기반 앱 셸·divider drag·이벤트 wake·테마 스위치·파일 동기화 조작/스크롤 회귀 테스트 |
-| `sync_ops.rs` | 332 | 파일 동기화 작업 조작 (추가·삭제·선택·입력 저장·원자적 수동 실행 큐) |
-| `events.rs` | 207 | `PlatformEvent` 채널 소비, 로그·토스트 유틸 |
+| `tests.rs` | 921 🟡 | GPUI `TestAppContext` 기반 앱 셸·divider drag·이벤트 wake·테마 스위치·파일 동기화 조작/스크롤/진행 표시줄·중지·로그 요약 회귀 테스트 |
+| `mod.rs` | 654 | `AppRoot` 정의·생성자·백그라운드 UI wake·리사이즈/스크롤 사이드바·최상위 레이아웃 |
+| `sync_ops.rs` | 362 | 파일 동기화 작업 조작 (추가·삭제·선택·입력 저장·원자적 수동 실행 큐·중지 요청) |
+| `events.rs` | 249 | `PlatformEvent` 채널 소비, 진행 상태 반영, 로그·토스트 유틸 |
+| `background.rs` | 220 | 스캔 스레드와 동기화 스레드 (진행 이벤트 빈도 제한·중지 처리) |
 | `ops.rs` | 195 | 광고 차단·서비스 관리·로그 설정 조작 |
-| `background.rs` | 170 | 스캔 스레드와 동기화 스레드 |
+| `state.rs` | 185 | 순수 데이터 타입 (`AppState`, `PlatformEvent`, `SyncRunning`, `ActivePanel` 등) |
 | `inputs.rs` | 129 | 입력 위젯(`InputState`) 지연 생성과 값 동기화 |
-| `state.rs` | 122 | 순수 데이터 타입 (`AppState`, `PlatformEvent`, `ActivePanel` 등) |
 
 ### 패널 (`app/src/window/`) — 3,110줄 / 9파일
 
@@ -71,7 +80,7 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | --- | ---: | --- |
 | `service_mgr.rs` | 635 | 편의 기능 — Windows 서비스 (목록/제어 ↔ 검색·필터·권한) |
 | `settings.rs` | 568 | 전역 설정 — 테마 선택·로그 보관 정책 |
-| `file_sync.rs` | 568 | 편의 기능 — 파일 동기화 (전체 너비 작업 목록 → 설정 → 실패 기록) |
+| `file_sync.rs` | 671 | 편의 기능 — 파일 동기화 (작업 목록 → 설정 → 실패 기록 + 하단 고정 진행 표시줄) |
 | `ad_block.rs` | 460 | 편의 기능 — 웹뷰 광고 차단 (상태·타겟 ↔ 스캔 주기·프로세스 추가) |
 | `service_view.rs` | 318 | 시스템 — 자동 시작(작업 스케줄러) 등록·삭제·즉시 실행 |
 | `ui.rs` | 207 | **공용 UI 프리미티브** — 상태 배지·액션 버튼·대비 보장 토글 스위치 |
@@ -104,7 +113,7 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | 파일 | 줄 | 책임 |
 | --- | ---: | --- |
 | `scripts/Verify-Workspace.ps1` | 163 | VS Code용 Rust/GPUI 자동 검증과 ChatGPT 데스크톱 handoff manifest·해시 고정 빌드 생성 |
-| `scripts/Invoke-ClaudeVisualCheck.ps1` | 437 | `CLAUDE_LOCAL` 시각 검증 하네스 — 격리 실행·창 캡처(`PrintWindow`)·입력(`SendInput`)·정리 |
+| `scripts/Invoke-ClaudeVisualCheck.ps1` | 450 | `CLAUDE_LOCAL` 시각 검증 하네스 — 격리 실행(`-SeedConfig`로 상태 재현)·창 캡처(`PrintWindow`)·입력(`SendInput`)·정리 |
 | `scripts/Start-DesktopVisualValidation.ps1` | 126 | manifest 해시 검증 후 단일 임시 데이터 루트 격리 프로세스·세션 파일 생성과 실패 롤백 |
 | `scripts/Stop-DesktopVisualValidation.ps1` | 75 | 기록된 검증 PID·시작 시각과 작업 전용 임시 루트만 검증 후 정리 |
 | `.vscode/tasks.json` | 111 | IDE 전용 검증, Claude 로컬 시각 세션, ChatGPT 데스크톱 인계 준비 작업 |
@@ -132,7 +141,9 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `window/mod.rs` | `scroll_pane(id, handle, content)` | 자연 높이 컨텐츠가 넘칠 때 세로 스크롤 + 스크롤바 부여 |
 | `theme.rs` | `change_theme` · `normalize_component_palette` | 테마 변경 후 스위치 트랙·썸 최소 대비 보정 |
 | `config.rs` | `update_config(edit)` | 설정 읽기-수정-쓰기 **단일 경로** |
-| `config.rs` | `data_dir` · `config_path` · `themes_path` · `logs_path` | `%APPDATA%` 하위 경로 계산 |
+| `config.rs` | `data_dir` · `config_path` · `themes_path` · `logs_path` | 데이터 루트 하위 경로 계산 (`GPUI_CONVENIENCE_TOOLS_DATA_DIR`로 재지정 가능) |
+| `sync.rs` | `SyncControl` · `SyncProgress` | 동기화 엔진의 진행 보고·중지 제어 (보고 빈도 제한은 호출자 몫) |
+| `app/state.rs` | `SyncRunning::counters` · `display_path` | 진행 표시줄 문자열 — 경로는 앞을 줄이고 파일명을 남긴다 |
 | `logging.rs` | `now_hms` · `current_log_file` · `log_dir_stats` | 시각 문자열, 로그 파일 현황 조회 |
 | `platform/windows/mod.rs` | `wide_null(&str)` | Win32 UTF-16 널 종단 문자열 변환 |
 

@@ -11,10 +11,69 @@ use std::{
     collections::BTreeSet,
     fs,
     path::{Path, PathBuf},
+    sync::atomic::{AtomicBool, Ordering},
     time::SystemTime,
 };
 
 use crate::config::SyncJob;
+
+/// 파일 하나를 처리하기 직전에 보고되는 진행 상황.
+///
+/// 경로는 소유하지 않고 빌려준다. 호출자가 필요할 때만 복사하도록 해서
+/// 파일 수천 개짜리 동기화에서 불필요한 할당이 생기지 않게 한다.
+#[derive(Clone, Copy, Debug)]
+pub struct SyncProgress<'a> {
+    /// 원본 기준 상대 경로.
+    pub current_path: &'a str,
+    pub copied: usize,
+    pub skipped: usize,
+    pub failed: usize,
+}
+
+/// 진행 보고와 중지 요청을 엔진에 연결하는 제어 핸들.
+///
+/// 엔진을 UI에 의존시키지 않기 위해 채널이 아니라 콜백과 플래그만 받는다.
+/// 보고 빈도 조절(throttling)은 호출자 몫이다 — 엔진은 파일마다 그대로 보고한다.
+#[derive(Default)]
+pub struct SyncControl<'a> {
+    cancel: Option<&'a AtomicBool>,
+    on_progress: Option<&'a mut dyn FnMut(SyncProgress<'_>)>,
+}
+
+impl<'a> SyncControl<'a> {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// 중지 플래그를 연결한다. 엔진은 파일·디렉터리 단위로 확인한다.
+    pub fn cancel_flag(mut self, flag: &'a AtomicBool) -> Self {
+        self.cancel = Some(flag);
+        self
+    }
+
+    /// 진행 상황 콜백을 연결한다.
+    pub fn on_progress(mut self, reporter: &'a mut dyn FnMut(SyncProgress<'_>)) -> Self {
+        self.on_progress = Some(reporter);
+        self
+    }
+
+    fn is_cancelled(&self) -> bool {
+        self.cancel
+            .is_some_and(|flag| flag.load(Ordering::Relaxed))
+    }
+
+    fn report(&mut self, current_path: &str, outcome: &SyncOutcome) {
+        let Some(reporter) = self.on_progress.as_mut() else {
+            return;
+        };
+        reporter(SyncProgress {
+            current_path,
+            copied: outcome.copied,
+            skipped: outcome.skipped,
+            failed: outcome.failures.len() + outcome.truncated_failures,
+        });
+    }
+}
 
 /// 한 파일에 대한 동기화 실패 기록.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -41,6 +100,8 @@ pub struct SyncOutcome {
     pub failures: Vec<SyncFailure>,
     /// 실패가 너무 많아 목록에 담지 못한 개수.
     pub truncated_failures: usize,
+    /// 사용자 중지 요청으로 중간에 끝났는지 여부.
+    pub cancelled: bool,
 }
 
 /// UI 목록이 무한정 길어지지 않도록 실패 기록 상한을 둔다.
@@ -72,12 +133,17 @@ impl SyncOutcome {
         if failed > 0 {
             s.push_str(&format!(", 실패 {failed}건"));
         }
+        if self.cancelled {
+            s.push_str(" — 중지됨");
+        }
         s
     }
 }
 
 /// 동기화 작업 하나를 1회 실행한다.
-pub fn run_sync_job(job: &SyncJob) -> SyncOutcome {
+///
+/// 제어가 필요 없으면 `SyncControl::new()`를 그대로 넘긴다.
+pub fn run_sync_job_with_control(job: &SyncJob, control: &mut SyncControl<'_>) -> SyncOutcome {
     let mut outcome = SyncOutcome::default();
 
     let source = PathBuf::from(job.source.trim());
@@ -110,14 +176,21 @@ pub fn run_sync_job(job: &SyncJob) -> SyncOutcome {
         return outcome;
     }
 
-    sync_dir(&source, &target, &source, job, &mut outcome);
+    sync_dir(&source, &target, &source, job, control, &mut outcome);
     outcome
 }
 
 /// `source` 하위를 재귀적으로 순회하며 `target`에 반영한다.
 ///
 /// `root`는 실패 메시지에 표시할 상대 경로 계산 기준이다.
-fn sync_dir(source: &Path, target: &Path, root: &Path, job: &SyncJob, outcome: &mut SyncOutcome) {
+fn sync_dir(
+    source: &Path,
+    target: &Path,
+    root: &Path,
+    job: &SyncJob,
+    control: &mut SyncControl<'_>,
+    outcome: &mut SyncOutcome,
+) {
     let entries = match fs::read_dir(source) {
         Ok(entries) => entries,
         Err(err) => {
@@ -130,6 +203,12 @@ fn sync_dir(source: &Path, target: &Path, root: &Path, job: &SyncJob, outcome: &
     let mut seen_names = BTreeSet::<std::ffi::OsString>::new();
 
     for entry in entries {
+        // 중지 요청은 파일 단위로 확인한다. 이미 복사한 파일은 되돌리지 않고 그대로 둔다.
+        if control.is_cancelled() {
+            outcome.cancelled = true;
+            return;
+        }
+
         let entry = match entry {
             Ok(entry) => entry,
             Err(err) => {
@@ -172,9 +251,15 @@ fn sync_dir(source: &Path, target: &Path, root: &Path, job: &SyncJob, outcome: &
                 outcome.fail(relative_label(&dst_path, root), describe_io_error(&err));
                 continue;
             }
-            sync_dir(&src_path, &dst_path, root, job, outcome);
+            sync_dir(&src_path, &dst_path, root, job, control, outcome);
+            if outcome.cancelled {
+                return;
+            }
             continue;
         }
+
+        // 건너뛰는 파일도 보고해야 대용량 폴더에서 화면이 멈춘 것처럼 보이지 않는다.
+        control.report(&relative_label(&src_path, root), outcome);
 
         match needs_copy(&dst_path, &meta) {
             Ok(false) => {
@@ -192,7 +277,9 @@ fn sync_dir(source: &Path, target: &Path, root: &Path, job: &SyncJob, outcome: &
         }
     }
 
-    if job.mirror_deletes {
+    // 중지된 순회는 `seen_names`가 불완전할 수 있다. 그 상태로 미러 삭제를 돌리면
+    // 아직 확인하지 않은 원본 파일의 대상본을 지우게 되므로 실행하지 않는다.
+    if job.mirror_deletes && !outcome.cancelled {
         mirror_deletes(target, root, &seen_names, outcome);
     }
 }
@@ -347,6 +434,11 @@ fn describe_io_error(err: &std::io::Error) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// 제어 없이 1회 실행하는 테스트 단축 호출.
+    fn run_sync_job(job: &SyncJob) -> SyncOutcome {
+        run_sync_job_with_control(job, &mut SyncControl::new())
+    }
 
     fn temp_dir(name: &str) -> PathBuf {
         use std::sync::atomic::{AtomicU64, Ordering};
@@ -589,6 +681,106 @@ mod tests {
             );
             println!("260자 초과 경로가 code 206으로 차단됨");
         }
+
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn progress_reports_each_file_with_running_counters() {
+        let root = temp_dir("progress");
+        let src = root.join("src");
+        let dst = root.join("dst");
+        fs::create_dir_all(src.join("nested")).unwrap();
+        fs::write(src.join("a.txt"), b"one").unwrap();
+        fs::write(src.join("nested/b.txt"), b"two").unwrap();
+
+        let mut seen: Vec<(String, usize)> = Vec::new();
+        let mut reporter = |progress: SyncProgress<'_>| {
+            seen.push((progress.current_path.to_string(), progress.copied));
+        };
+        let mut control = SyncControl::new().on_progress(&mut reporter);
+        let outcome = run_sync_job_with_control(&job(&src, &dst), &mut control);
+        drop(control);
+
+        assert_eq!(outcome.copied, 2, "failures: {:?}", outcome.failures);
+        let paths: Vec<&str> = seen.iter().map(|(path, _)| path.as_str()).collect();
+        assert!(
+            paths.contains(&"a.txt"),
+            "progress should name the file being processed: {paths:?}"
+        );
+        assert!(
+            paths.iter().any(|path| path.ends_with("b.txt")),
+            "nested files should also be reported: {paths:?}"
+        );
+        // 보고는 처리 '직전'이므로 첫 보고의 복사 수는 아직 0이다.
+        assert_eq!(seen[0].1, 0, "progress is reported before the copy: {seen:?}");
+
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn cancel_flag_stops_traversal_and_marks_outcome_cancelled() {
+        let root = temp_dir("cancel");
+        let src = root.join("src");
+        let dst = root.join("dst");
+        fs::create_dir_all(&src).unwrap();
+        for index in 0..50 {
+            fs::write(src.join(format!("file-{index:02}.txt")), b"payload").unwrap();
+        }
+
+        // 첫 파일을 처리하기 직전에 중지를 요청한다.
+        let cancel = AtomicBool::new(false);
+        let mut reporter = |_: SyncProgress<'_>| cancel.store(true, Ordering::Relaxed);
+        let mut control = SyncControl::new()
+            .cancel_flag(&cancel)
+            .on_progress(&mut reporter);
+        let outcome = run_sync_job_with_control(&job(&src, &dst), &mut control);
+        drop(control);
+
+        assert!(outcome.cancelled, "cancel flag should stop the traversal");
+        assert!(
+            outcome.copied < 50,
+            "cancellation should leave files unprocessed, copied={}",
+            outcome.copied
+        );
+        assert!(
+            outcome.summary().contains("중지됨"),
+            "summary should surface the cancellation: {}",
+            outcome.summary()
+        );
+
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn cancelled_run_does_not_mirror_delete_unvisited_targets() {
+        let root = temp_dir("cancel-mirror");
+        let src = root.join("src");
+        let dst = root.join("dst");
+        fs::create_dir_all(&src).unwrap();
+        fs::create_dir_all(&dst).unwrap();
+        for index in 0..20 {
+            fs::write(src.join(format!("keep-{index:02}.txt")), b"payload").unwrap();
+        }
+        // 원본에도 있는 파일이므로 정상 실행이었다면 절대 삭제되지 않아야 한다.
+        fs::write(dst.join("keep-19.txt"), b"stale").unwrap();
+
+        let cancel = AtomicBool::new(false);
+        let mut reporter = |_: SyncProgress<'_>| cancel.store(true, Ordering::Relaxed);
+        let mut control = SyncControl::new()
+            .cancel_flag(&cancel)
+            .on_progress(&mut reporter);
+        let mut cancelled_job = job(&src, &dst);
+        cancelled_job.mirror_deletes = true;
+        let outcome = run_sync_job_with_control(&cancelled_job, &mut control);
+        drop(control);
+
+        assert!(outcome.cancelled);
+        assert_eq!(
+            outcome.deleted, 0,
+            "an interrupted scan must not delete targets it never verified"
+        );
+        assert!(dst.join("keep-19.txt").exists());
 
         let _ = fs::remove_dir_all(&root);
     }

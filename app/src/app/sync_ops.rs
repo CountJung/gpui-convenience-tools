@@ -6,6 +6,7 @@
 
 use gpui::{Context, PathPromptOptions, Window};
 use gpui_component::notification::NotificationType;
+use std::sync::atomic::Ordering;
 
 use super::AppRoot;
 use crate::config::{update_config, SyncJob};
@@ -321,6 +322,35 @@ impl AppRoot {
             window,
             cx,
         );
+        cx.notify();
+    }
+
+    /// 실행 중인 동기화 중지를 요청한다.
+    ///
+    /// 동기화 스레드는 실행 중 공유 뮤텍스를 잡고 있지 않으므로 중지 신호는 원자 플래그로
+    /// 보낸다. 이미 복사된 파일은 되돌리지 않고, 대기 중인 수동 요청 큐도 함께 비운다.
+    pub(crate) fn request_sync_stop(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.sync_running.is_none() {
+            self.notify_toast(
+                "실행 중인 동기화가 없습니다",
+                NotificationType::Warning,
+                window,
+                cx,
+            );
+            return;
+        }
+
+        if let Ok(mut state) = self.sync_state.lock() {
+            state.cancel.store(true, Ordering::Relaxed);
+            state.run_now.clear();
+        }
+
+        if let Some(running) = self.sync_running.as_mut() {
+            running.stopping = true;
+        }
+
+        self.push_log("INFO", "동기화 중지를 요청했습니다.".to_string());
+        self.notify_toast("동기화를 중지합니다", NotificationType::Info, window, cx);
         cx.notify();
     }
 

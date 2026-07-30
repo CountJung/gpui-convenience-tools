@@ -9,7 +9,7 @@ use gpui_component::{
     WindowExt,
 };
 
-use super::state::{LogEntry, PlatformEvent, SyncJobStatus};
+use super::state::{LogEntry, PlatformEvent, SyncJobStatus, SyncRunning};
 use super::AppRoot;
 use crate::sync::SyncOutcome;
 
@@ -120,7 +120,45 @@ impl AppRoot {
                         self.push_log("INFO", format!("타겟을 삭제했습니다: {name}"));
                     }
                 }
+                PlatformEvent::SyncStarted { id, label } => {
+                    self.push_log("INFO", format!("[{label}] 동기화를 시작했습니다."));
+                    self.sync_running = Some(SyncRunning {
+                        id,
+                        label,
+                        current_path: String::new(),
+                        copied: 0,
+                        skipped: 0,
+                        failed: 0,
+                        stopping: false,
+                    });
+                }
+                PlatformEvent::SyncProgress {
+                    id,
+                    current_path,
+                    copied,
+                    skipped,
+                    failed,
+                } => {
+                    // 앞선 작업이 끝난 뒤 늦게 도착한 보고는 무시한다.
+                    if let Some(running) = self
+                        .sync_running
+                        .as_mut()
+                        .filter(|running| running.id == id)
+                    {
+                        running.current_path = current_path;
+                        running.copied = copied;
+                        running.skipped = skipped;
+                        running.failed = failed;
+                    }
+                }
                 PlatformEvent::SyncFinished { id, label, outcome } => {
+                    if self
+                        .sync_running
+                        .as_ref()
+                        .is_some_and(|running| running.id == id)
+                    {
+                        self.sync_running = None;
+                    }
                     self.handle_sync_finished(id, label, outcome, window, cx);
                 }
             }
@@ -149,37 +187,41 @@ impl AppRoot {
             },
         );
 
-        if outcome.copied > 0 || outcome.deleted > 0 {
+        if outcome.cancelled {
+            self.push_log("WARN", format!("[{label}] 중지했습니다 — {}", outcome.summary()));
+        } else if outcome.copied > 0 || outcome.deleted > 0 {
             self.push_log("INFO", format!("[{label}] {}", outcome.summary()));
         }
 
-        // ── 실패 처리: 로그에는 항상 남기고, 토스트는 억제되지 않은 새 항목만 ──
+        // ── 실패 처리 ──
+        //
+        // 로그에는 파일마다 남기지 않는다. 실패가 많은 폴더에서 로그가 실패 목록의
+        // 복사본이 되어 다른 활동 기록을 밀어내기 때문이다. 개별 사유는 이 패널의
+        // 실패 목록이 소유하고, 로그에는 실행 단위 요약 한 줄만 남긴다.
         let mut unsuppressed_new = 0usize;
+        let mut newly_recorded = 0usize;
         for failure in &outcome.failures {
             let key = failure.key();
-            let already_known = self.sync_failures.iter().any(|f| f.key() == key);
-
-            if !already_known {
-                self.app_state.log_entries.push(LogEntry {
-                    level: "ERROR".to_string(),
-                    message: format!("[{label}] {} — {}", failure.path, failure.reason),
-                });
-                self.sync_failures.push(failure.clone());
+            if self.sync_failures.iter().any(|f| f.key() == key) {
+                continue;
             }
 
-            if !already_known && !self.suppressed_sync_failures.contains(&key) {
+            self.sync_failures.push(failure.clone());
+            newly_recorded += 1;
+
+            if !self.suppressed_sync_failures.contains(&key) {
                 unsuppressed_new += 1;
             }
         }
 
-        if outcome.truncated_failures > 0 {
-            self.push_log(
-                "WARN",
-                format!(
-                    "[{label}] 실패 항목이 많아 {}건은 목록에서 생략했습니다.",
-                    outcome.truncated_failures
-                ),
-            );
+        if newly_recorded > 0 || outcome.truncated_failures > 0 {
+            let omitted = outcome.truncated_failures;
+            let mut message =
+                format!("[{label}] {newly_recorded}건을 복사하지 못했습니다. 사유는 아래 실패 목록에서 확인하세요.");
+            if omitted > 0 {
+                message.push_str(&format!(" (많아서 {omitted}건은 목록에서 생략)"));
+            }
+            self.push_log("ERROR", message);
         }
 
         // 기록 상한

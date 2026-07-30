@@ -33,6 +33,11 @@ param(
     [string]$Action,
 
     [string]$BinaryPath,
+
+    # Start 전용. 격리된 데이터 루트에 미리 넣어 둘 `config.json` 경로.
+    # 특정 상태(예: 동기화 작업이 등록된 화면)를 재현할 때 쓴다.
+    [string]$SeedConfig,
+
     [string]$Name = "capture",
     [double]$X = 0.5,
     [double]$Y = 0.5,
@@ -257,6 +262,14 @@ switch ($Action) {
         New-Item -ItemType Directory -Force -Path $appData | Out-Null
         New-Item -ItemType Directory -Force -Path (Join-Path $sessionRoot "source") | Out-Null
         New-Item -ItemType Directory -Force -Path (Join-Path $sessionRoot "target") | Out-Null
+
+        if (-not [string]::IsNullOrWhiteSpace($SeedConfig)) {
+            $seedPath = [System.IO.Path]::GetFullPath($SeedConfig)
+            if (-not (Test-Path -LiteralPath $seedPath -PathType Leaf)) {
+                throw "시드 config를 찾을 수 없다: $seedPath"
+            }
+            Copy-Item -LiteralPath $seedPath -Destination (Join-Path $appData "config.json") -Force
+        }
 
         # 앱은 `dirs::config_dir()`(= `SHGetKnownFolderPath`)로 데이터 루트를 찾으므로
         # `APPDATA`만 바꿔서는 격리되지 않는다. 전용 변수를 프로세스 범위로 지정해야

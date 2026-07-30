@@ -21,7 +21,7 @@ mod ops;
 mod state;
 mod sync_ops;
 
-pub use state::{ActivePanel, AppState, LogEntry, SyncJobStatus, TargetApp};
+pub use state::{ActivePanel, AppState, LogEntry, SyncJobStatus, SyncRunning, TargetApp};
 use state::{PlatformEvent, ScannerState, SyncSharedState, NAV_SYSTEM, NAV_TOOLS};
 
 use gpui::{
@@ -86,6 +86,8 @@ pub struct AppRoot {
     /// 작업 ID → 최근 실행 결과. 인덱스 대신 ID로 매칭해 삭제 시 어긋나지 않게 한다.
     pub(crate) sync_status: HashMap<String, SyncJobStatus>,
     pub(crate) sync_failures: Vec<SyncFailure>,
+    /// 실행 중인 작업의 진행 상황. 없으면 유휴 상태다.
+    pub(crate) sync_running: Option<SyncRunning>,
     pub(crate) suppressed_sync_failures: HashSet<String>,
     pub(crate) sync_notify_enabled: bool,
     pub(crate) sync_name_input: Option<Entity<InputState>>,
@@ -161,6 +163,7 @@ impl AppRoot {
         let sync_state = Arc::new(Mutex::new(SyncSharedState {
             jobs: sync_jobs.clone(),
             run_now: Vec::new(),
+            cancel: Arc::default(),
         }));
 
         #[cfg(target_os = "windows")]
@@ -220,6 +223,7 @@ impl AppRoot {
             selected_sync_job,
             sync_status: HashMap::new(),
             sync_failures: Vec::new(),
+            sync_running: None,
             suppressed_sync_failures: HashSet::new(),
             sync_notify_enabled: true,
             sync_name_input: None,

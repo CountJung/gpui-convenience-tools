@@ -8,7 +8,7 @@
 use std::{
     collections::HashMap,
     future::pending,
-    sync::{Arc, Mutex},
+    sync::{atomic::Ordering, Arc, Mutex},
     time::{Duration, Instant},
 };
 use tokio::sync::mpsc::UnboundedSender;
@@ -16,7 +16,13 @@ use tokio::sync::mpsc::UnboundedSender;
 use super::state::{PlatformEvent, ScannerState, SyncSharedState};
 use super::AppRoot;
 use crate::platform::{NativeWindowHandle, Platform};
-use crate::sync::run_sync_job;
+use crate::sync::{run_sync_job_with_control, SyncControl, SyncProgress};
+
+/// 진행 상황 이벤트 최소 간격.
+///
+/// 엔진은 파일마다 보고하지만 그대로 채널에 흘리면 3,000개 폴더에서 이벤트가 폭주해
+/// 렌더 루프가 진행 표시만 그리게 된다. 사람이 읽을 수 있는 속도로 제한한다.
+const PROGRESS_EVENT_INTERVAL: Duration = Duration::from_millis(120);
 
 impl AppRoot {
     // ─────────────────────────────────────────────
@@ -120,12 +126,12 @@ impl AppRoot {
             loop {
                 std::thread::sleep(Duration::from_secs(1));
 
-                let (jobs, manual) = {
+                let (jobs, manual, cancel) = {
                     let Ok(mut state) = sync_state.lock() else {
                         continue;
                     };
                     let manual = std::mem::take(&mut state.run_now);
-                    (state.jobs.clone(), manual)
+                    (state.jobs.clone(), manual, Arc::clone(&state.cancel))
                 };
 
                 // 삭제된 작업의 기록은 정리한다.
@@ -145,24 +151,68 @@ impl AppRoot {
                         continue;
                     }
 
-                    let outcome = run_sync_job(job);
+                    let label = job.label();
+
+                    // 이전 실행에서 남은 중지 요청이 새 작업을 곧바로 끊지 않게 한다.
+                    cancel.store(false, Ordering::Relaxed);
+                    let _ = event_tx.send(PlatformEvent::SyncStarted {
+                        id: job.id.clone(),
+                        label: label.clone(),
+                    });
+
+                    let outcome = {
+                        let progress_tx = event_tx.clone();
+                        let progress_id = job.id.clone();
+                        let mut last_sent: Option<Instant> = None;
+                        let mut reporter = |progress: SyncProgress<'_>| {
+                            if last_sent
+                                .is_some_and(|at| at.elapsed() < PROGRESS_EVENT_INTERVAL)
+                            {
+                                return;
+                            }
+                            last_sent = Some(Instant::now());
+                            let _ = progress_tx.send(PlatformEvent::SyncProgress {
+                                id: progress_id.clone(),
+                                current_path: progress.current_path.to_string(),
+                                copied: progress.copied,
+                                skipped: progress.skipped,
+                                failed: progress.failed,
+                            });
+                        };
+
+                        let mut control = SyncControl::new()
+                            .cancel_flag(&cancel)
+                            .on_progress(&mut reporter);
+                        run_sync_job_with_control(job, &mut control)
+                    };
                     last_run.insert(job.id.clone(), Instant::now());
 
-                    let label = job.label();
-                    if outcome.has_failures() {
+                    // 파일 단위 기록은 남기지 않는다. 개별 실패 사유는 UI의 실패 목록이
+                    // 소유하고, 로그에는 실행 단위의 중요한 결과만 남긴다.
+                    if outcome.cancelled {
+                        log::info!("동기화 '{label}' 중지됨: {}", outcome.summary());
+                    } else if outcome.has_failures() {
                         log::warn!("동기화 '{label}' 완료(실패 포함): {}", outcome.summary());
-                        for failure in &outcome.failures {
-                            log::warn!("  · {} — {}", failure.path, failure.reason);
-                        }
                     } else if outcome.copied > 0 || outcome.deleted > 0 {
                         log::info!("동기화 '{label}' 완료: {}", outcome.summary());
                     }
 
+                    let cancelled = outcome.cancelled;
                     let _ = event_tx.send(PlatformEvent::SyncFinished {
                         id: job.id.clone(),
                         label,
                         outcome,
                     });
+
+                    // 중지는 이번 틱의 남은 작업까지 멈춘다. 한 작업만 끊고 다음 작업을
+                    // 이어서 돌리면 '중지'를 누른 사용자의 기대와 어긋난다.
+                    if cancelled {
+                        if let Ok(mut state) = sync_state.lock() {
+                            state.run_now.clear();
+                        }
+                        cancel.store(false, Ordering::Relaxed);
+                        break;
+                    }
                 }
             }
         });

@@ -3,6 +3,7 @@
 //! 렌더링·I/O 로직 없이 상태 표현만 담는다.
 
 use serde::{Deserialize, Serialize};
+use std::sync::{atomic::AtomicBool, Arc};
 
 use crate::config::SyncJob;
 use crate::sync::SyncOutcome;
@@ -60,6 +61,18 @@ pub(crate) enum PlatformEvent {
     ServiceToggled(bool),
     TargetToggled { index: usize, enabled: bool },
     TargetRemoved { index: usize },
+    SyncStarted {
+        id: String,
+        label: String,
+    },
+    /// 실행 중 진행 상황. 백그라운드가 빈도를 제한해 보내므로 파일마다 오지는 않는다.
+    SyncProgress {
+        id: String,
+        current_path: String,
+        copied: usize,
+        skipped: usize,
+        failed: usize,
+    },
     SyncFinished { id: String, label: String, outcome: SyncOutcome },
 }
 
@@ -76,6 +89,56 @@ pub(crate) struct SyncSharedState {
     pub(crate) jobs: Vec<SyncJob>,
     /// 사용자가 '지금 동기화'로 요청한 작업 ID 큐.
     pub(crate) run_now: Vec<String>,
+    /// 실행 중인 작업의 중지 요청 플래그.
+    ///
+    /// 동기화 스레드는 실행 중 뮤텍스를 잡고 있지 않으므로 중지 신호는 뮤텍스가 아니라
+    /// 이 원자 플래그로 전달한다. 엔진이 파일 단위로 확인한다.
+    pub(crate) cancel: Arc<AtomicBool>,
+}
+
+/// 지금 실행 중인 동기화 작업의 진행 상황.
+#[derive(Clone, Debug)]
+pub struct SyncRunning {
+    pub id: String,
+    pub label: String,
+    /// 마지막으로 보고된 처리 중 파일(원본 기준 상대 경로).
+    pub current_path: String,
+    pub copied: usize,
+    pub skipped: usize,
+    pub failed: usize,
+    /// 중지를 요청했지만 아직 끝나지 않은 상태.
+    pub stopping: bool,
+}
+
+impl SyncRunning {
+    /// 하단 상태 표시줄에 쓸 진행 요약.
+    pub fn counters(&self) -> String {
+        format!(
+            "복사 {} · 건너뜀 {} · 실패 {}",
+            self.copied, self.skipped, self.failed
+        )
+    }
+
+    /// 하단 상태 표시줄에 넣을 현재 파일 경로.
+    ///
+    /// 길이 제한은 GPUI `truncate()`에 맡기지 않는다. flex 자식으로 들어가면 폭이
+    /// 0으로 잡혀 말줄임표만 남기 때문이다. 대신 여기서 잘라 두고, 어떤 파일인지
+    /// 알아볼 수 있도록 앞쪽을 버리고 파일명 쪽을 남긴다.
+    pub fn display_path(&self) -> String {
+        const MAX_CHARS: usize = 72;
+
+        if self.current_path.is_empty() {
+            return "폴더를 검사하는 중…".to_string();
+        }
+
+        let chars: Vec<char> = self.current_path.chars().collect();
+        if chars.len() <= MAX_CHARS {
+            return self.current_path.clone();
+        }
+
+        let tail: String = chars[chars.len() - (MAX_CHARS - 1)..].iter().collect();
+        format!("…{tail}")
+    }
 }
 
 /// 동기화 작업 하나의 최근 실행 결과.
