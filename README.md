@@ -156,7 +156,9 @@ schtasks /Run    /TN "gpui-convenience-tools"
 - **방법 2** — 관리자 터미널에서 `target\debug\gpui-convenience-tools.exe`를 직접 실행하고,
   `Attach to gpui-convenience-tools` 구성으로 attach.
 
-## Windows 설치 파일(MSI)
+## 설치 파일 만들기
+
+### Windows (MSI)
 
 WiX Toolset(v3) 설치 후:
 
@@ -166,15 +168,52 @@ WiX Toolset(v3) 설치 후:
 
 결과: `installer/windows/gpui-convenience-tools.msi`
 
-## CI / CD
+### macOS (앱 번들 · DMG)
+
+macOS에서:
+
+```bash
+bash installer/macos/build-app.sh
+```
+
+결과: `target/macos/gpui-convenience-tools.app`, `target/macos/gpui-convenience-tools-<버전>-universal.dmg`
+(Apple Silicon·Intel 유니버설 바이너리)
+
+## 릴리즈 (CI / CD)
 
 - **`windows-build.yml`** — `main`/`master` push 및 PR에서 `cargo check` → `cargo test` → 릴리즈 빌드
-- **`release.yml`** — `v*` 태그 push 시 릴리즈 빌드 + MSI를 GitHub Release 에셋으로 업로드
+- **`macos-build.yml`** — 같은 트리거로 macOS에서 `cargo check` → `cargo test` → 앱 번들·DMG 패키징
+- **`release.yml`** — `v*` 태그 push 시 Windows와 macOS를 각각 빌드해 **하나의 GitHub Release**에 첨부
 
 ```bash
 git tag v1.0.0
 git push origin v1.0.0
 ```
+
+두 플랫폼 빌드가 모두 성공해야 릴리즈가 만들어진다. 릴리즈 에셋은 다음과 같다.
+
+| 플랫폼 | 파일 | 비고 |
+| --- | --- | --- |
+| Windows | `gpui-convenience-tools.msi` | 설치 관리자 (권장) |
+| Windows | `gpui-convenience-tools.exe` | 단일 실행 파일 |
+| macOS | `gpui-convenience-tools-<버전>-universal.dmg` | Apple Silicon · Intel 공용 |
+
+### macOS 첫 실행 (중요)
+
+코드 서명·공증(notarization)을 하지 않은 빌드이므로 그냥 열면 Gatekeeper가 차단한다.
+앱을 `응용 프로그램`으로 옮긴 뒤 **한 번만** 아래 중 하나를 수행한다.
+
+- Finder에서 앱을 **우클릭 → 열기 → 열기**
+- 또는 터미널에서:
+
+  ```bash
+  xattr -dr com.apple.quarantine /Applications/gpui-convenience-tools.app
+  ```
+
+### macOS 지원 범위
+
+macOS 빌드에는 **파일 동기화**와 테마·로그·설정만 포함된다.
+웹뷰 광고 차단·Windows 서비스 관리·자동 시작은 Win32/SCM 전용이라 해당 메뉴가 노출되지 않는다.
 
 ## 프로젝트 문서
 

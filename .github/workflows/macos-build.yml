@@ -1,0 +1,47 @@
+name: macos-build
+
+# macOS 빌드는 Windows 개발 환경에서 교차 검사할 수 없다(의존성 build script가 크로스 C
+# 컴파일러를 요구한다). 그래서 `#[cfg(not(target_os = "windows"))]` 경로가 실제로
+# 컴파일되는지 확인하는 유일한 지점이 이 워크플로다.
+#
+# **태그를 만들 때가 아니라 push/PR마다 돌린다.** 릴리즈 시점에 처음 깨진 것을 발견하면
+# 태그를 다시 잘라야 하기 때문이다.
+on:
+  push:
+    branches: ["main", "master"]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Cargo check
+        run: cargo check -p gpui-convenience-tools --all-targets
+
+      - name: Cargo test
+        run: cargo test -p gpui-convenience-tools -- --nocapture
+
+      # 패키징 스크립트(유니버설 lipo · Info.plist · ad-hoc 서명 · DMG)까지 매번
+      # 돌려서 릴리즈 때 처음 실패하는 일이 없게 한다.
+      - name: Build app bundle and DMG
+        run: bash installer/macos/build-app.sh
+
+      - name: Upload app bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-dev-build
+          path: target/macos/*.dmg
+          if-no-files-found: error
+          retention-days: 7

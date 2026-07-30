@@ -12,6 +12,7 @@ mod logging;
 mod platform;
 mod sync;
 mod theme;
+mod util;
 mod window;
 
 use app::AppRoot;

@@ -10,10 +10,10 @@
 //! - 반환 타입이 `Div` / `Stateful<Div>`이므로 호출부에서 폭·여백을 이어 붙일 수 있다.
 
 use gpui::{
-    div, App, ClickEvent, Div, ElementId, Hsla, InteractiveElement, ParentElement, SharedString,
-    Stateful, StatefulInteractiveElement, Styled, Window,
+    div, AnyElement, App, ClickEvent, Div, ElementId, Hsla, InteractiveElement, IntoElement,
+    ParentElement, SharedString, Stateful, StatefulInteractiveElement, Styled, Window,
 };
-use gpui_component::{switch::Switch, theme::ActiveTheme};
+use gpui_component::{h_flex, switch::Switch, theme::ActiveTheme, v_flex};
 
 /// 배지·버튼의 여백 크기.
 ///
@@ -191,6 +191,99 @@ pub fn action_button(
     }
 
     el.id(id).on_click(on_click).child(label.into())
+}
+
+/// 숫자 하나를 강조해 보여주는 통계 타일.
+///
+/// 가로로 나열되는 것을 전제로 `flex_1`을 포함한다. 폭을 고정하려면 반환값에 `.w(px(..))`를
+/// 이어 붙인다. (원래 `ad_block::stat_card`와 `dashboard::stat_tile`로 나뉘어 있었고,
+/// 한쪽만 색을 인자로 받는 차이 외에는 완전히 같은 구현이었다.)
+pub fn stat_tile(label: impl Into<SharedString>, value: impl Into<SharedString>, cx: &App) -> Div {
+    let t = cx.theme();
+
+    div()
+        .flex_1()
+        .rounded_md()
+        .px_3()
+        .py_3()
+        .bg(t.list)
+        .border_1()
+        .border_color(t.border)
+        .child(
+            v_flex()
+                .gap_1()
+                .child(div().text_color(t.muted_foreground).child(label.into()))
+                .child(div().text_color(t.foreground).child(value.into())),
+        )
+}
+
+/// 제목·설명과 토글 스위치를 좌우로 배치한 설정 행.
+///
+/// `id`로 행(`{id}-row`)과 스위치(`{id}`) 양쪽에 `debug_selector`를 부여해 GPUI 테스트가
+/// 두 지점을 각각 집을 수 있게 한다.
+pub fn option_row(
+    id: &'static str,
+    title: impl Into<SharedString>,
+    description: impl Into<SharedString>,
+    checked: bool,
+    on_click: impl Fn(&bool, &mut Window, &mut App) + 'static,
+    cx: &App,
+) -> AnyElement {
+    let t = cx.theme();
+
+    h_flex()
+        .debug_selector(move || format!("{id}-row"))
+        .gap_3()
+        .items_center()
+        .child(
+            v_flex()
+                .flex_1()
+                .min_w_0()
+                .child(div().text_color(t.foreground).child(title.into()))
+                .child(
+                    div()
+                        .text_color(t.muted_foreground)
+                        .child(description.into()),
+                ),
+        )
+        .child(
+            div()
+                .debug_selector(move || id.to_string())
+                .child(toggle_switch(id, checked, cx).on_click(on_click)),
+        )
+        .into_any_element()
+}
+
+/// 프리셋 목록에서 하나를 고르는 칩. 선택 상태에 따라 배경·테두리가 바뀐다.
+///
+/// `on_click`은 호출부에서 `cx.listener(..)`로 이어 붙인다.
+/// 감시 주기·스캔 주기·로그 보관 프리셋이 각자 같은 스타일 체인을 복제하고 있었다.
+pub fn choice_chip(
+    id: impl Into<ElementId>,
+    label: impl Into<SharedString>,
+    selected: bool,
+    cx: &App,
+) -> Stateful<Div> {
+    let t = cx.theme();
+    let (bg, fg, border) = if selected {
+        (t.primary, t.primary_foreground, t.primary_hover)
+    } else {
+        (t.list, t.foreground, t.border)
+    };
+    let hover = t.secondary_hover;
+
+    div()
+        .id(id)
+        .rounded_md()
+        .px_3()
+        .py_2()
+        .cursor_pointer()
+        .bg(bg)
+        .text_color(fg)
+        .border_1()
+        .border_color(border)
+        .hover(move |s| s.bg(hover))
+        .child(label.into())
 }
 
 /// 테마에 상관없이 트랙 경계가 보이는 토글 스위치.

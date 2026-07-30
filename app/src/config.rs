@@ -22,6 +22,12 @@ pub struct AppConfig {
     pub scan_interval_secs: u32,
     #[serde(default)]
     pub favorite_services: Vec<String>,
+    /// 주기 드롭다운에 나열할 초 단위 프리셋.
+    ///
+    /// 광고 차단 스캔 주기와 파일 동기화 감시 주기가 **같은 목록을 공유**한다.
+    /// 사용자가 한쪽에서 추가한 주기를 다른 쪽에서 다시 만들 이유가 없기 때문이다.
+    #[serde(default = "default_interval_presets")]
+    pub interval_presets: Vec<u32>,
     /// 파일 동기화 작업 목록.
     #[serde(default)]
     pub sync_jobs: Vec<SyncJob>,
@@ -32,6 +38,20 @@ pub struct AppConfig {
 
 fn default_scan_interval_secs() -> u32 {
     10
+}
+
+/// 기본 주기 프리셋: 10초 · 30초 · 1분.
+pub fn default_interval_presets() -> Vec<u32> {
+    vec![10, 30, 60]
+}
+
+/// 프리셋 목록을 정규화한다 — 중복 제거 후 오름차순 정렬.
+///
+/// 드롭다운 순서를 사용자가 추가한 순서에 맡기면 목록이 금세 뒤죽박죽이 된다.
+pub fn normalize_interval_presets(presets: &mut Vec<u32>) {
+    presets.retain(|secs| *secs > 0);
+    presets.sort_unstable();
+    presets.dedup();
 }
 
 // ─────────────────────────────────────────────
@@ -190,6 +210,7 @@ impl Default for AppConfig {
             dark_theme_name: None,
             scan_interval_secs: default_scan_interval_secs(),
             favorite_services: Vec::new(),
+            interval_presets: default_interval_presets(),
             sync_jobs: Vec::new(),
             log: LogConfig::default(),
         }

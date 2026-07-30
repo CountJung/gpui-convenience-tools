@@ -17,9 +17,12 @@
 mod background;
 mod events;
 mod inputs;
+mod interval;
 mod ops;
 mod state;
 mod sync_ops;
+
+pub(crate) use interval::{IntervalPicker, IntervalTarget};
 
 pub use state::{ActivePanel, AppState, LogEntry, SyncJobStatus, SyncRunning, TargetApp};
 use state::{PlatformEvent, ScannerState, SyncSharedState, NAV_SYSTEM, NAV_TOOLS};
@@ -45,7 +48,10 @@ use std::{
 };
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 
-use crate::config::{load_config, update_config, LogConfig, SyncJob};
+use crate::config::{
+    default_interval_presets, load_config, normalize_interval_presets, update_config, LogConfig,
+    SyncJob,
+};
 use crate::platform::{NativePlatform, Platform, SysServiceInfo};
 use crate::sync::SyncFailure;
 use crate::window::{
@@ -69,6 +75,8 @@ pub struct AppRoot {
     scanner_state: Arc<Mutex<ScannerState>>,
     subscriptions: Vec<Subscription>,
     pub(crate) scan_interval_secs: u32,
+    /// 스캔 주기·감시 주기가 공유하는 주기 선택 상태.
+    pub(crate) interval_picker: IntervalPicker,
 
     // ── 서비스 관리 ──
     pub(crate) sys_services: Vec<SysServiceInfo>,
@@ -127,6 +135,7 @@ impl AppRoot {
         let mut sync_jobs = Vec::new();
         let mut favorite_services = Vec::new();
         let mut log_config = LogConfig::default();
+        let mut initial_interval_presets = default_interval_presets();
 
         if let Ok(Some(cfg)) = load_config() {
             app_state.is_active = cfg.service_enabled;
@@ -140,6 +149,12 @@ impl AppRoot {
                 job.ensure_id();
             }
             favorite_services = cfg.favorite_services;
+            // 구버전 config에는 프리셋이 없어 기본값이 들어온다. 손상된 값은 여기서 거른다.
+            initial_interval_presets = cfg.interval_presets;
+            normalize_interval_presets(&mut initial_interval_presets);
+            if initial_interval_presets.is_empty() {
+                initial_interval_presets = default_interval_presets();
+            }
             log_config = cfg.log;
             app_state.log_entries.push(LogEntry {
                 level: "INFO".to_string(),
@@ -209,6 +224,10 @@ impl AppRoot {
             scanner_state,
             subscriptions: Vec::new(),
             scan_interval_secs: initial_scan_interval_secs,
+            interval_picker: IntervalPicker {
+                presets: initial_interval_presets,
+                ..IntervalPicker::default()
+            },
 
             sys_services: Vec::new(),
             service_search_query: String::new(),
@@ -271,6 +290,43 @@ impl AppRoot {
 
     pub(crate) fn app_state(&self) -> &AppState {
         &self.app_state
+    }
+
+    /// 사이드바 상단의 광고 차단 전역 스위치.
+    ///
+    /// Win32 창 조작 전용 기능이라 다른 OS에서는 스위치 자체를 두지 않는다.
+    #[cfg(target_os = "windows")]
+    fn render_ad_block_toggle(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
+        let theme = cx.theme();
+        let accent = theme.sidebar_accent;
+        let accent_foreground = theme.sidebar_accent_foreground;
+        let enabled = self.app_state.is_active;
+
+        Some(
+            div()
+                .rounded_md()
+                .p_2()
+                .bg(accent)
+                .child(
+                    h_flex()
+                        .justify_between()
+                        .items_center()
+                        .child(div().text_color(accent_foreground).child("광고 차단"))
+                        .child(
+                            ui::toggle_switch("global-enable-switch", enabled, cx).on_click(
+                                cx.listener(|this, checked: &bool, window, cx| {
+                                    this.set_service_enabled(*checked, window, cx);
+                                }),
+                            ),
+                        ),
+                )
+                .into_any_element(),
+        )
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    fn render_ad_block_toggle(&self, _cx: &mut Context<Self>) -> Option<AnyElement> {
+        None
     }
     fn render_window_controls(&self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme();
@@ -476,6 +532,7 @@ impl Render for AppRoot {
         );
         let nav_tools = self.render_nav_group("편의 기능", &NAV_TOOLS, cx);
         let nav_system = self.render_nav_group("시스템", &NAV_SYSTEM, cx);
+        let ad_block_toggle = self.render_ad_block_toggle(cx);
 
         let theme = cx.theme();
         let background = theme.background;
@@ -483,7 +540,6 @@ impl Render for AppRoot {
         let sidebar_border = theme.sidebar_border;
         let sidebar_fg = theme.sidebar_foreground;
         let border = theme.border;
-        let app_enabled = self.app_state.is_active;
 
         // 스플리터·가상 리스트를 쓰는 패널은 높이를 스스로 채우므로
         // 바깥에서 스크롤을 걸지 않는다.
@@ -553,42 +609,7 @@ impl Render for AppRoot {
                                                     .text_color(sidebar_fg)
                                                     .child("GPUI 편의 도구"),
                                             )
-                                            .child(
-                                                div()
-                                                    .rounded_md()
-                                                    .p_2()
-                                                    .bg(theme.sidebar_accent)
-                                                    .child(
-                                                        h_flex()
-                                                            .justify_between()
-                                                            .items_center()
-                                                            .child(
-                                                                div()
-                                                                    .text_color(
-                                                                        theme
-                                                                            .sidebar_accent_foreground,
-                                                                    )
-                                                                    .child("광고 차단"),
-                                                            )
-                                                            .child(
-                                                                ui::toggle_switch(
-                                                                    "global-enable-switch",
-                                                                    app_enabled,
-                                                                    cx,
-                                                                )
-                                                                .on_click(cx.listener(
-                                                                    |this,
-                                                                     checked: &bool,
-                                                                     window,
-                                                                     cx| {
-                                                                        this.set_service_enabled(
-                                                                            *checked, window, cx,
-                                                                        );
-                                                                    },
-                                                                )),
-                                                            ),
-                                                    ),
-                                            )
+                                            .children(ad_block_toggle)
                                             .child(nav_overview)
                                             .child(nav_tools)
                                             .child(nav_system)

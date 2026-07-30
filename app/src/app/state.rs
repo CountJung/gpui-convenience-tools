@@ -160,6 +160,9 @@ impl SyncJobStatus {
     }
 }
 
+/// 비Windows에서는 Win32 전용 패널 variant가 만들어지지 않는다(아래 `NAV_*` 참고).
+/// 렌더 match는 모든 variant를 그대로 다루므로 그 플랫폼에서만 미사용 경고를 푼다.
+#[cfg_attr(not(target_os = "windows"), allow(dead_code))]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ActivePanel {
     Dashboard,
@@ -172,14 +175,33 @@ pub enum ActivePanel {
 }
 
 /// 사이드바 항목 정의: (패널, 표시 이름, 보조 설명)
+///
+/// 웹뷰 광고 차단·Windows 서비스·자동 시작은 Win32와 SCM에 직접 의존해 다른 OS에
+/// 대응물이 없다. **그 플랫폼에서는 메뉴 자체를 노출하지 않는다** — 눌러 봐야 미지원
+/// 안내만 나오는 항목을 남겨 두면 앱이 고장 난 것처럼 보인다.
+#[cfg(target_os = "windows")]
 pub(crate) const NAV_TOOLS: [(ActivePanel, &str, &str); 3] = [
     (ActivePanel::AdBlock, "웹뷰 광고 차단", "카카오톡 등 WebView 광고 숨김"),
     (ActivePanel::FileSync, "파일 동기화", "폴더 → 폴더 주기적 복사"),
     (ActivePanel::Services, "Windows 서비스", "서비스 시작·중지·삭제"),
 ];
 
+#[cfg(not(target_os = "windows"))]
+pub(crate) const NAV_TOOLS: [(ActivePanel, &str, &str); 1] = [(
+    ActivePanel::FileSync,
+    "파일 동기화",
+    "폴더 → 폴더 주기적 복사",
+)];
+
+#[cfg(target_os = "windows")]
 pub(crate) const NAV_SYSTEM: [(ActivePanel, &str, &str); 3] = [
     (ActivePanel::AutoStart, "자동 시작", "로그온 시 자동 실행 등록"),
+    (ActivePanel::Logs, "로그", "앱 활동 기록"),
+    (ActivePanel::Settings, "설정", "테마 · 로그 보관"),
+];
+
+#[cfg(not(target_os = "windows"))]
+pub(crate) const NAV_SYSTEM: [(ActivePanel, &str, &str); 2] = [
     (ActivePanel::Logs, "로그", "앱 활동 기록"),
     (ActivePanel::Settings, "설정", "테마 · 로그 보관"),
 ];

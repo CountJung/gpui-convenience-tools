@@ -14,19 +14,18 @@ use gpui::{
 };
 use gpui_component::{h_flex, theme::ActiveTheme, v_flex};
 
-use crate::app::AppRoot;
+use crate::app::{AppRoot, IntervalTarget};
 use crate::window::ui::{self, Tone};
 use crate::window::{balanced_split, scroll_pane, SETTINGS_PANE_MIN_WIDTH};
 
-const INTERVAL_PRESETS: [u32; 5] = [5, 10, 30, 60, 120];
 const FEATURE_PANE_MIN_WIDTH: gpui::Pixels = px(320.0);
 
-pub fn render(this: &mut AppRoot, _window: &mut Window, cx: &mut Context<AppRoot>) -> AnyElement {
+pub fn render(this: &mut AppRoot, window: &mut Window, cx: &mut Context<AppRoot>) -> AnyElement {
     let left_scroll = this.ad_left_scroll.clone();
     let right_scroll = this.ad_right_scroll.clone();
 
     let feature = render_status_and_targets(this, cx);
-    let settings = render_settings(this, cx);
+    let settings = render_settings(this, window, cx);
 
     balanced_split(
         "ad-block-split",
@@ -160,29 +159,20 @@ fn render_status_and_targets(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> A
                         .child(
                             h_flex()
                                 .gap_3()
-                                .child(stat_card(
+                                .child(ui::stat_tile(
                                     "누적 차단",
-                                    &blocked_count.to_string(),
-                                    theme.list,
-                                    border,
-                                    fg,
-                                    muted_fg,
+                                    blocked_count.to_string(),
+                                    cx,
                                 ))
-                                .child(stat_card(
+                                .child(ui::stat_tile(
                                     "활성 타겟",
-                                    &format!("{active_targets} / {total_targets}"),
-                                    theme.list,
-                                    border,
-                                    fg,
-                                    muted_fg,
+                                    format!("{active_targets} / {total_targets}"),
+                                    cx,
                                 ))
-                                .child(stat_card(
+                                .child(ui::stat_tile(
                                     "스캔 주기",
-                                    &format!("{}초", this.scan_interval_secs),
-                                    theme.list,
-                                    border,
-                                    fg,
-                                    muted_fg,
+                                    crate::util::format_interval(this.scan_interval_secs),
+                                    cx,
                                 )),
                         ),
                 ),
@@ -229,42 +219,21 @@ fn render_status_and_targets(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> A
 // 우측: 광고 차단 설정
 // ─────────────────────────────────────────────
 
-fn render_settings(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElement {
+fn render_settings(
+    this: &mut AppRoot,
+    window: &mut Window,
+    cx: &mut Context<AppRoot>,
+) -> AnyElement {
+    // 주기 선택 UI는 `cx`를 가변으로 쓰므로 테마 참조를 잡기 전에 만든다.
+    let interval_row = crate::window::interval::render(this, IntervalTarget::Scan, window, cx);
+
     let theme = cx.theme();
     let fg = theme.foreground;
     let muted_fg = theme.muted_foreground;
     let border = theme.border;
     let card = theme.secondary;
-    let selected_bg = theme.primary;
-    let selected_fg = theme.primary_foreground;
     let current_interval = this.scan_interval_secs;
     let is_active = this.app_state().is_active;
-
-    let mut interval_row = h_flex().gap_2().flex_wrap();
-    for secs in INTERVAL_PRESETS {
-        let is_selected = current_interval == secs;
-        interval_row = interval_row.child(
-            div()
-                .id(("ad-interval-preset", secs as usize))
-                .rounded_md()
-                .px_3()
-                .py_2()
-                .cursor_pointer()
-                .bg(if is_selected { selected_bg } else { theme.list })
-                .text_color(if is_selected { selected_fg } else { fg })
-                .border_1()
-                .border_color(if is_selected {
-                    theme.primary_hover
-                } else {
-                    border
-                })
-                .hover(|s| s.bg(theme.secondary_hover))
-                .on_click(cx.listener(move |this, _ev, _window, cx| {
-                    this.set_scan_interval(secs, cx);
-                }))
-                .child(format!("{secs}초")),
-        );
-    }
 
     // ── 실행 중인 프로세스 목록 ──
     let targets = this.app_state().targets.clone();
@@ -350,32 +319,20 @@ fn render_settings(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElement 
                 .child(
                     v_flex()
                         .gap_3()
-                        .child(
-                            h_flex()
-                                .gap_3()
-                                .items_center()
-                                .child(
-                                    v_flex()
-                                        .flex_1()
-                                        .min_w_0()
-                                        .child(div().text_color(fg).child("광고 차단 사용"))
-                                        .child(
-                                            div()
-                                                .text_color(muted_fg)
-                                                .child("끄면 스캔과 창 숨김을 모두 중단합니다."),
-                                        ),
-                                )
-                                .child(
-                                    ui::toggle_switch("ad-block-enable", is_active, cx).on_click(
-                                        cx.listener(|this, checked: &bool, window, cx| {
-                                            this.set_service_enabled(*checked, window, cx);
-                                        }),
-                                    ),
-                                ),
-                        )
+                        .child(ui::option_row(
+                            "ad-block-enable",
+                            "광고 차단 사용",
+                            "끄면 스캔과 창 숨김을 모두 중단합니다.",
+                            is_active,
+                            cx.listener(|this, checked: &bool, window, cx| {
+                                this.set_service_enabled(*checked, window, cx);
+                            }),
+                            cx,
+                        ))
                         .child(div().text_color(fg).child("스캔 주기"))
                         .child(div().text_color(muted_fg).child(format!(
-                            "광고 창 감지 주기입니다. 현재: {current_interval}초"
+                            "광고 창 감지 주기입니다. 현재: {}",
+                            crate::util::format_interval(current_interval)
                         )))
                         .child(interval_row),
                 ),
@@ -434,27 +391,3 @@ fn render_settings(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElement 
 // 공통 조각
 // ─────────────────────────────────────────────
 
-fn stat_card(
-    label: &'static str,
-    value: &str,
-    bg: gpui::Hsla,
-    border: gpui::Hsla,
-    fg: gpui::Hsla,
-    muted_fg: gpui::Hsla,
-) -> AnyElement {
-    div()
-        .flex_1()
-        .rounded_md()
-        .px_3()
-        .py_3()
-        .bg(bg)
-        .border_1()
-        .border_color(border)
-        .child(
-            v_flex()
-                .gap_1()
-                .child(div().text_color(muted_fg).child(label))
-                .child(div().text_color(fg).child(value.to_string())),
-        )
-        .into_any_element()
-}

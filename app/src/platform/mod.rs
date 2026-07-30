@@ -110,9 +110,16 @@ pub trait Platform: Send + Sync {
 #[cfg(target_os = "windows")]
 pub mod windows;
 
+#[cfg(not(target_os = "windows"))]
+pub mod fallback;
+
 #[cfg(target_os = "windows")]
 #[allow(unused_imports)]
 pub use windows::WindowsPlatform as NativePlatform;
+
+#[cfg(not(target_os = "windows"))]
+#[allow(unused_imports)]
+pub use fallback::FallbackPlatform as NativePlatform;
 
 #[cfg(target_os = "windows")]
 #[allow(unused_imports)]

@@ -1,17 +1,21 @@
 name: release
 
+# `v*` 태그를 push하면 Windows와 macOS 앱을 각각 빌드해 하나의 GitHub Release에 첨부한다.
+#   git tag v0.2.0 && git push origin v0.2.0
 on:
   push:
     tags:
       - 'v*'
+  # 태그를 만들기 전에 릴리즈 파이프라인만 점검하고 싶을 때 수동 실행한다.
+  # 이 경로에서는 릴리즈를 만들지 않고 아티팩트만 남긴다.
+  workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  build-release:
+  build-windows:
     runs-on: windows-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -33,11 +37,104 @@ jobs:
         shell: pwsh
         run: .\installer\windows\build-installer.ps1 -Configuration release
 
+      # 업로드 경로 추론에 기대지 않고 한 폴더로 모은다. 다운로드 쪽 경로가
+      # 러너 디렉터리 구조에 따라 달라지지 않게 하기 위함이다.
+      - name: Stage artifacts
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          Copy-Item target\release\gpui-convenience-tools.exe dist\
+          Copy-Item installer\windows\gpui-convenience-tools.msi dist\
+          Get-ChildItem dist
+
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: dist/*
+          if-no-files-found: error
+
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      # Windows 전용 코드는 cfg로 걸러지므로 macOS 빌드는 파일 동기화 중심의
+      # 축소 구성이다. 컴파일 자체가 깨지지 않았는지 먼저 확인한다.
+      - name: Cargo test
+        run: cargo test -p gpui-convenience-tools
+
+      - name: Build app bundle and DMG
+        run: bash installer/macos/build-app.sh "${{ github.ref_name }}"
+
+      - name: Stage artifacts
+        run: |
+          mkdir -p dist
+          cp target/macos/*.dmg dist/
+          ls -l dist
+
+      - name: Upload macOS artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos
+          path: dist/*
+          if-no-files-found: error
+
+  release:
+    # 두 플랫폼이 모두 성공했을 때만 릴리즈를 만든다. 한쪽만 올라간 릴리즈가
+    # 생기면 사용자가 받은 버전이 무엇인지 알 수 없다.
+    needs: [build-windows, build-macos]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: List artifacts
+        run: find artifacts -type f | sort
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           name: "Release ${{ github.ref_name }}"
           generate_release_notes: true
+          body: |
+            ## 다운로드
+
+            | 플랫폼 | 파일 | 비고 |
+            | --- | --- | --- |
+            | Windows | `gpui-convenience-tools.msi` | 설치 관리자 (권장) |
+            | Windows | `gpui-convenience-tools.exe` | 단일 실행 파일 |
+            | macOS | `gpui-convenience-tools-*-universal.dmg` | Apple Silicon · Intel 공용 |
+
+            ## macOS 첫 실행 안내
+
+            코드 서명·공증을 하지 않은 빌드이므로 그냥 열면 차단됩니다.
+            DMG에서 앱을 `응용 프로그램`으로 옮긴 뒤 **한 번만** 아래 중 하나를 수행하세요.
+
+            - Finder에서 앱을 **우클릭 → 열기 → 열기**
+            - 또는 터미널에서:
+              ```
+              xattr -dr com.apple.quarantine /Applications/gpui-convenience-tools.app
+              ```
+
+            ## macOS 지원 범위
+
+            웹뷰 광고 차단·Windows 서비스 관리·자동 시작은 Win32/SCM 전용이라
+            macOS 빌드에는 포함되지 않습니다. macOS에서는 **파일 동기화**와
+            테마·로그·설정을 사용할 수 있습니다.
           files: |
-            target/release/gpui-convenience-tools.exe
-            installer/windows/gpui-convenience-tools.msi
+            artifacts/windows/*
+            artifacts/macos/*
+          fail_on_unmatched_files: true

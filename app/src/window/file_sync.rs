@@ -12,18 +12,17 @@ use gpui::{
 };
 use gpui_component::{h_flex, input::Input, theme::ActiveTheme, v_flex};
 
-use crate::app::AppRoot;
+use crate::app::{AppRoot, IntervalTarget};
+use crate::util::format_interval;
 use crate::window::scroll_pane;
 use crate::window::ui::{self, ButtonStyle};
-
-const INTERVAL_PRESETS: [u32; 5] = [30, 60, 300, 900, 3600];
 
 pub fn render(this: &mut AppRoot, window: &mut Window, cx: &mut Context<AppRoot>) -> AnyElement {
     this.ensure_sync_inputs(window, cx);
 
     let page_scroll = this.sync_page_scroll.clone();
     let jobs = render_job_list(this, cx);
-    let settings = render_job_settings(this, cx);
+    let settings = render_job_settings(this, window, cx);
     let failures = render_failures(this, cx);
     let status_bar = render_status_bar(this, cx);
 
@@ -196,7 +195,7 @@ fn render_job_list(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElement 
                                             .child(if enabled { "자동" } else { "수동" }),
                                     )
                                     .child(
-                                        div().text_color(muted_fg).child(format!("{interval}초")),
+                                        div().text_color(muted_fg).child(format_interval(interval)),
                                     ),
                             )
                             .child(
@@ -281,14 +280,16 @@ fn render_job_list(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElement 
 // 선택한 작업 설정
 // ─────────────────────────────────────────────
 
-fn render_job_settings(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElement {
+fn render_job_settings(
+    this: &mut AppRoot,
+    window: &mut Window,
+    cx: &mut Context<AppRoot>,
+) -> AnyElement {
     let theme = cx.theme();
     let fg = theme.foreground;
     let muted_fg = theme.muted_foreground;
     let border = theme.border;
     let card = theme.secondary;
-    let selected_bg = theme.primary;
-    let selected_fg = theme.primary_foreground;
 
     // 이 패널의 버튼은 테두리 색을 hover 색과 같이 쓴다(승격 전 시각 유지).
     let neutral_btn = ButtonStyle::neutral(cx).hover(border);
@@ -321,31 +322,7 @@ fn render_job_settings(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElem
     let source_input = this.sync_source_input.clone();
     let target_input = this.sync_target_input.clone();
 
-    let mut interval_row = h_flex().gap_2().flex_wrap();
-    for secs in INTERVAL_PRESETS {
-        let is_selected = job.interval_secs == secs;
-        interval_row = interval_row.child(
-            div()
-                .id(("sync-interval", secs as usize))
-                .rounded_md()
-                .px_3()
-                .py_2()
-                .cursor_pointer()
-                .bg(if is_selected { selected_bg } else { theme.list })
-                .text_color(if is_selected { selected_fg } else { fg })
-                .border_1()
-                .border_color(if is_selected {
-                    theme.primary_hover
-                } else {
-                    border
-                })
-                .hover(|s| s.bg(theme.secondary_hover))
-                .on_click(cx.listener(move |this, _ev, window, cx| {
-                    this.update_selected_sync_job(window, cx, |job| job.interval_secs = secs);
-                }))
-                .child(format_interval(secs)),
-        );
-    }
+    let interval_row = crate::window::interval::render(this, IntervalTarget::Sync, window, cx);
 
     v_flex()
         .w_full()
@@ -455,7 +432,7 @@ fn render_job_settings(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElem
                         .child(interval_row)
                         // ── 옵션 ──
                         .child(div().text_color(fg).child("옵션"))
-                        .child(option_row(
+                        .child(ui::option_row(
                             "sync-opt-enabled",
                             "자동 동기화 사용",
                             "감시 주기마다 자동으로 실행합니다.",
@@ -468,7 +445,7 @@ fn render_job_settings(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElem
                             }),
                             cx,
                         ))
-                        .child(option_row(
+                        .child(ui::option_row(
                             "sync-opt-hidden",
                             "숨김·시스템 파일 포함",
                             "끄면 숨김 속성 파일을 건너뜁니다. 기본값은 전체 포함입니다.",
@@ -481,7 +458,7 @@ fn render_job_settings(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElem
                             }),
                             cx,
                         ))
-                        .child(option_row(
+                        .child(ui::option_row(
                             "sync-opt-mirror",
                             "원본에서 삭제된 항목 반영",
                             "대상에만 있는 파일을 삭제합니다. 되돌릴 수 없으니 주의하세요.",
@@ -631,41 +608,3 @@ fn render_failures(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElement 
 // 공통 조각
 // ─────────────────────────────────────────────
 
-fn option_row(
-    id: &'static str,
-    title: &'static str,
-    description: &'static str,
-    checked: bool,
-    on_click: impl Fn(&bool, &mut Window, &mut gpui::App) + 'static,
-    cx: &gpui::App,
-) -> AnyElement {
-    let theme = cx.theme();
-
-    h_flex()
-        .debug_selector(move || format!("{id}-row"))
-        .gap_3()
-        .items_center()
-        .child(
-            v_flex()
-                .flex_1()
-                .min_w_0()
-                .child(div().text_color(theme.foreground).child(title))
-                .child(div().text_color(theme.muted_foreground).child(description)),
-        )
-        .child(
-            div()
-                .debug_selector(move || id.to_string())
-                .child(ui::toggle_switch(id, checked, cx).on_click(on_click)),
-        )
-        .into_any_element()
-}
-
-fn format_interval(secs: u32) -> String {
-    if secs >= 3600 {
-        format!("{}시간", secs / 3600)
-    } else if secs >= 60 {
-        format!("{}분", secs / 60)
-    } else {
-        format!("{secs}초")
-    }
-}

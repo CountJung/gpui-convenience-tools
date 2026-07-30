@@ -23,26 +23,12 @@ fn render_theme_option(
     id_seed: usize,
     theme_name: &str,
     is_selected: bool,
-    bg_card: gpui::Hsla,
-    fg: gpui::Hsla,
-    border: gpui::Hsla,
-    selected_bg: gpui::Hsla,
-    selected_fg: gpui::Hsla,
-    selected_border: gpui::Hsla,
     cx: &mut Context<AppRoot>,
 ) -> AnyElement {
     let theme_name = theme_name.to_string();
     let label = theme_name.clone();
 
-    div()
-        .rounded_md()
-        .p_2()
-        .cursor_pointer()
-        .bg(if is_selected { selected_bg } else { bg_card })
-        .text_color(if is_selected { selected_fg } else { fg })
-        .border_1()
-        .border_color(if is_selected { selected_border } else { border })
-        .id(("theme-name", id_seed))
+    ui::choice_chip(("theme-name", id_seed), label, is_selected, cx)
         .on_click(cx.listener(move |_this, _event, window, cx| {
             let selected = ThemeRegistry::global(cx)
                 .themes()
@@ -58,7 +44,6 @@ fn render_theme_option(
                 }
             }
         }))
-        .child(label)
         .into_any_element()
 }
 
@@ -66,30 +51,17 @@ fn render_filter_chip(
     id_seed: usize,
     label: &str,
     is_selected: bool,
-    bg_card: gpui::Hsla,
-    fg: gpui::Hsla,
-    border: gpui::Hsla,
-    selected_bg: gpui::Hsla,
-    selected_fg: gpui::Hsla,
-    selected_border: gpui::Hsla,
     on_click: impl Fn(&mut AppRoot, &gpui::ClickEvent, &mut Window, &mut Context<AppRoot>) + 'static,
     cx: &mut Context<AppRoot>,
 ) -> AnyElement {
-    let label = label.to_string();
-
-    div()
-        .rounded_md()
-        .px_2()
-        .py_1()
-        .cursor_pointer()
-        .bg(if is_selected { selected_bg } else { bg_card })
-        .text_color(if is_selected { selected_fg } else { fg })
-        .border_1()
-        .border_color(if is_selected { selected_border } else { border })
-        .id(("theme-filter-chip", id_seed))
-        .on_click(cx.listener(on_click))
-        .child(label)
-        .into_any_element()
+    ui::choice_chip(
+        ("theme-filter-chip", id_seed),
+        label.to_string(),
+        is_selected,
+        cx,
+    )
+    .on_click(cx.listener(on_click))
+    .into_any_element()
 }
 
 /// 로그 보관 설정 카드.
@@ -101,9 +73,6 @@ fn render_log_settings(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElem
     let muted_fg = theme.muted_foreground;
     let border = theme.border;
     let bg_card = theme.secondary;
-    let selected_bg = theme.primary;
-    let selected_fg = theme.primary_foreground;
-    let selected_border = theme.primary_hover;
 
     let config = this.log_config.clone();
     let (file_count, total_bytes) = crate::logging::log_dir_stats();
@@ -116,40 +85,24 @@ fn render_log_settings(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElem
         current: u32,
         label_of: fn(u32) -> String,
         apply: fn(&mut crate::config::LogConfig, u32),
-        bg_card: gpui::Hsla,
-        fg: gpui::Hsla,
-        border: gpui::Hsla,
-        selected_bg: gpui::Hsla,
-        selected_fg: gpui::Hsla,
-        selected_border: gpui::Hsla,
-        hover_bg: gpui::Hsla,
         cx: &mut Context<AppRoot>,
     ) -> AnyElement {
         let mut row = h_flex().gap_2().flex_wrap();
         for &value in presets {
-            let is_selected = current == value;
             row = row.child(
-                div()
-                    .id((id_prefix, value as usize))
-                    .rounded_md()
-                    .px_3()
-                    .py_2()
-                    .cursor_pointer()
-                    .bg(if is_selected { selected_bg } else { bg_card })
-                    .text_color(if is_selected { selected_fg } else { fg })
-                    .border_1()
-                    .border_color(if is_selected { selected_border } else { border })
-                    .hover(|s| s.bg(hover_bg))
-                    .on_click(cx.listener(move |this, _ev, _window, cx| {
-                        this.update_log_config(cx, |cfg| apply(cfg, value));
-                    }))
-                    .child(label_of(value)),
+                ui::choice_chip(
+                    (id_prefix, value as usize),
+                    label_of(value),
+                    current == value,
+                    cx,
+                )
+                .on_click(cx.listener(move |this, _ev, _window, cx| {
+                    this.update_log_config(cx, |cfg| apply(cfg, value));
+                })),
             );
         }
         row.into_any_element()
     }
-
-    let hover_bg = theme.secondary_hover;
 
     let files_row = preset_row(
         "log-max-files",
@@ -157,13 +110,6 @@ fn render_log_settings(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElem
         config.max_files,
         |v| format!("{v}개"),
         |cfg, v| cfg.max_files = v,
-        bg_card,
-        fg,
-        border,
-        selected_bg,
-        selected_fg,
-        selected_border,
-        hover_bg,
         cx,
     );
     let age_row = preset_row(
@@ -178,13 +124,6 @@ fn render_log_settings(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElem
             }
         },
         |cfg, v| cfg.max_age_days = v,
-        bg_card,
-        fg,
-        border,
-        selected_bg,
-        selected_fg,
-        selected_border,
-        hover_bg,
         cx,
     );
     let size_row = preset_row(
@@ -193,13 +132,6 @@ fn render_log_settings(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElem
         config.max_file_size_mb,
         |v| format!("{v} MB"),
         |cfg, v| cfg.max_file_size_mb = v,
-        bg_card,
-        fg,
-        border,
-        selected_bg,
-        selected_fg,
-        selected_border,
-        hover_bg,
         cx,
     );
 
@@ -219,31 +151,17 @@ fn render_log_settings(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElem
                     total_bytes as f64 / (1024.0 * 1024.0),
                 )))
                 // ── 파일 기록 사용 ──
-                .child(
-                    h_flex()
-                        .gap_3()
-                        .items_center()
-                        .child(
-                            v_flex()
-                                .flex_1()
-                                .min_w_0()
-                                .child(div().text_color(fg).child("파일로 기록"))
-                                .child(
-                                    div()
-                                        .text_color(muted_fg)
-                                        .child("끄면 화면 로그만 남고 파일에는 쓰지 않습니다."),
-                                ),
-                        )
-                        .child(
-                            ui::toggle_switch("log-file-enabled", config.file_enabled, cx)
-                                .on_click(cx.listener(|this, checked: &bool, _window, cx| {
-                                    let checked = *checked;
-                                    this.update_log_config(cx, move |cfg| {
-                                        cfg.file_enabled = checked
-                                    });
-                                })),
-                        ),
-                )
+                .child(ui::option_row(
+                    "log-file-enabled",
+                    "파일로 기록",
+                    "끄면 화면 로그만 남고 파일에는 쓰지 않습니다.",
+                    config.file_enabled,
+                    cx.listener(|this, checked: &bool, _window, cx| {
+                        let checked = *checked;
+                        this.update_log_config(cx, move |cfg| cfg.file_enabled = checked);
+                    }),
+                    cx,
+                ))
                 // ── 파일 개수 ──
                 .child(div().text_color(fg).child("보관 파일 수"))
                 .child(div().text_color(muted_fg).child(
@@ -341,12 +259,6 @@ pub fn render(this: &mut AppRoot, window: &mut Window, cx: &mut Context<AppRoot>
         0,
         "초기화",
         this.theme_filter_query.is_empty() && !this.theme_filter_active_only,
-        bg_card,
-        fg,
-        border,
-        selected_bg,
-        selected_fg,
-        selected_border,
         |this, _, window, cx| {
             this.set_theme_filter_query(String::new(), window, cx);
             this.theme_filter_active_only = false;
@@ -358,12 +270,6 @@ pub fn render(this: &mut AppRoot, window: &mut Window, cx: &mut Context<AppRoot>
         1,
         "현재 활성만",
         this.theme_filter_active_only,
-        bg_card,
-        fg,
-        border,
-        selected_bg,
-        selected_fg,
-        selected_border,
         |this, _, _window, cx| {
             this.theme_filter_active_only = !this.theme_filter_active_only;
             cx.notify();
@@ -374,12 +280,6 @@ pub fn render(this: &mut AppRoot, window: &mut Window, cx: &mut Context<AppRoot>
         2,
         "현재 Light",
         this.theme_filter_query == active_light_theme,
-        bg_card,
-        fg,
-        border,
-        selected_bg,
-        selected_fg,
-        selected_border,
         {
             let active_light_theme = active_light_theme.clone();
             move |this, _, window, cx| {
@@ -393,12 +293,6 @@ pub fn render(this: &mut AppRoot, window: &mut Window, cx: &mut Context<AppRoot>
         3,
         "현재 Dark",
         this.theme_filter_query == active_dark_theme,
-        bg_card,
-        fg,
-        border,
-        selected_bg,
-        selected_fg,
-        selected_border,
         {
             let active_dark_theme = active_dark_theme.clone();
             move |this, _, window, cx| {
@@ -414,12 +308,6 @@ pub fn render(this: &mut AppRoot, window: &mut Window, cx: &mut Context<AppRoot>
             10 + idx,
             keyword,
             this.theme_filter_query == *keyword,
-            bg_card,
-            fg,
-            border,
-            selected_bg,
-            selected_fg,
-            selected_border,
             {
                 let keyword = keyword.clone();
                 move |this, _, window, cx| {
@@ -437,12 +325,6 @@ pub fn render(this: &mut AppRoot, window: &mut Window, cx: &mut Context<AppRoot>
             idx,
             &theme_name,
             active_light_theme == theme_name,
-            bg_card,
-            fg,
-            border,
-            selected_bg,
-            selected_fg,
-            selected_border,
             cx,
         ));
     }
@@ -453,12 +335,6 @@ pub fn render(this: &mut AppRoot, window: &mut Window, cx: &mut Context<AppRoot>
             10_000 + idx,
             &theme_name,
             active_dark_theme == theme_name,
-            bg_card,
-            fg,
-            border,
-            selected_bg,
-            selected_fg,
-            selected_border,
             cx,
         ));
     }

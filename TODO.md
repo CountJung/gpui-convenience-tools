@@ -88,36 +88,22 @@
 
 ## 3. 구조 개선
 
-- [ ] **🟡 경고 구간 파일 분할 — `app/tests.rs`(921줄) · `sync.rs`(831줄)** *(0순위, 다음 작업 전)*
-      Phase D-2에서 두 파일이 800~1,000 경고 구간에 들어왔다. 규칙상 다음 작업 전에 처리한다.
-      **동작 변경 없이** 수행하고 `cargo check`(경고 0) + `cargo test`로 동일성을 확인한다.
-      기능 변경과 같은 커밋에 섞지 않는다.
-      - `app/tests.rs` → `app/tests/` 디렉터리 모듈: `mod.rs`(공용 픽스처·헬퍼) +
-        `layout.rs`(사이드바·스플리터·스크롤) + `file_sync.rs`(동기화 조작·표시줄·로그)
-      - `sync.rs` → 테스트 518줄을 `sync/tests.rs`로 먼저 분리(본문은 313줄). 그래도 크면
-        순회(`sync_dir`·`mirror_deletes`)와 판정(`needs_copy`·`describe_io_error`)을 나눈다
-
-- [ ] **`window/ui.rs` 2차 승격 — 남은 🟡 후보** *(1순위)*
-      `PROJECTMAP.md`「중복 헬퍼 추적」의 후보들을 처리한다.
-      - 스탯 타일 — `ad_block::stat_card` + `dashboard::stat_tile` → `ui::stat_tile(label, value, cx)`
-      - 토글 행 — `file_sync::option_row` + `settings.rs`·`ad_block.rs` 인라인 → `ui::option_row(..)`
-      - 선택 칩 — `settings::render_theme_option`·`render_filter_chip` + `service_mgr` 필터 행
-      - `format_interval` — UI가 아니므로 `util.rs`로 분리(`ad_block`의 `format!("{}초")` 3곳 흡수)
-
-      승격 헬퍼는 색을 인자로 받지 말고 `cx.theme()`를 직접 읽는다. 승격 후 원본은 삭제.
-
-- [ ] **`ButtonStyle` 덮어쓰기 정리** *(선행: 위 항목 아님, 독립)*
-      `PROJECTMAP.md`「승격 후 남은 덮어쓰기」 표의 3건을 기본값으로 통일한다.
-      화면이 실제로 바뀌므로 **리팩터와 섞지 말고 단독 커밋**으로 처리한다.
+- [ ] **`ButtonStyle` 덮어쓰기 정리** *(독립, 단독 커밋)*
+      `PROJECTMAP.md`「승격 후 남은 덮어쓰기」 표의 버튼 3건을 기본값으로 통일한다.
+      화면이 실제로 바뀌므로 **리팩터와 섞지 않는다**.
 
 - [ ] **`AppRoot` 분할 검토**
   현재 모든 패널 상태를 `AppRoot`가 직접 소유해 필드가 25개를 넘었다.
   기능별 상태 구조체(`AdBlockState`, `SyncState`, `ServiceState`)로 묶는 것을 검토한다.
   *주의: gpui 엔티티 분리까지 갈지, 단순 구조체 묶음으로 둘지 먼저 결정할 것.*
 
-- [ ] **`platform/macos.rs` 추가**
-  현재 파일이 없어 macOS에서는 `Platform` 기본 구현만 동작한다(창 조작 불가).
-  최소한 컴파일과 파일 동기화는 동작하도록 stub을 만든다.
+- [ ] **macOS 네이티브 기능 확장** *(선행 완료: Phase K에서 빌드·릴리즈는 구성됨)*
+  현재 macOS는 `platform/fallback.rs`로 컴파일과 파일 동기화만 지원한다.
+  아래는 macOS에서 의미가 있을 때만 진행한다.
+  - [ ] 메뉴 막대(status bar) 상주 — Windows 트레이에 대응
+  - [ ] `launchd` 로그온 자동 시작 — Windows 작업 스케줄러에 대응
+  - [ ] `.icns` 앱 아이콘 (현재 기본 아이콘으로 배포됨)
+  - [ ] 코드 서명·공증 — Apple Developer 계정 확보 시
 
 - [ ] **스플리터 폭 영속화**
   `ResizableState`의 `sizes()`를 `on_resize`에서 읽어 config에 저장하고 복원한다.

@@ -41,17 +41,19 @@ cargo test -p gpui-convenience-tools -- --ignored
 ```text
 Cargo.toml          workspace (members = ["app"], 모든 의존성은 [workspace.dependencies])
 app/
-  src/config.rs     AppConfig · SyncJob · LogConfig · update_config
+  src/config.rs     AppConfig · SyncJob · LogConfig · 주기 프리셋 · update_config
   src/logging.rs    롤링 파일 로거 (log::Log 구현)
-  src/sync.rs       폴더 동기화 엔진 (순수 로직, UI 비의존)
+  src/util.rs       주인 없는 순수 헬퍼 — format_interval · interval_to_secs · TimeUnit
+  src/sync/         폴더 동기화 엔진 (순수 로직, UI 비의존) — mod · tests
   src/app/          AppRoot — 유일한 Render 엔티티, 모든 패널 상태 소유
     mod.rs            구조체 · 생성자 · 사이드바 · 최상위 레이아웃
     state.rs          순수 데이터 타입      background.rs  스캔 · 동기화 스레드
     ops.rs            광고차단·서비스·로그   sync_ops.rs    동기화 작업 조작
     events.rs         이벤트 소비 · 토스트   inputs.rs      입력 위젯 지연 생성
-  src/platform/     Platform trait + windows/ (Win32 구현)
+    interval.rs       주기 프리셋 상태·조작  tests/         GPUI 회귀 테스트 5파일
+  src/platform/     Platform trait + windows/ (Win32) + fallback.rs (비Windows)
     windows/          mod · window_ops · tray · scm · services · task_scheduler
-  src/window/       패널 렌더 함수 + scroll_pane 헬퍼
+  src/window/       패널 렌더 함수 + ui.rs 공용 프리미티브 + interval.rs 주기 선택
   assets/themes/    include_str!로 바이너리에 임베드되는 테마 JSON 21종
 ```
 
@@ -241,7 +243,27 @@ SCM 코드(`install_win_service` 등)는 남아 있지만 이 용도로는 쓰�
   미착수 대기열은 `TODO.md`** 두 곳만 쓴다(체크리스트를 복제하던 `TASKS.md`는 제거됨).
 - 사용자에게 보이는 텍스트(설명, 주석, 커밋 메시지)는 한국어 또는 영어만 사용한다.
 
-## CI
+## CI / 릴리즈
 
-`.github/workflows/windows-build.yml` — main/master push 및 PR에서 check → test → release build.
-`.github/workflows/release.yml` — `v*` 태그 push 시 릴리즈 빌드 + MSI를 Release 에셋으로 업로드.
+- `.github/workflows/windows-build.yml` — main/master push 및 PR에서 check → test → release build.
+- `.github/workflows/macos-build.yml` — 같은 트리거로 macOS에서 check → test → `.app`/DMG 패키징.
+- `.github/workflows/release.yml` — `v*` 태그 push 시 Windows(exe·MSI)와 macOS(universal DMG)를
+  각각 빌드해 **하나의 Release**에 첨부한다. 두 플랫폼이 모두 성공해야 릴리즈가 생성된다.
+
+```powershell
+git tag v0.2.0
+git push origin v0.2.0
+```
+
+### macOS 지원 범위와 검증 제약
+
+macOS 빌드는 **파일 동기화 + 테마·로그·설정**만 포함한다. 웹뷰 광고 차단·Windows 서비스
+관리·자동 시작은 Win32/SCM 전용이라 `NAV_TOOLS`·`NAV_SYSTEM`에서 cfg로 제외되고, 사이드바
+광고 차단 스위치와 대시보드의 광고 차단 카드도 노출되지 않는다. 비Windows `Platform` 구현은
+[platform/fallback.rs](app/src/platform/fallback.rs)다.
+
+**Windows 개발 환경에서는 `#[cfg(not(target_os = "windows"))]` 경로를 컴파일할 수 없다** —
+의존성 build script가 크로스 C 컴파일러를 요구해 `--target`을 지정한 `cargo check`가 실패한다.
+따라서 그 경로의 유일한 검증 지점은 `macos-build.yml`이며, **태그가 아니라 push/PR마다**
+돌려서 릴리즈 시점에 처음 깨지는 일이 없게 한다. 비Windows 분기를 건드렸다면 태그를 만들기
+전에 이 워크플로가 초록인지 확인할 것.

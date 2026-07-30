@@ -56,14 +56,15 @@ try {
         throw "Unable to enumerate the package test list."
     }
 
+    # 테스트가 어느 모듈에 있든 이름으로 찾는다. 모듈 경로를 고정하면 테스트 파일을
+    # 책임 단위로 분할할 때마다 이 목록이 함께 깨진다.
     foreach ($testName in $visualTests) {
-        $fullTestName = "app::tests::$testName"
         $testMatches = @($testListOutput | Where-Object {
-            $_ -match ("^{0}: test$" -f [Regex]::Escape($fullTestName))
+            $_ -match ("(^|::){0}: test$" -f [Regex]::Escape($testName))
         })
         if ($testMatches.Count -ne 1) {
             throw ("Expected exactly one listed GPUI test named {0}; found {1}." -f
-                $fullTestName, $testMatches.Count)
+                $testName, $testMatches.Count)
         }
     }
     Write-Host ("Validated {0} required GPUI test names." -f $visualTests.Count)
