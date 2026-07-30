@@ -178,9 +178,8 @@ cargo workspace, Hello World 앱 동작 확인
 
 ### Phase J — 테마 가시성·스크롤 안정화 🧪
 
-구현 변경은 반영되었지만 새 GPUI 자체 테스트 필수 게이트를 소급 적용해 최종 완료 판정을
-재개했다. `TODO.md`의 네이티브 테스트와 실제 화면 순차 검증을 모두 통과하기 전에는 완료로
-분류하지 않는다.
+구현 변경과 GPUI 자체 테스트 필수 게이트는 통과했다. `TODO.md`의 실제 화면 순차 검증을
+통과하기 전에는 완료로 분류하지 않는다.
 
 - 사이드바 그룹과 개별 항목에 `sidebar_border` 기반 경계를 적용해 비활성 항목 구분 강화
 - 번들 테마 36개 변형의 스위치 팔레트를 감사하고, 누락 토큰을 런타임 최소 대비 정책으로 보정
@@ -191,6 +190,9 @@ cargo workspace, Hello World 앱 동작 확인
 - 사이드바 전체를 독립 `scroll_pane`으로 감싸 작은 창에서도 마지막 시스템 항목까지 도달
 - GPUI 자체 테스트로 기본 1000×700·최소 폭 920px의 pane 너비와 920×480의 사이드바
   wheel 스크롤·마지막 항목 도달을 검증
+- GPUI 자체 테스트로 1000×700에서 기본 light/dark와 `Alduin` 테마의 실제 스위치
+  off→on→off 전이, 920×480에서 파일 동기화 좌·우 pane wheel 스크롤·마지막 항목 도달을 검증
+- 표준 `target\release`에서 `cargo build --release` 링크 완료
 - Codex·Claude 공용 정본과 GPUI 스킬에 테마·스크롤 회귀 방지 규칙 반영
 - Computer Use health check와 구현 담당자·독립 Visual Reviewer의 순차 크로스체크 계약 및
   Codex·Claude Code 에이전트 연결 추가

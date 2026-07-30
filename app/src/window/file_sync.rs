@@ -142,6 +142,7 @@ fn render_job_list(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElement 
             let suppressed = this.suppressed_sync_failures.contains(&key);
             failures = failures.child(
                 h_flex()
+                    .debug_selector(move || format!("sync-failure-row-{ix}"))
                     .gap_2()
                     .items_center()
                     .px_2()
@@ -251,17 +252,23 @@ fn render_job_list(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElement 
                                                 .child("실패 알림 표시"),
                                         )
                                         .child(
-                                            ui::toggle_switch(
-                                                "sync-notify-toggle",
-                                                notify_enabled,
-                                                cx,
-                                            )
-                                                .on_click(cx.listener(
-                                                    |this, checked: &bool, _window, cx| {
-                                                        this.sync_notify_enabled = *checked;
-                                                        cx.notify();
-                                                    },
-                                                )),
+                                            div()
+                                                .debug_selector(|| {
+                                                    "sync-notify-toggle".to_string()
+                                                })
+                                                .child(
+                                                    ui::toggle_switch(
+                                                        "sync-notify-toggle",
+                                                        notify_enabled,
+                                                        cx,
+                                                    )
+                                                    .on_click(cx.listener(
+                                                        |this, checked: &bool, _window, cx| {
+                                                            this.sync_notify_enabled = *checked;
+                                                            cx.notify();
+                                                        },
+                                                    )),
+                                                ),
                                         )
                                         .children(has_failures.then(|| {
                                             ui::action_button(
@@ -529,6 +536,7 @@ fn option_row(
     let theme = cx.theme();
 
     h_flex()
+        .debug_selector(move || format!("{id}-row"))
         .gap_3()
         .items_center()
         .child(
@@ -538,7 +546,11 @@ fn option_row(
                 .child(div().text_color(theme.foreground).child(title))
                 .child(div().text_color(theme.muted_foreground).child(description)),
         )
-        .child(ui::toggle_switch(id, checked, cx).on_click(on_click))
+        .child(
+            div()
+                .debug_selector(move || id.to_string())
+                .child(ui::toggle_switch(id, checked, cx).on_click(on_click)),
+        )
         .into_any_element()
 }
 

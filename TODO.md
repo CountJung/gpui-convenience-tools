@@ -14,19 +14,12 @@
 
 ## 0. 즉시 처리 (검증 잔여)
 
-- [ ] **Phase J GPUI 자체 테스트 및 실제 화면 순차 검증**
-  light/dark·이슈 테마의 on/off 스위치와 파일 동기화 좌·우 스크롤·마지막 항목 도달
-  `TestAppContext`/`VisualTestContext` 회귀 테스트를 구현·통과시킨다. 이어서 Windows
-  ChatGPT 데스크톱 앱의 Work 또는 Codex에서 구현 담당자 1차 검증 후 독립 Visual Reviewer
-  2차 검증을 수행한다. 캡처 범위에는 사이드바 경계·overflow 스크롤, 균형 스플리터,
-  테마별 스위치, 파일 동기화 스크롤을 포함한다. 파일 동기화는 임시 `APPDATA` 격리 환경을
-  사용한다. VS Code의 Codex IDE 확장은 실제 화면 검증 표면으로 사용하지 않는다.
-
-- [ ] **릴리즈 빌드 링크 확인**
-  실행 중인 인스턴스가 `target\release\gpui-convenience-tools.exe`를 잠그면
-  `cargo build --release`가 `os error 5`로 실패한다.
-  트레이 앱을 종료(또는 `schtasks /End /TN "gpui-convenience-tools"`)한 뒤 재빌드해 확인한다.
-  *`cargo check --release`는 통과 상태이므로 코드 문제는 아니다.*
+- [ ] **Phase J 실제 화면 순차 검증**
+  Windows ChatGPT 데스크톱 앱의 Work 또는 Codex에서 구현 담당자 1차 검증 후 독립
+  Visual Reviewer 2차 검증을 수행한다. 캡처 범위에는 사이드바 경계·overflow 스크롤,
+  균형 스플리터, 테마별 스위치, 파일 동기화 스크롤을 포함한다. 파일 동기화는 임시
+  `APPDATA` 격리 환경을 사용한다. VS Code의 Codex IDE 확장은 실제 화면 검증 표면으로
+  사용하지 않는다.
 
 - [ ] **파일 동기화 실사용 검증**
   - 대용량 폴더(수천 개 파일)에서 1회 동기화 소요 시간 측정

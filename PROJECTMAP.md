@@ -57,7 +57,7 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | 파일 | 줄 | 책임 |
 | --- | ---: | --- |
 | `mod.rs` | 600 | `AppRoot` 정의·생성자·스크롤 사이드바·타이틀바·최상위 레이아웃 |
-| `tests.rs` | 266 | GPUI `TestAppContext` 기반 앱 셸·스플리터·사이드바 회귀 테스트 |
+| `tests.rs` | 461 | GPUI `TestAppContext` 기반 앱 셸·스플리터·사이드바·테마 스위치·파일 동기화 스크롤 회귀 테스트 |
 | `sync_ops.rs` | 256 | 파일 동기화 작업 조작 (추가·삭제·선택·경로 적용·수동 실행) |
 | `events.rs` | 202 | `PlatformEvent` 채널 소비, 로그·토스트 유틸 |
 | `ops.rs` | 195 | 광고 차단·서비스 관리·로그 설정 조작 |
@@ -71,7 +71,7 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | --- | ---: | --- |
 | `service_mgr.rs` | 635 | 편의 기능 — Windows 서비스 (목록/제어 ↔ 검색·필터·권한) |
 | `settings.rs` | 568 | 전역 설정 — 테마 선택·로그 보관 정책 |
-| `file_sync.rs` | 553 | 편의 기능 — 파일 동기화 (작업 목록·실패 기록 ↔ 작업 설정) |
+| `file_sync.rs` | 565 | 편의 기능 — 파일 동기화 (작업 목록·실패 기록 ↔ 작업 설정) |
 | `ad_block.rs` | 460 | 편의 기능 — 웹뷰 광고 차단 (상태·타겟 ↔ 스캔 주기·프로세스 추가) |
 | `service_view.rs` | 318 | 시스템 — 자동 시작(작업 스케줄러) 등록·삭제·즉시 실행 |
 | `ui.rs` | 207 | **공용 UI 프리미티브** — 상태 배지·액션 버튼·대비 보장 토글 스위치 |
@@ -210,7 +210,7 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 
 - **`window/service_mgr.rs` (636)** — 가상 리스트 행 렌더가 큰 비중을 차지한다.
   800줄에 닿으면 행 렌더를 `service_mgr/row.rs`로, 보기 설정을 `service_mgr/settings.rs`로 분리한다.
-- **`window/file_sync.rs` (563)** — `TODO.md`의 제외 패턴·진행률 UI가 들어가면 커진다.
+- **`window/file_sync.rs` (565)** — `TODO.md`의 제외 패턴·진행률 UI가 들어가면 커진다.
   좌측(목록·실패 기록)과 우측(작업 설정)을 각각 별도 파일로 나누는 것이 자연스럽다.
   `format_interval`은 그 전에 `util.rs`로 승격한다.
 - **`window/settings.rs` (542)** — 유일하게 이번 승격에서 줄지 않은 패널이다.
