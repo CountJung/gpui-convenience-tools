@@ -15,16 +15,24 @@ impl AppRoot {
     // 파일 동기화
     // ─────────────────────────────────────────────
 
-    pub(super) fn persist_sync_jobs(&mut self) {
+    fn persist_sync_jobs_config(&self) {
         let jobs = self.sync_jobs.clone();
 
-        if let Ok(mut state) = self.sync_state.lock() {
-            state.jobs = jobs.clone();
+        #[cfg(test)]
+        if !self.external_side_effects_enabled {
+            return;
         }
 
         if let Err(err) = update_config(move |cfg| cfg.sync_jobs = jobs) {
             log::error!("동기화 작업 저장 실패: {err}");
         }
+    }
+
+    pub(super) fn persist_sync_jobs(&mut self) {
+        if let Ok(mut state) = self.sync_state.lock() {
+            state.jobs = self.sync_jobs.clone();
+        }
+        self.persist_sync_jobs_config();
     }
 
     pub(crate) fn add_sync_job(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -79,13 +87,20 @@ impl AppRoot {
     }
 
     /// 선택한 작업의 값을 입력 위젯에 채운다.
-    pub(super) fn load_sync_inputs(&mut self, index: usize, window: &mut Window, cx: &mut Context<Self>) {
+    pub(super) fn load_sync_inputs(
+        &mut self,
+        index: usize,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         let Some(job) = self.sync_jobs.get(index).cloned() else {
             return;
         };
 
         if let Some(input) = self.sync_name_input.as_ref() {
-            input.update(cx, |state, cx| state.set_value(job.name.clone(), window, cx));
+            input.update(cx, |state, cx| {
+                state.set_value(job.name.clone(), window, cx)
+            });
         }
         if let Some(input) = self.sync_source_input.as_ref() {
             input.update(cx, |state, cx| {
@@ -117,12 +132,15 @@ impl AppRoot {
         cx.notify();
     }
 
-    /// 입력창의 경로 텍스트를 선택한 작업에 반영한다.
-    pub(crate) fn apply_sync_inputs(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(index) = self.selected_sync_job else {
-            return;
-        };
-
+    /// 입력창의 이름·경로 텍스트를 UI 작업 스냅샷에 반영한다.
+    ///
+    /// 호출자가 공유 상태 갱신 또는 실행 큐 등록과 함께 저장 시점을 결정한다.
+    fn capture_sync_inputs(&mut self, index: usize, cx: &mut Context<Self>) -> bool {
+        let name = self
+            .sync_name_input
+            .as_ref()
+            .map(|i| i.read(cx).value().to_string())
+            .unwrap_or_default();
         let source = self
             .sync_source_input
             .as_ref()
@@ -135,8 +153,23 @@ impl AppRoot {
             .unwrap_or_default();
 
         if let Some(job) = self.sync_jobs.get_mut(index) {
+            job.name = name.trim().to_string();
             job.source = source.trim().to_string();
             job.target = target.trim().to_string();
+        } else {
+            return false;
+        }
+
+        true
+    }
+
+    /// 입력창의 이름·경로 텍스트를 선택한 작업에 반영한다.
+    pub(crate) fn apply_sync_inputs(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(index) = self.selected_sync_job else {
+            return;
+        };
+        if !self.capture_sync_inputs(index, cx) {
+            return;
         }
 
         self.persist_sync_jobs();
@@ -211,20 +244,51 @@ impl AppRoot {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        let Some(id) = self.sync_jobs.get(index).map(|job| job.id.clone()) else {
+        if !self.capture_sync_inputs(index, cx) {
+            return;
+        }
+
+        let Some(job) = self.sync_jobs.get(index) else {
             return;
         };
+        if job.source.trim().is_empty() || job.target.trim().is_empty() {
+            self.persist_sync_jobs();
+            self.notify_toast(
+                "원본 폴더와 대상 폴더를 입력하세요",
+                NotificationType::Warning,
+                window,
+                cx,
+            );
+            return;
+        }
+        let id = job.id.clone();
 
         if let Ok(mut state) = self.sync_state.lock() {
+            // 최신 입력 스냅샷과 수동 요청을 한 임계구역에서 공개해 자동 tick이
+            // 둘 사이에 끼어 같은 작업을 두 번 실행하지 않게 한다.
+            state.jobs = self.sync_jobs.clone();
             if !state.run_now.contains(&id) {
-                state.run_now.push(id);
+                state.run_now.push(id.clone());
             }
         }
-        self.notify_toast("동기화를 시작했습니다", NotificationType::Info, window, cx);
+        self.persist_sync_jobs_config();
+        self.sync_status.insert(
+            id,
+            super::SyncJobStatus {
+                last_run: None,
+                summary: "실행 요청됨 — 결과를 기다리는 중입니다.".to_string(),
+                failed: false,
+            },
+        );
+        self.notify_toast("동기화를 요청했습니다", NotificationType::Info, window, cx);
         cx.notify();
     }
 
     pub(crate) fn request_sync_all(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if let Some(index) = self.selected_sync_job {
+            self.capture_sync_inputs(index, cx);
+        }
+
         let count = self.sync_jobs.len();
         if count == 0 {
             self.notify_toast(
@@ -237,10 +301,22 @@ impl AppRoot {
         }
 
         if let Ok(mut state) = self.sync_state.lock() {
+            state.jobs = self.sync_jobs.clone();
             state.run_now = self.sync_jobs.iter().map(|job| job.id.clone()).collect();
         }
+        self.persist_sync_jobs_config();
+        for job in &self.sync_jobs {
+            self.sync_status.insert(
+                job.id.clone(),
+                super::SyncJobStatus {
+                    last_run: None,
+                    summary: "실행 요청됨 — 결과를 기다리는 중입니다.".to_string(),
+                    failed: false,
+                },
+            );
+        }
         self.notify_toast(
-            "전체 동기화를 시작했습니다",
+            "전체 동기화를 요청했습니다",
             NotificationType::Info,
             window,
             cx,

@@ -10,10 +10,13 @@ $repoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 $packageName = "gpui-convenience-tools"
 $visualTests = @(
     "ad_block_split_fills_default_and_minimum_supported_width",
-    "every_feature_split_keeps_settings_pane_usable_at_default_width",
+    "split_panels_keep_settings_pane_usable_at_default_width",
+    "sidebar_divider_drag_resizes_navigation_and_content",
     "sidebar_wheel_scroll_reaches_last_navigation_item",
     "rendered_switch_toggles_in_light_dark_and_missing_switch_token_theme",
-    "file_sync_both_panes_scroll_to_their_last_controls_at_compact_height"
+    "file_sync_unified_page_uses_full_width_and_scrolls_to_last_record",
+    "file_sync_run_button_saves_current_inputs_and_queues_selected_job",
+    "background_sync_event_wakes_render_without_additional_user_input"
 )
 
 function Invoke-CheckedCommand {

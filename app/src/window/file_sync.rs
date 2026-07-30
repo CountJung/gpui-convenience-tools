@@ -1,42 +1,44 @@
 //! 파일 동기화 패널.
 //!
-//! 좌측(기능 영역)은 동기화 작업 목록과 실행 상태·실패 기록을,
-//! 우측(설정 영역)은 선택한 작업의 원본/대상/주기/옵션을 편집한다.
-//! 두 영역은 스플리터([`h_resizable`])로 나뉜다.
+//! 작업 선택, 실행, 설정, 실패 기록을 하나의 세로 흐름으로 배치한다.
+//! 페이지 전체가 하나의 스크롤 영역을 사용하므로 좁은 창에서도 설정 pane이 눌리지 않는다.
 
 use gpui::{
-    div, px, AnyElement, Context, InteractiveElement, IntoElement, ParentElement,
+    div, AnyElement, Context, InteractiveElement, IntoElement, ParentElement,
     StatefulInteractiveElement, Styled, Window,
 };
 use gpui_component::{h_flex, input::Input, theme::ActiveTheme, v_flex};
 
 use crate::app::AppRoot;
+use crate::window::scroll_pane;
 use crate::window::ui::{self, ButtonStyle};
-use crate::window::{balanced_split, scroll_pane, SETTINGS_PANE_MIN_WIDTH};
 
 const INTERVAL_PRESETS: [u32; 5] = [30, 60, 300, 900, 3600];
-const FEATURE_PANE_MIN_WIDTH: gpui::Pixels = px(320.0);
 
 pub fn render(this: &mut AppRoot, window: &mut Window, cx: &mut Context<AppRoot>) -> AnyElement {
     this.ensure_sync_inputs(window, cx);
 
-    let left_scroll = this.sync_left_scroll.clone();
-    let right_scroll = this.sync_right_scroll.clone();
-
-    let feature = render_job_list(this, cx);
+    let page_scroll = this.sync_page_scroll.clone();
+    let jobs = render_job_list(this, cx);
     let settings = render_job_settings(this, cx);
+    let failures = render_failures(this, cx);
 
-    balanced_split(
-        "file-sync-split",
-        FEATURE_PANE_MIN_WIDTH,
-        SETTINGS_PANE_MIN_WIDTH,
-        scroll_pane("file-sync-left", &left_scroll, feature),
-        scroll_pane("file-sync-right", &right_scroll, settings),
+    scroll_pane(
+        "file-sync-page",
+        &page_scroll,
+        v_flex()
+            .w_full()
+            .gap_4()
+            .p_1()
+            .child(jobs)
+            .child(settings)
+            .child(failures)
+            .into_any_element(),
     )
 }
 
 // ─────────────────────────────────────────────
-// 좌측: 기능 영역 (작업 목록 + 상태 + 실패 기록)
+// 작업 선택·전체 실행
 // ─────────────────────────────────────────────
 
 fn render_job_list(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElement {
@@ -128,7 +130,284 @@ fn render_job_list(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElement 
         }
     }
 
-    // ── 실패 기록 ──
+    v_flex()
+        .w_full()
+        .gap_3()
+        .child(
+            h_flex()
+                .justify_between()
+                .items_center()
+                .child(div().text_color(fg).child("파일 동기화"))
+                .child(
+                    h_flex()
+                        .gap_2()
+                        .child(ui::action_button(
+                            "sync-new-job",
+                            "새 작업",
+                            ui::Size::Md,
+                            neutral_btn,
+                            cx.listener(|this, _ev, window, cx| {
+                                this.add_sync_job(window, cx);
+                            }),
+                        ))
+                        .child(ui::action_button(
+                            "sync-run-all",
+                            "전체 지금 동기화",
+                            ui::Size::Md,
+                            primary_btn,
+                            cx.listener(|this, _ev, window, cx| {
+                                this.request_sync_all(window, cx);
+                            }),
+                        )),
+                ),
+        )
+        // ── 작업 목록 카드 ──
+        .child(
+            div()
+                .debug_selector(|| "file-sync-job-list-card".to_string())
+                .rounded_lg()
+                .bg(card)
+                .border_1()
+                .border_color(border)
+                .child(v_flex().child(rows)),
+        )
+        .into_any_element()
+}
+
+// ─────────────────────────────────────────────
+// 선택한 작업 설정
+// ─────────────────────────────────────────────
+
+fn render_job_settings(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElement {
+    let theme = cx.theme();
+    let fg = theme.foreground;
+    let muted_fg = theme.muted_foreground;
+    let border = theme.border;
+    let card = theme.secondary;
+    let selected_bg = theme.primary;
+    let selected_fg = theme.primary_foreground;
+
+    // 이 패널의 버튼은 테두리 색을 hover 색과 같이 쓴다(승격 전 시각 유지).
+    let neutral_btn = ButtonStyle::neutral(cx).hover(border);
+    let primary_btn = ButtonStyle::primary(cx).border(theme.primary_hover);
+    let danger_btn = ButtonStyle::danger(cx).border(theme.danger_active);
+
+    let Some(selected) = this.selected_sync_job else {
+        return v_flex()
+            .w_full()
+            .gap_3()
+            .child(div().text_color(fg).child("작업 설정"))
+            .child(
+                div()
+                    .rounded_lg()
+                    .bg(card)
+                    .border_1()
+                    .border_color(border)
+                    .p_4()
+                    .text_color(muted_fg)
+                    .child("위 작업 목록에서 작업을 선택하거나 '새 작업'을 추가하세요."),
+            )
+            .into_any_element();
+    };
+
+    let Some(job) = this.sync_jobs.get(selected).cloned() else {
+        return div().into_any_element();
+    };
+
+    let name_input = this.sync_name_input.clone();
+    let source_input = this.sync_source_input.clone();
+    let target_input = this.sync_target_input.clone();
+
+    let mut interval_row = h_flex().gap_2().flex_wrap();
+    for secs in INTERVAL_PRESETS {
+        let is_selected = job.interval_secs == secs;
+        interval_row = interval_row.child(
+            div()
+                .id(("sync-interval", secs as usize))
+                .rounded_md()
+                .px_3()
+                .py_2()
+                .cursor_pointer()
+                .bg(if is_selected { selected_bg } else { theme.list })
+                .text_color(if is_selected { selected_fg } else { fg })
+                .border_1()
+                .border_color(if is_selected {
+                    theme.primary_hover
+                } else {
+                    border
+                })
+                .hover(|s| s.bg(theme.secondary_hover))
+                .on_click(cx.listener(move |this, _ev, window, cx| {
+                    this.update_selected_sync_job(window, cx, |job| job.interval_secs = secs);
+                }))
+                .child(format_interval(secs)),
+        );
+    }
+
+    v_flex()
+        .w_full()
+        .gap_3()
+        .child(
+            h_flex()
+                .justify_between()
+                .items_center()
+                .child(div().text_color(fg).child("작업 설정"))
+                .child(
+                    h_flex()
+                        .gap_2()
+                        .child(div().debug_selector(|| "sync-run-one".to_string()).child(
+                            ui::action_button(
+                                "sync-run-one",
+                                "저장하고 지금 동기화",
+                                ui::Size::Md,
+                                primary_btn,
+                                cx.listener(move |this, _ev, window, cx| {
+                                    this.request_sync_job(selected, window, cx);
+                                }),
+                            ),
+                        ))
+                        .child(ui::action_button(
+                            "sync-delete-job",
+                            "작업 삭제",
+                            ui::Size::Md,
+                            danger_btn,
+                            cx.listener(move |this, _ev, window, cx| {
+                                this.remove_sync_job(selected, window, cx);
+                            }),
+                        )),
+                ),
+        )
+        .child(
+            div()
+                .debug_selector(|| "file-sync-settings-card".to_string())
+                .rounded_lg()
+                .bg(card)
+                .border_1()
+                .border_color(border)
+                .p_4()
+                .child(
+                    v_flex()
+                        .gap_3()
+                        // ── 이름 ──
+                        .child(div().text_color(fg).child("작업 이름"))
+                        .children(name_input.as_ref().map(Input::new))
+                        // ── 원본 폴더 ──
+                        .child(div().text_color(fg).child("원본 폴더"))
+                        .child(
+                            h_flex()
+                                .gap_2()
+                                .items_center()
+                                .child(
+                                    div()
+                                        .flex_1()
+                                        .min_w_0()
+                                        .children(source_input.as_ref().map(Input::new)),
+                                )
+                                .child(ui::action_button(
+                                    "sync-pick-source",
+                                    "찾아보기",
+                                    ui::Size::Md,
+                                    neutral_btn,
+                                    cx.listener(|this, _ev, window, cx| {
+                                        this.pick_sync_folder(true, window, cx);
+                                    }),
+                                )),
+                        )
+                        // ── 대상 폴더 ──
+                        .child(div().text_color(fg).child("대상 폴더"))
+                        .child(
+                            h_flex()
+                                .gap_2()
+                                .items_center()
+                                .child(
+                                    div()
+                                        .flex_1()
+                                        .min_w_0()
+                                        .children(target_input.as_ref().map(Input::new)),
+                                )
+                                .child(ui::action_button(
+                                    "sync-pick-target",
+                                    "찾아보기",
+                                    ui::Size::Md,
+                                    neutral_btn,
+                                    cx.listener(|this, _ev, window, cx| {
+                                        this.pick_sync_folder(false, window, cx);
+                                    }),
+                                )),
+                        )
+                        .child(div().text_color(muted_fg).child(
+                            "직접 입력한 값은 '설정 저장' 또는 실행 버튼을 누를 때 저장됩니다.",
+                        ))
+                        .child(ui::action_button(
+                            "sync-apply-paths",
+                            "설정 저장",
+                            ui::Size::Md,
+                            neutral_btn,
+                            cx.listener(|this, _ev, window, cx| {
+                                this.apply_sync_inputs(window, cx);
+                            }),
+                        ))
+                        // ── 감시 주기 ──
+                        .child(div().text_color(fg).child("감시 주기"))
+                        .child(interval_row)
+                        // ── 옵션 ──
+                        .child(div().text_color(fg).child("옵션"))
+                        .child(option_row(
+                            "sync-opt-enabled",
+                            "자동 동기화 사용",
+                            "감시 주기마다 자동으로 실행합니다.",
+                            job.enabled,
+                            cx.listener(|this, checked: &bool, window, cx| {
+                                let checked = *checked;
+                                this.update_selected_sync_job(window, cx, move |job| {
+                                    job.enabled = checked
+                                });
+                            }),
+                            cx,
+                        ))
+                        .child(option_row(
+                            "sync-opt-hidden",
+                            "숨김·시스템 파일 포함",
+                            "끄면 숨김 속성 파일을 건너뜁니다. 기본값은 전체 포함입니다.",
+                            job.include_hidden,
+                            cx.listener(|this, checked: &bool, window, cx| {
+                                let checked = *checked;
+                                this.update_selected_sync_job(window, cx, move |job| {
+                                    job.include_hidden = checked
+                                });
+                            }),
+                            cx,
+                        ))
+                        .child(option_row(
+                            "sync-opt-mirror",
+                            "원본에서 삭제된 항목 반영",
+                            "대상에만 있는 파일을 삭제합니다. 되돌릴 수 없으니 주의하세요.",
+                            job.mirror_deletes,
+                            cx.listener(|this, checked: &bool, window, cx| {
+                                let checked = *checked;
+                                this.update_selected_sync_job(window, cx, move |job| {
+                                    job.mirror_deletes = checked
+                                });
+                            }),
+                            cx,
+                        )),
+                ),
+        )
+        .into_any_element()
+}
+
+// ─────────────────────────────────────────────
+// 실패 기록
+// ─────────────────────────────────────────────
+
+fn render_failures(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElement {
+    let theme = cx.theme();
+    let fg = theme.foreground;
+    let muted_fg = theme.muted_foreground;
+    let border = theme.border;
+    let card = theme.secondary;
+    let neutral_btn = ButtonStyle::neutral(cx).hover(border);
+
     let mut failures = v_flex().gap_1();
     if this.sync_failures.is_empty() {
         failures = failures.child(
@@ -185,338 +464,62 @@ fn render_job_list(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElement 
     let notify_enabled = this.sync_notify_enabled;
     let has_failures = !this.sync_failures.is_empty();
 
-    v_flex()
-        .w_full()
-        .gap_3()
-        .p_1()
+    div()
+        .debug_selector(|| "file-sync-failures-card".to_string())
+        .rounded_lg()
+        .bg(card)
+        .border_1()
+        .border_color(border)
+        .p_3()
         .child(
-            h_flex()
-                .justify_between()
-                .items_center()
-                .child(div().text_color(fg).child("파일 동기화"))
+            v_flex()
+                .gap_2()
                 .child(
                     h_flex()
-                        .gap_2()
-                        .child(ui::action_button(
-                            "sync-new-job",
-                            "새 작업",
-                            ui::Size::Md,
-                            neutral_btn,
-                            cx.listener(|this, _ev, window, cx| {
-                                this.add_sync_job(window, cx);
-                            }),
-                        ))
-                        .child(ui::action_button(
-                            "sync-run-all",
-                            "전체 지금 동기화",
-                            ui::Size::Md,
-                            primary_btn,
-                            cx.listener(|this, _ev, window, cx| {
-                                this.request_sync_all(window, cx);
-                            }),
-                        )),
-                ),
-        )
-        // ── 작업 목록 카드 ──
-        .child(
-            div()
-                .rounded_lg()
-                .bg(card)
-                .border_1()
-                .border_color(border)
-                .child(v_flex().child(rows)),
-        )
-        // ── 실패 기록 카드 ──
-        .child(
-            div()
-                .rounded_lg()
-                .bg(card)
-                .border_1()
-                .border_color(border)
-                .p_3()
-                .child(
-                    v_flex()
-                        .gap_2()
+                        .justify_between()
+                        .items_center()
+                        .child(div().text_color(fg).child("동기화 실패 기록"))
                         .child(
                             h_flex()
-                                .justify_between()
+                                .gap_2()
                                 .items_center()
-                                .child(div().text_color(fg).child("동기화 실패 기록"))
+                                .child(div().text_color(muted_fg).child("실패 알림 표시"))
                                 .child(
-                                    h_flex()
-                                        .gap_2()
-                                        .items_center()
+                                    div()
+                                        .debug_selector(|| "sync-notify-toggle".to_string())
                                         .child(
-                                            div()
-                                                .text_color(muted_fg)
-                                                .child("실패 알림 표시"),
-                                        )
-                                        .child(
-                                            div()
-                                                .debug_selector(|| {
-                                                    "sync-notify-toggle".to_string()
-                                                })
-                                                .child(
-                                                    ui::toggle_switch(
-                                                        "sync-notify-toggle",
-                                                        notify_enabled,
-                                                        cx,
-                                                    )
-                                                    .on_click(cx.listener(
-                                                        |this, checked: &bool, _window, cx| {
-                                                            this.sync_notify_enabled = *checked;
-                                                            cx.notify();
-                                                        },
-                                                    )),
-                                                ),
-                                        )
-                                        .children(has_failures.then(|| {
-                                            ui::action_button(
-                                                "sync-clear-failures",
-                                                "기록 지우기",
-                                                ui::Size::Md,
-                                                neutral_btn,
-                                                cx.listener(|this, _ev, _window, cx| {
-                                                    this.sync_failures.clear();
+                                            ui::toggle_switch(
+                                                "sync-notify-toggle",
+                                                notify_enabled,
+                                                cx,
+                                            )
+                                            .on_click(
+                                                cx.listener(|this, checked: &bool, _window, cx| {
+                                                    this.sync_notify_enabled = *checked;
                                                     cx.notify();
                                                 }),
-                                            )
-                                        })),
-                                ),
-                        )
-                        .child(
-                            div()
-                                .text_color(muted_fg)
-                                .child(
-                                    "복사할 수 없는 파일은 건너뛰고 사유를 남깁니다. \
-                                     '알림 끄기'를 누르면 같은 항목의 토스트가 더 이상 뜨지 않습니다.",
-                                ),
-                        )
-                        .child(failures),
-                ),
-        )
-        .into_any_element()
-}
-
-// ─────────────────────────────────────────────
-// 우측: 설정 영역 (선택한 작업 편집)
-// ─────────────────────────────────────────────
-
-fn render_job_settings(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElement {
-    let theme = cx.theme();
-    let fg = theme.foreground;
-    let muted_fg = theme.muted_foreground;
-    let border = theme.border;
-    let card = theme.secondary;
-    let selected_bg = theme.primary;
-    let selected_fg = theme.primary_foreground;
-
-    // 이 패널의 버튼은 테두리 색을 hover 색과 같이 쓴다(승격 전 시각 유지).
-    let neutral_btn = ButtonStyle::neutral(cx).hover(border);
-    let primary_btn = ButtonStyle::primary(cx).border(theme.primary_hover);
-    let danger_btn = ButtonStyle::danger(cx).border(theme.danger_active);
-
-    let Some(selected) = this.selected_sync_job else {
-        return v_flex()
-            .w_full()
-            .p_1()
-            .gap_3()
-            .child(div().text_color(fg).child("작업 설정"))
-            .child(
-                div()
-                    .rounded_lg()
-                    .bg(card)
-                    .border_1()
-                    .border_color(border)
-                    .p_4()
-                    .text_color(muted_fg)
-                    .child("좌측에서 작업을 선택하거나 '새 작업'을 추가하세요."),
-            )
-            .into_any_element();
-    };
-
-    let Some(job) = this.sync_jobs.get(selected).cloned() else {
-        return div().into_any_element();
-    };
-
-    let name_input = this.sync_name_input.clone();
-    let source_input = this.sync_source_input.clone();
-    let target_input = this.sync_target_input.clone();
-
-    let mut interval_row = h_flex().gap_2().flex_wrap();
-    for secs in INTERVAL_PRESETS {
-        let is_selected = job.interval_secs == secs;
-        interval_row = interval_row.child(
-            div()
-                .id(("sync-interval", secs as usize))
-                .rounded_md()
-                .px_3()
-                .py_2()
-                .cursor_pointer()
-                .bg(if is_selected { selected_bg } else { theme.list })
-                .text_color(if is_selected { selected_fg } else { fg })
-                .border_1()
-                .border_color(if is_selected {
-                    theme.primary_hover
-                } else {
-                    border
-                })
-                .hover(|s| s.bg(theme.secondary_hover))
-                .on_click(cx.listener(move |this, _ev, window, cx| {
-                    this.update_selected_sync_job(window, cx, |job| job.interval_secs = secs);
-                }))
-                .child(format_interval(secs)),
-        );
-    }
-
-    v_flex()
-        .w_full()
-        .p_1()
-        .gap_3()
-        .child(
-            h_flex()
-                .justify_between()
-                .items_center()
-                .child(div().text_color(fg).child("작업 설정"))
-                .child(
-                    h_flex()
-                        .gap_2()
-                        .child(ui::action_button(
-                            "sync-run-one",
-                            "지금 동기화",
-                            ui::Size::Md,
-                            primary_btn,
-                            cx.listener(move |this, _ev, window, cx| {
-                                this.request_sync_job(selected, window, cx);
-                            }),
-                        ))
-                        .child(ui::action_button(
-                            "sync-delete-job",
-                            "작업 삭제",
-                            ui::Size::Md,
-                            danger_btn,
-                            cx.listener(move |this, _ev, window, cx| {
-                                this.remove_sync_job(selected, window, cx);
-                            }),
-                        )),
-                ),
-        )
-        .child(
-            div()
-                .rounded_lg()
-                .bg(card)
-                .border_1()
-                .border_color(border)
-                .p_4()
-                .child(
-                    v_flex()
-                        .gap_3()
-                        // ── 이름 ──
-                        .child(div().text_color(fg).child("작업 이름"))
-                        .children(name_input.as_ref().map(Input::new))
-                        // ── 원본 폴더 ──
-                        .child(div().text_color(fg).child("원본 폴더"))
-                        .child(
-                            h_flex()
-                                .gap_2()
-                                .items_center()
-                                .child(
-                                    div()
-                                        .flex_1()
-                                        .min_w_0()
-                                        .children(source_input.as_ref().map(Input::new)),
+                                            ),
+                                        ),
                                 )
-                                .child(ui::action_button(
-                                    "sync-pick-source",
-                                    "찾아보기",
-                                    ui::Size::Md,
-                                    neutral_btn,
-                                    cx.listener(|this, _ev, window, cx| {
-                                        this.pick_sync_folder(true, window, cx);
-                                    }),
-                                )),
-                        )
-                        // ── 대상 폴더 ──
-                        .child(div().text_color(fg).child("대상 폴더"))
-                        .child(
-                            h_flex()
-                                .gap_2()
-                                .items_center()
-                                .child(
-                                    div()
-                                        .flex_1()
-                                        .min_w_0()
-                                        .children(target_input.as_ref().map(Input::new)),
-                                )
-                                .child(ui::action_button(
-                                    "sync-pick-target",
-                                    "찾아보기",
-                                    ui::Size::Md,
-                                    neutral_btn,
-                                    cx.listener(|this, _ev, window, cx| {
-                                        this.pick_sync_folder(false, window, cx);
-                                    }),
-                                )),
-                        )
-                        .child(
-                            div()
-                                .text_color(muted_fg)
-                                .child("경로를 직접 입력했다면 '경로 적용'을 눌러 저장하세요."),
-                        )
-                        .child(ui::action_button(
-                            "sync-apply-paths",
-                            "경로 적용",
-                            ui::Size::Md,
-                            neutral_btn,
-                            cx.listener(|this, _ev, window, cx| {
-                                this.apply_sync_inputs(window, cx);
-                            }),
-                        ))
-                        // ── 감시 주기 ──
-                        .child(div().text_color(fg).child("감시 주기"))
-                        .child(interval_row)
-                        // ── 옵션 ──
-                        .child(div().text_color(fg).child("옵션"))
-                        .child(option_row(
-                            "sync-opt-enabled",
-                            "자동 동기화 사용",
-                            "감시 주기마다 자동으로 실행합니다.",
-                            job.enabled,
-                            cx.listener(|this, checked: &bool, window, cx| {
-                                let checked = *checked;
-                                this.update_selected_sync_job(window, cx, move |job| {
-                                    job.enabled = checked
-                                });
-                            }),
-                            cx,
-                        ))
-                        .child(option_row(
-                            "sync-opt-hidden",
-                            "숨김·시스템 파일 포함",
-                            "끄면 숨김 속성 파일을 건너뜁니다. 기본값은 전체 포함입니다.",
-                            job.include_hidden,
-                            cx.listener(|this, checked: &bool, window, cx| {
-                                let checked = *checked;
-                                this.update_selected_sync_job(window, cx, move |job| {
-                                    job.include_hidden = checked
-                                });
-                            }),
-                            cx,
-                        ))
-                        .child(option_row(
-                            "sync-opt-mirror",
-                            "원본에서 삭제된 항목 반영",
-                            "대상에만 있는 파일을 삭제합니다. 되돌릴 수 없으니 주의하세요.",
-                            job.mirror_deletes,
-                            cx.listener(|this, checked: &bool, window, cx| {
-                                let checked = *checked;
-                                this.update_selected_sync_job(window, cx, move |job| {
-                                    job.mirror_deletes = checked
-                                });
-                            }),
-                            cx,
-                        )),
-                ),
+                                .children(has_failures.then(|| {
+                                    ui::action_button(
+                                        "sync-clear-failures",
+                                        "기록 지우기",
+                                        ui::Size::Md,
+                                        neutral_btn,
+                                        cx.listener(|this, _ev, _window, cx| {
+                                            this.sync_failures.clear();
+                                            cx.notify();
+                                        }),
+                                    )
+                                })),
+                        ),
+                )
+                .child(div().text_color(muted_fg).child(
+                    "복사할 수 없는 파일은 건너뛰고 사유를 남깁니다. \
+                         '알림 끄기'를 누르면 같은 항목의 토스트가 더 이상 뜨지 않습니다.",
+                ))
+                .child(failures),
         )
         .into_any_element()
 }

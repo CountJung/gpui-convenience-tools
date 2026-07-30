@@ -1,11 +1,13 @@
 use super::*;
 use crate::config::{SyncJob, BUNDLED_THEMES};
 use crate::platform::NativeWindowHandle;
-use crate::sync::SyncFailure;
+use crate::sync::{SyncFailure, SyncOutcome};
 use anyhow::Result;
-use gpui::{point, px, size, Modifiers, ScrollDelta, ScrollWheelEvent, TestAppContext};
+use gpui::{
+    point, px, size, Modifiers, MouseButton, ScrollDelta, ScrollWheelEvent, TestAppContext,
+};
 use gpui_component::theme::{ActiveTheme, Theme, ThemeMode, ThemeSet};
-use std::rc::Rc;
+use std::{cell::Cell, rc::Rc};
 
 const DEFAULT_WINDOW_WIDTH: f32 = 1000.0;
 const DEFAULT_WINDOW_HEIGHT: f32 = 700.0;
@@ -75,9 +77,9 @@ fn test_app_root(active_panel: ActivePanel) -> AppRoot {
         sync_name_input: None,
         sync_source_input: None,
         sync_target_input: None,
-        sync_left_scroll: ScrollHandle::default(),
-        sync_right_scroll: ScrollHandle::default(),
+        sync_page_scroll: ScrollHandle::default(),
         sync_state: Arc::new(Mutex::new(SyncSharedState::default())),
+        external_side_effects_enabled: false,
         ad_left_scroll: ScrollHandle::default(),
         ad_right_scroll: ScrollHandle::default(),
         log_config: LogConfig::default(),
@@ -109,6 +111,27 @@ fn click_debug_element(cx: &mut gpui::VisualTestContext, selector: &'static str)
         ),
         Modifiers::none(),
     );
+    refresh(cx);
+}
+
+fn drag_divider(
+    cx: &mut gpui::VisualTestContext,
+    start: gpui::Point<gpui::Pixels>,
+    end: gpui::Point<gpui::Pixels>,
+) {
+    let direction = if end.x >= start.x { px(12.0) } else { px(-12.0) };
+    cx.simulate_mouse_move(start, None, Modifiers::none());
+    cx.simulate_mouse_down(start, MouseButton::Left, Modifiers::none());
+    refresh(cx);
+    cx.simulate_mouse_move(
+        point(start.x + direction, start.y),
+        MouseButton::Left,
+        Modifiers::none(),
+    );
+    refresh(cx);
+    cx.simulate_mouse_move(end, MouseButton::Left, Modifiers::none());
+    refresh(cx);
+    cx.simulate_mouse_up(end, MouseButton::Left, Modifiers::none());
     refresh(cx);
 }
 
@@ -291,26 +314,13 @@ fn ad_block_split_fills_default_and_minimum_supported_width(cx: &mut TestAppCont
 }
 
 #[gpui::test]
-fn every_feature_split_keeps_settings_pane_usable_at_default_width(cx: &mut TestAppContext) {
+fn split_panels_keep_settings_pane_usable_at_default_width(cx: &mut TestAppContext) {
     initialize_components(cx);
     let (view, cx) = cx.add_window_view(|_, _| test_app_root(ActivePanel::AdBlock));
 
     cx.simulate_resize(size(px(DEFAULT_WINDOW_WIDTH), px(DEFAULT_WINDOW_HEIGHT)));
     refresh(cx);
     assert_feature_split_is_usable(cx, "ad-block-split-left-pane", "ad-block-split-right-pane");
-
-    cx.update(|_, app| {
-        view.update(app, |root, cx| {
-            root.active_panel = ActivePanel::FileSync;
-            cx.notify();
-        });
-    });
-    refresh(cx);
-    assert_feature_split_is_usable(
-        cx,
-        "file-sync-split-left-pane",
-        "file-sync-split-right-pane",
-    );
 
     cx.update(|_, app| {
         view.update(app, |root, cx| {
@@ -323,6 +333,67 @@ fn every_feature_split_keeps_settings_pane_usable_at_default_width(cx: &mut Test
         cx,
         "service-mgr-split-left-pane",
         "service-mgr-split-right-pane",
+    );
+}
+
+#[gpui::test]
+fn sidebar_divider_drag_resizes_navigation_and_content(cx: &mut TestAppContext) {
+    initialize_components(cx);
+    let (_view, cx) = cx.add_window_view(|_, _| test_app_root(ActivePanel::Dashboard));
+
+    cx.simulate_resize(size(px(DEFAULT_WINDOW_WIDTH), px(DEFAULT_WINDOW_HEIGHT)));
+    refresh(cx);
+
+    let before_sidebar = cx
+        .debug_bounds("sidebar-pane")
+        .expect("sidebar pane should be rendered");
+    let before_content = cx
+        .debug_bounds("content-pane")
+        .expect("content pane should be rendered");
+    let start = point(
+        before_content.origin.x - px(2.0),
+        before_sidebar.origin.y + before_sidebar.size.height / 2.0,
+    );
+    let end = point(start.x + px(400.0), start.y);
+    drag_divider(cx, start, end);
+
+    let after_sidebar = cx
+        .debug_bounds("sidebar-pane")
+        .expect("resized sidebar pane should be rendered");
+    let after_content = cx
+        .debug_bounds("content-pane")
+        .expect("resized content pane should be rendered");
+    assert!(
+        after_sidebar.size.width >= px(359.0),
+        "dragging past the maximum should widen the sidebar to its upper bound: \
+         before={before_sidebar:?}, \
+         after={after_sidebar:?}"
+    );
+    assert!(
+        after_sidebar.size.width <= px(360.0),
+        "sidebar should respect its maximum width: {after_sidebar:?}"
+    );
+    assert!(
+        after_content.origin.x >= before_content.origin.x + px(150.0),
+        "content should move with the resized divider: before={before_content:?}, \
+         after={after_content:?}"
+    );
+
+    let shrink_start = point(
+        after_content.origin.x - px(2.0),
+        after_sidebar.origin.y + after_sidebar.size.height / 2.0,
+    );
+    drag_divider(
+        cx,
+        shrink_start,
+        point(shrink_start.x - px(400.0), shrink_start.y),
+    );
+    let minimum_sidebar = cx
+        .debug_bounds("sidebar-pane")
+        .expect("minimum sidebar pane should be rendered");
+    assert!(
+        minimum_sidebar.size.width >= px(200.0) && minimum_sidebar.size.width <= px(201.0),
+        "dragging past the minimum should clamp the sidebar at 200px: {minimum_sidebar:?}"
     );
 }
 
@@ -340,6 +411,10 @@ fn sidebar_wheel_scroll_reaches_last_navigation_item(cx: &mut TestAppContext) {
     let viewport = cx
         .debug_bounds("sidebar-scroll")
         .expect("sidebar viewport should be rendered");
+    assert!(
+        viewport.origin.y + viewport.size.height <= px(COMPACT_WINDOW_HEIGHT),
+        "sidebar viewport should stay below the title bar and inside the window: {viewport:?}"
+    );
     let max_scroll_height =
         cx.update(|_, app| view.read(app).sidebar_scroll_handle.max_offset().height);
     assert!(
@@ -399,7 +474,7 @@ fn rendered_switch_toggles_in_light_dark_and_missing_switch_token_theme(cx: &mut
 }
 
 #[gpui::test]
-fn file_sync_both_panes_scroll_to_their_last_controls_at_compact_height(cx: &mut TestAppContext) {
+fn file_sync_unified_page_uses_full_width_and_scrolls_to_last_record(cx: &mut TestAppContext) {
     initialize_components(cx);
     let (view, cx) = cx.add_window_view(|_, _| {
         let mut root = test_app_root(ActivePanel::FileSync);
@@ -427,35 +502,151 @@ fn file_sync_both_panes_scroll_to_their_last_controls_at_compact_height(cx: &mut
     ));
     refresh(cx);
 
-    let (left_max, right_max) = cx.update(|_, app| {
-        let root = view.read(app);
-        (
-            root.sync_left_scroll.max_offset().height,
-            root.sync_right_scroll.max_offset().height,
-        )
+    let job_card = cx
+        .debug_bounds("file-sync-job-list-card")
+        .expect("job list card should be rendered");
+    let settings_card = cx
+        .debug_bounds("file-sync-settings-card")
+        .expect("settings card should be rendered");
+    let failures_card = cx
+        .debug_bounds("file-sync-failures-card")
+        .expect("failures card should be rendered");
+    let viewport = cx
+        .debug_bounds("file-sync-page")
+        .expect("File Sync viewport should be rendered");
+    assert!(
+        (job_card.origin.x - settings_card.origin.x).abs() <= px(1.0)
+            && (job_card.size.width - settings_card.size.width).abs() <= px(1.0)
+            && (job_card.origin.x - failures_card.origin.x).abs() <= px(1.0)
+            && (job_card.size.width - failures_card.size.width).abs() <= px(1.0),
+        "all File Sync sections should share one full-width layout: \
+         jobs={job_card:?}, settings={settings_card:?}, failures={failures_card:?}"
+    );
+    assert!(
+        job_card.size.width >= viewport.size.width - px(24.0),
+        "File Sync sections should fill the viewport width within page padding: \
+         viewport={viewport:?}, jobs={job_card:?}"
+    );
+    let max_scroll = cx.update(|_, app| view.read(app).sync_page_scroll.max_offset().height);
+    assert!(
+        max_scroll > px(0.0),
+        "compact unified File Sync page should overflow"
+    );
+
+    wheel_to_end(cx, "file-sync-page", -10000.0);
+    let offset = cx.update(|_, app| view.read(app).sync_page_scroll.offset().y);
+    assert!(
+        offset < px(0.0),
+        "wheel input should move the unified page scroll offset"
+    );
+    assert_inside_viewport(cx, "file-sync-page", "sync-failure-row-11");
+}
+
+#[gpui::test]
+fn background_sync_event_wakes_render_without_additional_user_input(cx: &mut TestAppContext) {
+    initialize_components(cx);
+    let (view, cx) = cx.add_window_view(|_, cx| {
+        let mut root = test_app_root(ActivePanel::FileSync);
+        root.sync_jobs = vec![SyncJob::default()];
+        root.selected_sync_job = Some(0);
+        AppRoot::start_event_refresh_loop(cx);
+        root
     });
-    assert!(
-        left_max > px(0.0),
-        "compact File Sync left pane should overflow"
-    );
-    assert!(
-        right_max > px(0.0),
-        "compact File Sync settings pane should overflow"
-    );
 
-    wheel_to_end(cx, "file-sync-left", -5000.0);
-    let left_offset = cx.update(|_, app| view.read(app).sync_left_scroll.offset().y);
-    assert!(
-        left_offset < px(0.0),
-        "wheel input should move the left pane scroll offset"
-    );
-    assert_inside_viewport(cx, "file-sync-left", "sync-failure-row-11");
+    cx.simulate_resize(size(px(DEFAULT_WINDOW_WIDTH), px(DEFAULT_WINDOW_HEIGHT)));
+    refresh(cx);
 
-    wheel_to_end(cx, "file-sync-right", -5000.0);
-    let right_offset = cx.update(|_, app| view.read(app).sync_right_scroll.offset().y);
+    let wake_observed = Rc::new(Cell::new(false));
+    let wake_observed_for_subscription = Rc::clone(&wake_observed);
+    let _wake_subscription = cx.cx.update(|app| {
+        app.observe(&view, move |_, _| {
+            wake_observed_for_subscription.set(true);
+        })
+    });
+
+    let (id, tx) = cx.update(|_, app| {
+        let root = view.read(app);
+        (root.sync_jobs[0].id.clone(), root.event_tx.clone())
+    });
+    tx.send(PlatformEvent::SyncFinished {
+        id: id.clone(),
+        label: "백그라운드 검증".to_string(),
+        outcome: SyncOutcome {
+            copied: 1,
+            ..SyncOutcome::default()
+        },
+    })
+    .expect("background event should enter the channel");
+
+    std::thread::sleep(Duration::from_millis(300));
+    cx.run_until_parked();
     assert!(
-        right_offset < px(0.0),
-        "wheel input should move the right pane scroll offset"
+        wake_observed.get(),
+        "pending background events should notify the AppRoot without user input"
     );
-    assert_inside_viewport(cx, "file-sync-right", "sync-opt-mirror-row");
+    refresh(cx);
+
+    cx.update(|_, app| {
+        let status = view
+            .read(app)
+            .sync_status
+            .get(&id)
+            .cloned()
+            .expect("timer notification should trigger render and consume the event");
+        assert_eq!(status.summary, "복사 1건, 건너뜀 0건");
+        assert!(!status.failed);
+    });
+}
+
+#[gpui::test]
+fn file_sync_run_button_saves_current_inputs_and_queues_selected_job(cx: &mut TestAppContext) {
+    initialize_components(cx);
+    let (view, cx) = cx.add_window_view(|_, _| {
+        let mut root = test_app_root(ActivePanel::FileSync);
+        root.sync_jobs = vec![SyncJob::default()];
+        root.selected_sync_job = Some(0);
+        root
+    });
+
+    cx.simulate_resize(size(px(DEFAULT_WINDOW_WIDTH), px(DEFAULT_WINDOW_HEIGHT)));
+    refresh(cx);
+
+    cx.update(|window, app| {
+        let (name, source, target) = {
+            let root = view.read(app);
+            (
+                root.sync_name_input.clone().expect("name input"),
+                root.sync_source_input.clone().expect("source input"),
+                root.sync_target_input.clone().expect("target input"),
+            )
+        };
+        name.update(app, |state, cx| state.set_value("즉시 백업", window, cx));
+        source.update(app, |state, cx| {
+            state.set_value(r"D:\validation\source", window, cx)
+        });
+        target.update(app, |state, cx| {
+            state.set_value(r"E:\validation\target", window, cx)
+        });
+    });
+    refresh(cx);
+    click_debug_element(cx, "sync-run-one");
+
+    cx.update(|_, app| {
+        let root = view.read(app);
+        let job = &root.sync_jobs[0];
+        assert_eq!(job.name, "즉시 백업");
+        assert_eq!(job.source, r"D:\validation\source");
+        assert_eq!(job.target, r"E:\validation\target");
+        assert_eq!(
+            root.sync_status
+                .get(&job.id)
+                .expect("queued status")
+                .summary,
+            "실행 요청됨 — 결과를 기다리는 중입니다."
+        );
+        let shared = root.sync_state.lock().expect("sync shared state");
+        assert_eq!(shared.jobs[0].source, job.source);
+        assert_eq!(shared.jobs[0].target, job.target);
+        assert_eq!(shared.run_now, vec![job.id.clone()]);
+    });
 }

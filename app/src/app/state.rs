@@ -91,6 +91,7 @@ impl SyncJobStatus {
     pub fn line(&self) -> String {
         match &self.last_run {
             Some(time) => format!("최근 실행 {time} — {}", self.summary),
+            None if !self.summary.is_empty() => self.summary.clone(),
             None => "아직 실행되지 않았습니다.".to_string(),
         }
     }

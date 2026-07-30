@@ -26,12 +26,14 @@ use state::{PlatformEvent, ScannerState, SyncSharedState, NAV_SYSTEM, NAV_TOOLS}
 
 use gpui::{
     div, px, AnyElement, Context, Entity, InteractiveElement, IntoElement, ParentElement, Render,
-    ScrollHandle, StatefulInteractiveElement, Styled, Subscription, Window, WindowControlArea,
+    Pixels, ScrollHandle, StatefulInteractiveElement, Styled, Subscription, Timer, Window,
+    WindowControlArea,
 };
 use gpui_component::{
     h_flex,
     input::InputState,
     notification::NotificationType,
+    resizable::{h_resizable, resizable_panel},
     scroll::{Scrollbar, ScrollbarShow},
     theme::ActiveTheme,
     v_flex, VirtualListScrollHandle, TITLE_BAR_HEIGHT,
@@ -39,6 +41,7 @@ use gpui_component::{
 use std::{
     collections::{HashMap, HashSet},
     sync::{Arc, Mutex},
+    time::Duration,
 };
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 
@@ -88,9 +91,10 @@ pub struct AppRoot {
     pub(crate) sync_name_input: Option<Entity<InputState>>,
     pub(crate) sync_source_input: Option<Entity<InputState>>,
     pub(crate) sync_target_input: Option<Entity<InputState>>,
-    pub(crate) sync_left_scroll: ScrollHandle,
-    pub(crate) sync_right_scroll: ScrollHandle,
+    pub(crate) sync_page_scroll: ScrollHandle,
     sync_state: Arc<Mutex<SyncSharedState>>,
+    #[cfg(test)]
+    external_side_effects_enabled: bool,
 
     // ── 광고 차단 패널 ──
     pub(crate) ad_left_scroll: ScrollHandle,
@@ -114,7 +118,7 @@ pub enum ServiceFilter {
 }
 
 impl AppRoot {
-    pub fn new(_cx: &mut Context<Self>) -> Self {
+    pub fn new(cx: &mut Context<Self>) -> Self {
         let platform: Arc<dyn Platform> = Arc::new(NativePlatform::new());
         let mut app_state = AppState::default();
         let mut initial_scan_interval_secs: u32 = 10;
@@ -188,7 +192,7 @@ impl AppRoot {
         let running_processes = platform.list_running_processes().unwrap_or_default();
         let selected_sync_job = (!sync_jobs.is_empty()).then_some(0);
 
-        Self {
+        let root = Self {
             active_panel: ActivePanel::Dashboard,
             app_state,
             theme_filter_query: String::new(),
@@ -221,9 +225,10 @@ impl AppRoot {
             sync_name_input: None,
             sync_source_input: None,
             sync_target_input: None,
-            sync_left_scroll: ScrollHandle::default(),
-            sync_right_scroll: ScrollHandle::default(),
+            sync_page_scroll: ScrollHandle::default(),
             sync_state,
+            #[cfg(test)]
+            external_side_effects_enabled: true,
 
             ad_left_scroll: ScrollHandle::default(),
             ad_right_scroll: ScrollHandle::default(),
@@ -232,7 +237,32 @@ impl AppRoot {
 
             sidebar_scroll_handle: ScrollHandle::default(),
             content_scroll_handle: ScrollHandle::default(),
-        }
+        };
+
+        Self::start_event_refresh_loop(cx);
+
+        root
+    }
+
+    /// 백그라운드 채널에 새 이벤트가 있을 때 GPUI 렌더 루프를 깨운다.
+    fn start_event_refresh_loop(cx: &mut Context<Self>) {
+        cx.spawn(async move |this, cx| loop {
+            Timer::after(Duration::from_millis(200)).await;
+            let Some(this) = this.upgrade() else {
+                break;
+            };
+            if this
+                .update(cx, |this, cx| {
+                    if !this.event_rx.is_empty() {
+                        cx.notify();
+                    }
+                })
+                .is_err()
+            {
+                break;
+            }
+        })
+        .detach();
     }
 
     pub(crate) fn app_state(&self) -> &AppState {
@@ -489,109 +519,129 @@ impl Render for AppRoot {
                     .child(window_controls),
             )
             .child(
-                h_flex()
-                    .size_full()
+                div()
+                    .flex_1()
                     .min_h_0()
                     .child(
-                        div()
-                            .w(px(240.0))
-                            .h_full()
-                            .min_h_0()
-                            .flex_shrink_0()
-                            .bg(sidebar)
-                            .border_r_1()
-                            .border_color(sidebar_border)
-                            .child(crate::window::scroll_pane(
-                                "sidebar-scroll",
-                                &sidebar_scroll,
-                                v_flex()
-                                    .w_full()
-                                    .p_3()
-                                    .gap_3()
-                                    .child(
-                                        div()
-                                            .px_2()
-                                            .py_2()
-                                            .text_color(sidebar_fg)
-                                            .child("GPUI 편의 도구"),
-                                    )
-                                    .child(
-                                        div().rounded_md().p_2().bg(theme.sidebar_accent).child(
-                                            h_flex()
-                                                .justify_between()
-                                                .items_center()
-                                                .child(
-                                                    div()
-                                                        .text_color(theme.sidebar_accent_foreground)
-                                                        .child("광고 차단"),
-                                                )
-                                                .child(
-                                                    ui::toggle_switch(
-                                                        "global-enable-switch",
-                                                        app_enabled,
-                                                        cx,
-                                                    )
-                                                    .on_click(cx.listener(
-                                                        |this, checked: &bool, window, cx| {
-                                                            this.set_service_enabled(
-                                                                *checked, window, cx,
-                                                            );
-                                                        },
-                                                    )),
-                                                ),
-                                        ),
-                                    )
-                                    .child(nav_overview)
-                                    .child(nav_tools)
-                                    .child(nav_system)
-                                    .into_any_element(),
-                            )),
-                    )
-                    .child({
-                        let outer = div()
-                            .flex_1()
-                            .min_w_0()
-                            .h_full()
-                            .min_h_0()
-                            .relative()
-                            .border_l_1()
-                            .border_color(border);
-
-                        if fills_height {
-                            outer.child(
+                        h_resizable("app-shell-split").child(
+                        resizable_panel()
+                            .size(px(240.0))
+                            .size_range(px(200.0)..px(360.0))
+                            .child(
                                 div()
-                                    .id("content-area")
-                                    .debug_selector(|| "content-area".to_string())
+                                    .debug_selector(|| "sidebar-pane".to_string())
                                     .size_full()
-                                    .p_4()
-                                    .child(panel),
-                            )
-                        } else {
-                            outer
-                                .child(
-                                    div()
-                                        .id("content-area")
-                                        .debug_selector(|| "content-area".to_string())
+                                    .min_h_0()
+                                    .bg(sidebar)
+                                    .border_r_1()
+                                    .border_color(sidebar_border)
+                                    .child(crate::window::scroll_pane(
+                                        "sidebar-scroll",
+                                        &sidebar_scroll,
+                                        v_flex()
+                                            .w_full()
+                                            .p_3()
+                                            .gap_3()
+                                            .child(
+                                                div()
+                                                    .px_2()
+                                                    .py_2()
+                                                    .text_color(sidebar_fg)
+                                                    .child("GPUI 편의 도구"),
+                                            )
+                                            .child(
+                                                div()
+                                                    .rounded_md()
+                                                    .p_2()
+                                                    .bg(theme.sidebar_accent)
+                                                    .child(
+                                                        h_flex()
+                                                            .justify_between()
+                                                            .items_center()
+                                                            .child(
+                                                                div()
+                                                                    .text_color(
+                                                                        theme
+                                                                            .sidebar_accent_foreground,
+                                                                    )
+                                                                    .child("광고 차단"),
+                                                            )
+                                                            .child(
+                                                                ui::toggle_switch(
+                                                                    "global-enable-switch",
+                                                                    app_enabled,
+                                                                    cx,
+                                                                )
+                                                                .on_click(cx.listener(
+                                                                    |this,
+                                                                     checked: &bool,
+                                                                     window,
+                                                                     cx| {
+                                                                        this.set_service_enabled(
+                                                                            *checked, window, cx,
+                                                                        );
+                                                                    },
+                                                                )),
+                                                            ),
+                                                    ),
+                                            )
+                                            .child(nav_overview)
+                                            .child(nav_tools)
+                                            .child(nav_system)
+                                            .into_any_element(),
+                                    )),
+                            ),
+                    )
+                        .child(
+                            resizable_panel()
+                                .size_range(px(520.0)..Pixels::MAX)
+                                .child({
+                                    let outer = div()
+                                        .debug_selector(|| "content-pane".to_string())
                                         .size_full()
-                                        .p_4()
-                                        .overflow_y_scroll()
-                                        .track_scroll(&content_scroll)
-                                        .child(panel),
-                                )
-                                .child(
-                                    div()
-                                        .absolute()
-                                        .top_0()
-                                        .left_0()
-                                        .right_0()
-                                        .bottom_0()
-                                        .child(
-                                            Scrollbar::vertical(&content_scroll)
-                                                .scrollbar_show(ScrollbarShow::Always),
-                                        ),
-                                )
-                        }
-                    }),
+                                        .min_w_0()
+                                        .min_h_0()
+                                        .relative()
+                                        .border_l_1()
+                                        .border_color(border);
+
+                                    if fills_height {
+                                        outer.child(
+                                            div()
+                                                .id("content-area")
+                                                .debug_selector(|| "content-area".to_string())
+                                                .size_full()
+                                                .p_4()
+                                                .child(panel),
+                                        )
+                                    } else {
+                                        outer
+                                            .child(
+                                                div()
+                                                    .id("content-area")
+                                                    .debug_selector(|| "content-area".to_string())
+                                                    .size_full()
+                                                    .p_4()
+                                                    .overflow_y_scroll()
+                                                    .track_scroll(&content_scroll)
+                                                    .child(panel),
+                                            )
+                                            .child(
+                                                div()
+                                                    .absolute()
+                                                    .top_0()
+                                                    .left_0()
+                                                    .right_0()
+                                                    .bottom_0()
+                                                    .child(
+                                                        Scrollbar::vertical(&content_scroll)
+                                                            .scrollbar_show(ScrollbarShow::Always),
+                                                    ),
+                                            )
+                                    }
+                                }),
+                        ),
+                    ),
             )
     }
 }

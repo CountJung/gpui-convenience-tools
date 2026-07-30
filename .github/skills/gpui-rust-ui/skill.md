@@ -114,13 +114,17 @@ ALWAYS use:
 - margin-based layout
 - pixel magic numbers
 
-## SCROLLABLE SPLIT PANELS
+## SCROLLABLE FEATURE PANELS
 
-- Wrap each resizable split region with `window::scroll_pane`.
+- Use a resizable split only when both regions must be scanned independently.
+- For a coupled select → configure → run → result workflow, use one full-width
+  `window::scroll_pane` and stack the sections in workflow order.
+- Wrap each region of a chosen resizable split with `window::scroll_pane`.
 - Constrain the viewport and its flex ancestors with `size_full`/`h_full` plus `min_h_0`.
 - Keep the scroll content root at natural height; use `w_full`, not `size_full`/`h_full`.
 - Do not put `flex_1().min_h_0()` on a long settings card inside a scroll pane.
-- Verify that the final control is reachable at the minimum supported window height.
+- Verify equal section widths and that the final control is reachable at the minimum supported
+  window height.
 
 ## SWITCH VISIBILITY
 

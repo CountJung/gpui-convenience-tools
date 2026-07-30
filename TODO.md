@@ -15,8 +15,9 @@
 ## 0. 실제 화면 검증 대기
 
 - [ ] **Phase J 실제 화면 순차 검증**
-  캡처 범위에는 사이드바 경계·overflow 스크롤, 균형 스플리터, 테마별 스위치, 파일 동기화
-  스크롤을 포함한다. 구현 담당자 1차 검증 후 독립 Visual Reviewer 2차 검증을 수행한다.
+  캡처 범위에는 사이드바 경계·divider 리사이즈·overflow 스크롤, 독립 탐색형 스플리터,
+  테마별 스위치, 파일 동기화 전체 너비 단일 페이지·스크롤·실행 결과를 포함한다.
+  구현 담당자 1차 검증 후 독립 Visual Reviewer 2차 검증을 수행한다.
   - **Windows Claude Code(`CLAUDE_LOCAL`)**: 인계 없이
     `scripts/Invoke-ClaudeVisualCheck.ps1`으로 두 검증을 모두 수행하고 `PASS`/`FAIL`/
     `BLOCKED`를 판정한다. 하네스가 커버하지 못하는 항목(키보드 텍스트 입력 등)은 한계로
@@ -74,7 +75,8 @@
 ## 2. 편의 기능 확장 — Phase E
 
 새 기능은 `.github/copilot-instructions.md`의 **편의 기능 패널 구조 기준**을 따른다
-(독립 패널 + 스플리터 + `NAV_TOOLS` 등록 + `fills_height` 추가).
+(독립 패널 + 작업 흐름에 맞는 스플리터/단일 페이지 + `NAV_TOOLS` 등록 +
+`fills_height` 추가).
 
 - [ ] **클립보드 히스토리** — 텍스트/이미지 최근 N개, 고정(pin), 검색
 - [ ] **프로세스 모니터** — CPU/메모리 상위 프로세스, 강제 종료

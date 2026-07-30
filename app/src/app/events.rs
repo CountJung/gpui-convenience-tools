@@ -42,6 +42,11 @@ impl AppRoot {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
+        #[cfg(test)]
+        if !self.external_side_effects_enabled {
+            return;
+        }
+
         window.push_notification(
             Notification::new()
                 .message(message)
