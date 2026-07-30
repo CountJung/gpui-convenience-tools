@@ -97,7 +97,7 @@ fn render_service_list(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElem
         let item_sizes = Rc::new(
             filtered_indices
                 .iter()
-                .map(|_| size(px(0.), px(52.0)))
+                .map(|_| size(px(0.), px(88.0)))
                 .collect::<Vec<_>>(),
         );
         let idx = Rc::clone(&filtered_indices);
@@ -112,10 +112,10 @@ fn render_service_list(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElem
                 visible_range
                     .map(|list_ix| {
                         let Some(&svc_ix) = idx.get(list_ix) else {
-                            return div().h(px(52.0));
+                            return div().h(px(88.0));
                         };
                         let Some(svc) = this.sys_services.get(svc_ix) else {
-                            return div().h(px(52.0));
+                            return div().h(px(88.0));
                         };
 
                         let badge_tone = match svc.status {
@@ -136,143 +136,212 @@ fn render_service_list(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElem
                         let is_favorite = this.is_favorite_service(&svc.name);
 
                         div()
-                            .h(px(52.0))
-                            .px_4()
+                            .debug_selector(move || format!("service-row-{svc_ix}"))
+                            .h(px(88.0))
+                            .px_3()
                             .pr(px(20.0))
+                            .py_2()
                             .border_b_1()
                             .border_color(theme.border)
                             .hover(|s| s.bg(theme.secondary_hover))
                             .child(
-                                h_flex()
+                                v_flex()
                                     .h_full()
-                                    .gap_3()
-                                    .items_center()
-                                    // 즐겨찾기 토글
+                                    .gap_2()
+                                    .justify_center()
+                                    // 서비스 식별 정보는 제어 버튼과 행을 나눠 가용 폭을 온전히 쓴다.
                                     .child(
-                                        div()
-                                            .id(("svc-fav", svc_ix))
-                                            .w(px(24.0))
-                                            .flex()
+                                        h_flex()
+                                            .w_full()
+                                            .gap_2()
                                             .items_center()
-                                            .justify_center()
-                                            .cursor_pointer()
-                                            .text_color(if is_favorite {
-                                                theme.warning
-                                            } else {
-                                                theme.muted_foreground
-                                            })
-                                            .on_click(cx.listener(move |this, _ev, _window, cx| {
-                                                this.toggle_favorite_service(&name_fav);
-                                                cx.notify();
-                                            }))
-                                            .child(if is_favorite { "★" } else { "☆" }),
-                                    )
-                                    // 표시 이름 + 서비스명
-                                    .child(
-                                        v_flex()
-                                            .flex_1()
-                                            .min_w_0()
                                             .child(
                                                 div()
-                                                    .text_color(theme.foreground)
-                                                    .child(display),
+                                                    .id(("svc-fav", svc_ix))
+                                                    .w(px(24.0))
+                                                    .flex_shrink_0()
+                                                    .flex()
+                                                    .items_center()
+                                                    .justify_center()
+                                                    .cursor_pointer()
+                                                    .text_color(if is_favorite {
+                                                        theme.warning
+                                                    } else {
+                                                        theme.muted_foreground
+                                                    })
+                                                    .on_click(cx.listener(
+                                                        move |this, _ev, _window, cx| {
+                                                            this.toggle_favorite_service(&name_fav);
+                                                            cx.notify();
+                                                        },
+                                                    ))
+                                                    .child(if is_favorite { "★" } else { "☆" }),
                                             )
                                             .child(
-                                                div()
-                                                    .text_color(theme.muted_foreground)
-                                                    .child(name_label),
+                                                v_flex()
+                                                    .debug_selector(move || {
+                                                        format!("service-row-{svc_ix}-identity")
+                                                    })
+                                                    .flex_1()
+                                                    .min_w_0()
+                                                    .overflow_hidden()
+                                                    .child(
+                                                        div()
+                                                            .whitespace_nowrap()
+                                                            .text_color(theme.foreground)
+                                                            .child(display),
+                                                    )
+                                                    .child(
+                                                        div()
+                                                            .whitespace_nowrap()
+                                                            .text_color(theme.muted_foreground)
+                                                            .child(name_label),
+                                                    ),
                                             ),
                                     )
-                                    // 상태 배지
+                                    // 상태와 작업은 별도 줄에서 고정 폭을 보존한다.
                                     .child(
-                                        ui::badge(status_label, badge_tone, ui::Size::Sm, cx)
-                                            .w(px(90.0)),
-                                    )
-                                    // 시작 버튼
-                                    .child(
-                                        ui::action_button(
-                                            ("svc-start", svc_ix),
-                                            "시작",
-                                            ui::Size::Sm,
-                                            if is_running {
-                                                ButtonStyle::muted(cx)
-                                                    .border(theme.border)
-                                                    .hover(theme.secondary_hover)
-                                            } else {
-                                                ButtonStyle::neutral(cx)
-                                            },
-                                            cx.listener(move |this, _ev, window, cx| {
-                                                match this.platform.start_sys_service(&name_start) {
-                                                    Ok(()) => {
-                                                        this.push_service_log(
-                                                            &format!("서비스 시작: {name_start}"),
-                                                            window,
-                                                            cx,
-                                                        );
-                                                        this.refresh_sys_services();
-                                                    }
-                                                    Err(e) => {
-                                                        this.push_service_log(
-                                                            &format!("시작 실패 ({name_start}): {e}"),
-                                                            window,
-                                                            cx,
-                                                        );
-                                                    }
-                                                }
-                                                cx.notify();
-                                            }),
-                                        )
-                                        .w(px(52.0)),
-                                    )
-                                    // 중지 버튼
-                                    .child(
-                                        ui::action_button(
-                                            ("svc-stop", svc_ix),
-                                            "중지",
-                                            ui::Size::Sm,
-                                            if is_running {
-                                                ButtonStyle::danger(cx)
-                                            } else {
-                                                ButtonStyle::muted(cx)
-                                            },
-                                            cx.listener(move |this, _ev, window, cx| {
-                                                match this.platform.stop_sys_service(&name_stop) {
-                                                    Ok(()) => {
-                                                        this.push_service_log(
-                                                            &format!("서비스 중지: {name_stop}"),
-                                                            window,
-                                                            cx,
-                                                        );
-                                                        this.refresh_sys_services();
-                                                    }
-                                                    Err(e) => {
-                                                        this.push_service_log(
-                                                            &format!("중지 실패 ({name_stop}): {e}"),
-                                                            window,
-                                                            cx,
-                                                        );
-                                                    }
-                                                }
-                                                cx.notify();
-                                            }),
-                                        )
-                                        .w(px(52.0)),
-                                    )
-                                    // 삭제 버튼 (spacer + danger 스타일)
-                                    .child(div().w(px(8.0)))
-                                    .child(
-                                        ui::action_button(
-                                            ("svc-delete", svc_ix),
-                                            "삭제",
-                                            ui::Size::Sm,
-                                            ButtonStyle::danger(cx),
-                                            cx.listener(move |this, _ev, _window, cx| {
-                                                this.pending_delete_service =
-                                                    Some(name_delete.clone());
-                                                cx.notify();
-                                            }),
-                                        )
-                                        .w(px(52.0)),
+                                        h_flex()
+                                            .debug_selector(move || {
+                                                format!("service-row-{svc_ix}-controls")
+                                            })
+                                            .w_full()
+                                            .gap_2()
+                                            .items_center()
+                                            .justify_between()
+                                            .child(
+                                                ui::badge(
+                                                    status_label,
+                                                    badge_tone,
+                                                    ui::Size::Sm,
+                                                    cx,
+                                                )
+                                                .w(px(90.0))
+                                                .flex_shrink_0()
+                                                .whitespace_nowrap(),
+                                            )
+                                            .child(
+                                                h_flex()
+                                                    .debug_selector(move || {
+                                                        format!("service-row-{svc_ix}-actions")
+                                                    })
+                                                    .w(px(172.0))
+                                                    .flex_shrink_0()
+                                                    .gap_2()
+                                                    .child(
+                                                        ui::action_button(
+                                                            ("svc-start", svc_ix),
+                                                            "시작",
+                                                            ui::Size::Sm,
+                                                            if is_running {
+                                                                ButtonStyle::muted(cx)
+                                                                    .border(theme.border)
+                                                                    .hover(theme.secondary_hover)
+                                                            } else {
+                                                                ButtonStyle::neutral(cx)
+                                                            },
+                                                            cx.listener(
+                                                                move |this,
+                                                                      _ev,
+                                                                      window,
+                                                                      cx| {
+                                                                    match this
+                                                                        .platform
+                                                                        .start_sys_service(
+                                                                            &name_start,
+                                                                        ) {
+                                                                        Ok(()) => {
+                                                                            this.push_service_log(
+                                                                                &format!(
+                                                                                    "서비스 시작: {name_start}"
+                                                                                ),
+                                                                                window,
+                                                                                cx,
+                                                                            );
+                                                                            this.refresh_sys_services();
+                                                                        }
+                                                                        Err(e) => {
+                                                                            this.push_service_log(
+                                                                                &format!(
+                                                                                    "시작 실패 ({name_start}): {e}"
+                                                                                ),
+                                                                                window,
+                                                                                cx,
+                                                                            );
+                                                                        }
+                                                                    }
+                                                                    cx.notify();
+                                                                },
+                                                            ),
+                                                        )
+                                                        .w(px(52.0)),
+                                                    )
+                                                    .child(
+                                                        ui::action_button(
+                                                            ("svc-stop", svc_ix),
+                                                            "중지",
+                                                            ui::Size::Sm,
+                                                            if is_running {
+                                                                ButtonStyle::danger(cx)
+                                                            } else {
+                                                                ButtonStyle::muted(cx)
+                                                            },
+                                                            cx.listener(
+                                                                move |this,
+                                                                      _ev,
+                                                                      window,
+                                                                      cx| {
+                                                                    match this
+                                                                        .platform
+                                                                        .stop_sys_service(
+                                                                            &name_stop,
+                                                                        ) {
+                                                                        Ok(()) => {
+                                                                            this.push_service_log(
+                                                                                &format!(
+                                                                                    "서비스 중지: {name_stop}"
+                                                                                ),
+                                                                                window,
+                                                                                cx,
+                                                                            );
+                                                                            this.refresh_sys_services();
+                                                                        }
+                                                                        Err(e) => {
+                                                                            this.push_service_log(
+                                                                                &format!(
+                                                                                    "중지 실패 ({name_stop}): {e}"
+                                                                                ),
+                                                                                window,
+                                                                                cx,
+                                                                            );
+                                                                        }
+                                                                    }
+                                                                    cx.notify();
+                                                                },
+                                                            ),
+                                                        )
+                                                        .w(px(52.0)),
+                                                    )
+                                                    .child(
+                                                        ui::action_button(
+                                                            ("svc-delete", svc_ix),
+                                                            "삭제",
+                                                            ui::Size::Sm,
+                                                            ButtonStyle::danger(cx),
+                                                            cx.listener(
+                                                                move |this,
+                                                                      _ev,
+                                                                      _window,
+                                                                      cx| {
+                                                                    this.pending_delete_service =
+                                                                        Some(name_delete.clone());
+                                                                    cx.notify();
+                                                                },
+                                                            ),
+                                                        )
+                                                        .w(px(52.0)),
+                                                    ),
+                                            ),
                                     ),
                             )
                     })
@@ -419,65 +488,33 @@ fn render_service_list(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElem
                     // 컬럼 헤더
                     .child(
                         h_flex()
-                            .px_4()
+                            .px_3()
                             .pr(px(20.0))
                             .py_2()
                             .border_b_1()
                             .border_color(theme.border)
-                            .gap_3()
-                            .child(div().w(px(24.0)))
+                            .justify_between()
+                            .child(div().text_color(theme.muted_foreground).child("서비스"))
                             .child(
                                 div()
-                                    .flex_1()
-                                    .min_w_0()
                                     .text_color(theme.muted_foreground)
-                                    .child("서비스"),
-                            )
-                            .child(
-                                div()
-                                    .w(px(90.0))
-                                    .text_color(theme.muted_foreground)
-                                    .child("상태"),
-                            )
-                            .child(
-                                div()
-                                    .w(px(52.0))
-                                    .text_color(theme.muted_foreground)
-                                    .child("시작"),
-                            )
-                            .child(
-                                div()
-                                    .w(px(52.0))
-                                    .text_color(theme.muted_foreground)
-                                    .child("중지"),
-                            )
-                            .child(div().w(px(8.0)))
-                            .child(
-                                div()
-                                    .w(px(52.0))
-                                    .text_color(theme.danger)
-                                    .child("삭제"),
+                                    .child("상태 · 작업"),
                             ),
                     )
                     // 목록 본문
                     .child(
-                        div()
-                            .relative()
-                            .flex_1()
-                            .min_h_0()
-                            .child(list_body)
-                            .child(
-                                div()
-                                    .absolute()
-                                    .top_0()
-                                    .left_0()
-                                    .right_0()
-                                    .bottom_0()
-                                    .child(
-                                        Scrollbar::vertical(&svc_scroll)
-                                            .scrollbar_show(ScrollbarShow::Always),
-                                    ),
-                            ),
+                        div().relative().flex_1().min_h_0().child(list_body).child(
+                            div()
+                                .absolute()
+                                .top_0()
+                                .left_0()
+                                .right_0()
+                                .bottom_0()
+                                .child(
+                                    Scrollbar::vertical(&svc_scroll)
+                                        .scrollbar_show(ScrollbarShow::Always),
+                                ),
+                        ),
                     ),
             ),
     );

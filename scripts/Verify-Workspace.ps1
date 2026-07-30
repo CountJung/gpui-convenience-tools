@@ -11,6 +11,7 @@ $packageName = "gpui-convenience-tools"
 $visualTests = @(
     "ad_block_split_fills_default_and_minimum_supported_width",
     "split_panels_keep_settings_pane_usable_at_default_width",
+    "service_rows_keep_names_readable_at_supported_window_widths",
     "sidebar_divider_drag_resizes_navigation_and_content",
     "sidebar_wheel_scroll_reaches_last_navigation_item",
     "rendered_switch_toggles_in_light_dark_and_missing_switch_token_theme",

@@ -1,6 +1,7 @@
 //! 사이드바·스플리터·스크롤 레이아웃 회귀 테스트.
 
 use super::*;
+use crate::platform::{SysServiceInfo, SysServiceStartType, SysServiceStatus};
 
 fn drag_divider(
     cx: &mut gpui::VisualTestContext,
@@ -86,6 +87,54 @@ fn assert_feature_split_is_usable(
     );
 }
 
+fn assert_service_row_preserves_identity_width(cx: &mut gpui::VisualTestContext) {
+    let row = cx
+        .debug_bounds("service-row-0")
+        .expect("first service row should be rendered");
+    let identity = cx
+        .debug_bounds("service-row-0-identity")
+        .expect("service identity should be rendered");
+    let controls = cx
+        .debug_bounds("service-row-0-controls")
+        .expect("service controls should be rendered");
+    let actions = cx
+        .debug_bounds("service-row-0-actions")
+        .expect("service actions should be rendered");
+
+    assert!(
+        identity.size.width >= px(250.0),
+        "service identity should retain readable width instead of collapsing to one glyph: \
+         row={row:?}, identity={identity:?}"
+    );
+    assert!(
+        identity.size.height >= px(32.0),
+        "display name and service name should occupy two readable lines: {identity:?}"
+    );
+    assert!(
+        actions.size.width >= px(171.0),
+        "three service action buttons should retain their fixed widths: {actions:?}"
+    );
+
+    let row_right = row.origin.x + row.size.width;
+    let identity_right = identity.origin.x + identity.size.width;
+    let controls_right = controls.origin.x + controls.size.width;
+    let actions_right = actions.origin.x + actions.size.width;
+    assert!(
+        identity.origin.x >= row.origin.x
+            && identity_right <= row_right
+            && controls.origin.x >= row.origin.x
+            && controls_right <= row_right
+            && actions_right <= row_right,
+        "identity and controls should remain inside the service row: \
+         row={row:?}, identity={identity:?}, controls={controls:?}, actions={actions:?}"
+    );
+    assert!(
+        identity.origin.y + identity.size.height <= controls.origin.y,
+        "service identity and controls should use separate rows without overlap: \
+         identity={identity:?}, controls={controls:?}"
+    );
+}
+
 #[gpui::test]
 fn ad_block_split_fills_default_and_minimum_supported_width(cx: &mut TestAppContext) {
     initialize_components(cx);
@@ -124,6 +173,30 @@ fn split_panels_keep_settings_pane_usable_at_default_width(cx: &mut TestAppConte
         "service-mgr-split-left-pane",
         "service-mgr-split-right-pane",
     );
+}
+
+#[gpui::test]
+fn service_rows_keep_names_readable_at_supported_window_widths(cx: &mut TestAppContext) {
+    initialize_components(cx);
+    let (view, cx) = cx.add_window_view(|_, _| test_app_root(ActivePanel::Services));
+
+    cx.update(|_, app| {
+        view.update(app, |root, cx| {
+            root.sys_services = vec![SysServiceInfo {
+                name: "LongBackgroundServiceIdentifier".to_string(),
+                display_name: "긴 Windows 백그라운드 서비스 표시 이름".to_string(),
+                status: SysServiceStatus::Running,
+                start_type: SysServiceStartType::Automatic,
+            }];
+            cx.notify();
+        });
+    });
+
+    for width in [MIN_SUPPORTED_WINDOW_WIDTH, DEFAULT_WINDOW_WIDTH, 1280.0] {
+        cx.simulate_resize(size(px(width), px(DEFAULT_WINDOW_HEIGHT)));
+        refresh(cx);
+        assert_service_row_preserves_identity_width(cx);
+    }
 }
 
 #[gpui::test]
