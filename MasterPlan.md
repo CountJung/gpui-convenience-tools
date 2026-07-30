@@ -220,6 +220,29 @@ cargo workspace, Hello World 앱 동작 확인
 - 실제 화면 1차·2차 검증은 `target/visual-validation/handoff.json`을 생성한 뒤 Windows
   ChatGPT 데스크톱 앱에서 재개
 
+### Phase J-2 — Claude Code 로컬 시각 검증 표면(`CLAUDE_LOCAL`) 도입 ✅
+
+기존 하드 게이트는 ChatGPT 데스크톱의 Computer Use를 전제로 설계돼, 그 API가 아예 없는
+Claude Code까지 `IDE`로 묶어 실제 화면 검증을 금지하고 있었다. 실측으로 대안 경로를 확인해
+표면을 분리했다.
+
+- Claude Code에는 Computer Use 도구가 존재하지 않음을 확인(전체 도구 목록 조회). ChatGPT에서
+  문제가 됐던 wrapper·native pipe 오작동은 Claude Code에서 발생할 수 없다
+- `PrintWindow(..., PW_RENDERFULLCONTENT)`가 GPU 렌더링(GPUI/Blade) 창을 정상 캡처하고,
+  `SendInput` 휠·클릭이 대상 창에 전달되는 것을 실제 앱으로 확인. 전체 데스크톱이 아니라
+  대상 창만 캡처된다
+- `scripts/Invoke-ClaudeVisualCheck.ps1` 추가 — 격리 실행·캡처·휠·클릭·크기 변경·정리를
+  단일 세션 모델로 제공. 포그라운드 확보 실패 시 입력을 보내지 않고 중단
+- **격리 결함 수정**: `config::data_dir()`이 `dirs::config_dir()`(= `SHGetKnownFolderPath`)를
+  쓰기 때문에 기존 검증 스크립트의 `APPDATA` 격리는 **한 번도 동작한 적이 없었고**, 검증
+  프로세스가 사용자의 실제 `config.json`·로그를 그대로 사용했다. `GPUI_CONVENIENCE_TOOLS_DATA_DIR`
+  오버라이드를 추가하고 두 시작 스크립트에 연결해 실제 격리를 확인
+- **정리 실패 수정**: `Stop-DesktopVisualValidation.ps1`의 시작 시각 비교가 `ConvertFrom-Json`이
+  만든 `Kind=Unspecified` DateTime을 다시 로컬로 해석해, UTC가 아닌 시간대에서는 항상
+  9시간(KST) 어긋나 프로세스를 정리하지 못했다. 두 스크립트 모두 UTC 변환 헬퍼로 교체
+- 정본·Claude 어댑터·공용 리뷰어 프롬프트·`CLAUDE.md`·`AGENTS.md`·VS Code 작업에 표면 분리와
+  격리 규칙 반영
+
 ---
 
 ## 진행 예정 단계

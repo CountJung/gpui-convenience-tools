@@ -46,6 +46,46 @@
       }
     },
     {
+      "label": "GPUI: Start Claude local visual session",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}\\scripts\\Invoke-ClaudeVisualCheck.ps1",
+        "-Action",
+        "Start"
+      ],
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      }
+    },
+    {
+      "label": "GPUI: Stop Claude local visual session",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}\\scripts\\Invoke-ClaudeVisualCheck.ps1",
+        "-Action",
+        "Stop"
+      ],
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      }
+    },
+    {
       "label": "GPUI: Prepare ChatGPT desktop handoff",
       "type": "shell",
       "command": "powershell",

@@ -104,9 +104,15 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | 파일 | 줄 | 책임 |
 | --- | ---: | --- |
 | `scripts/Verify-Workspace.ps1` | 163 | VS Code용 Rust/GPUI 자동 검증과 ChatGPT 데스크톱 handoff manifest·해시 고정 빌드 생성 |
-| `scripts/Start-DesktopVisualValidation.ps1` | 115 | manifest 해시 검증 후 단일 임시 `APPDATA` 격리 프로세스·세션 파일 생성과 실패 롤백 |
-| `scripts/Stop-DesktopVisualValidation.ps1` | 58 | 기록된 검증 PID·시작 시각과 작업 전용 임시 루트만 검증 후 정리 |
-| `.vscode/tasks.json` | 71 | IDE 전용 검증과 ChatGPT 데스크톱 인계 준비 작업 |
+| `scripts/Invoke-ClaudeVisualCheck.ps1` | 437 | `CLAUDE_LOCAL` 시각 검증 하네스 — 격리 실행·창 캡처(`PrintWindow`)·입력(`SendInput`)·정리 |
+| `scripts/Start-DesktopVisualValidation.ps1` | 126 | manifest 해시 검증 후 단일 임시 데이터 루트 격리 프로세스·세션 파일 생성과 실패 롤백 |
+| `scripts/Stop-DesktopVisualValidation.ps1` | 75 | 기록된 검증 PID·시작 시각과 작업 전용 임시 루트만 검증 후 정리 |
+| `.vscode/tasks.json` | 111 | IDE 전용 검증, Claude 로컬 시각 세션, ChatGPT 데스크톱 인계 준비 작업 |
+
+> `Invoke-ClaudeVisualCheck.ps1`은 437줄이지만 분할하지 않는다. 하나의 Win32 시퀀스
+> (P/Invoke 선언 → 세션 → 캡처 → 입력 → 정리)를 공유하고, 쪼개면 각 파일이 같은 `Add-Type`
+> 블록과 세션 스키마를 중복 소유하게 되어 응집도가 깨진다.
+> 정본의 「구조 리팩터링 기준 > 예외」 조항을 적용한다.
 
 ---
 

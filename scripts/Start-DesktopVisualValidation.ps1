@@ -53,9 +53,14 @@ try {
 
     $standardOutputPath = Join-Path $sessionRoot "process.stdout.log"
     $standardErrorPath = Join-Path $sessionRoot "process.stderr.log"
+    # 앱은 `dirs::config_dir()`(= `SHGetKnownFolderPath`)로 데이터 루트를 찾으므로
+    # `APPDATA`만 바꿔서는 격리되지 않는다. 전용 변수를 함께 지정해야 사용자의 실제
+    # config.json·로그가 보호된다.
     $previousAppData = $env:APPDATA
+    $previousDataDir = $env:GPUI_CONVENIENCE_TOOLS_DATA_DIR
     try {
         $env:APPDATA = $appDataPath
+        $env:GPUI_CONVENIENCE_TOOLS_DATA_DIR = $appDataPath
         $process = Start-Process `
             -FilePath $binaryPath `
             -WorkingDirectory $repoRoot `
@@ -69,6 +74,12 @@ try {
         }
         else {
             $env:APPDATA = $previousAppData
+        }
+        if ($null -eq $previousDataDir) {
+            Remove-Item Env:\GPUI_CONVENIENCE_TOOLS_DATA_DIR -ErrorAction SilentlyContinue
+        }
+        else {
+            $env:GPUI_CONVENIENCE_TOOLS_DATA_DIR = $previousDataDir
         }
     }
 

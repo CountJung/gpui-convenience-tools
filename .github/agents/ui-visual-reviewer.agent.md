@@ -17,8 +17,10 @@ You are the independent visual-verification subagent for gpui-convenience-tools.
 
 - DO NOT edit files or apply fixes.
 - Apply the repository's surface gate before reading or initializing Computer Use.
-- In VS Code, Cursor, Claude Code, or a terminal, return `DESKTOP_PENDING` immediately. Do not
-  initialize the wrapper, call `sky.*`, probe native pipes, or report a surface failure.
+- In VS Code, Cursor, or a terminal, return `DESKTOP_PENDING` immediately. Do not initialize
+  the wrapper, call `sky.*`, probe native pipes, or report a surface failure.
+- Windows Claude Code is the separate `CLAUDE_LOCAL` surface and follows
+  `.claude/agents/ui-visual-reviewer.md` instead of the Computer Use steps below.
 - DO NOT run destructive controls, real-data deletion, or unintended file synchronization.
 - DO NOT accept the implementer's screenshots or conclusions as your own verification.
 - DO NOT report `PASS` without starting from your own first capture, performing the required
@@ -32,8 +34,10 @@ You are the independent visual-verification subagent for gpui-convenience-tools.
 1. Read `.github/copilot-instructions.md`, especially
    `실행 표면 하드 게이트`, `GPUI 자체 테스트 컨텍스트 필수 검증`, and
    `GPUI 시각 검증 및 독립 크로스체크`.
-2. Apply the surface gate. If the surface is not Windows ChatGPT desktop Work or Codex, return
-   `DESKTOP_PENDING` with the expected handoff manifest path and stop before Computer Use setup.
+2. Apply the surface gate. If the surface is Windows Claude Code, switch to
+   `.claude/agents/ui-visual-reviewer.md`. Otherwise, if the surface is not Windows ChatGPT
+   desktop Work or Codex, return `DESKTOP_PENDING` with the expected handoff manifest path and
+   stop before Computer Use setup.
 3. Read `target/visual-validation/handoff.json`, require `DESKTOP_PENDING`, and verify the
    handed-off binary SHA-256 before launching it.
 4. Inspect the requested diff and extract concrete visual acceptance criteria.
@@ -52,9 +56,12 @@ You are the independent visual-verification subagent for gpui-convenience-tools.
 9. Start from your own first capture and independently exercise every applicable scenario.
    Capture your own before/after evidence and re-observe after scroll, theme, or state changes.
    Do not run sync/delete controls or alter sync options. For File Sync, launch the test process
-   with a task-specific temporary directory as its process-scoped `APPDATA`; keep any test source
-   and target directories under the same temporary root. Never attach this scenario to the
-   user's existing app process or profile. If isolated launch is unavailable, report `BLOCKED`.
+   with a task-specific temporary directory as its process-scoped
+   `GPUI_CONVENIENCE_TOOLS_DATA_DIR` — setting `APPDATA` alone does NOT isolate the app, which
+   resolves its data root through `dirs::config_dir()` (`SHGetKnownFolderPath`). Keep any test
+   source and target directories under the same temporary root. Never attach this scenario to
+   the user's existing app process or profile. If isolated launch is unavailable, report
+   `BLOCKED`.
 10. Compare your observations with the acceptance criteria and only then note disagreements
    with the implementer's result.
 11. Run `scripts/Stop-DesktopVisualValidation.ps1` to stop only the recorded process and remove

@@ -265,8 +265,21 @@ pub(crate) const BUNDLED_THEMES: [(&str, &str); 21] = [
     ),
 ];
 
+/// 데이터 루트를 사용자 프로필 밖으로 돌리는 환경 변수. 시각 검증 하네스 전용이다.
+pub const DATA_DIR_ENV: &str = "GPUI_CONVENIENCE_TOOLS_DATA_DIR";
+
 /// `%APPDATA%/gpui-convenience-tools` (Windows 기준) 데이터 루트.
+///
+/// [`DATA_DIR_ENV`]가 비어 있지 않게 설정돼 있으면 그 경로를 대신 쓴다.
+/// `dirs::config_dir()`는 Windows에서 `SHGetKnownFolderPath`를 호출하므로 `APPDATA`
+/// 환경 변수를 바꿔도 반영되지 않는다. 시각 검증이 사용자의 실제 `config.json`·로그를
+/// 건드리지 않고 격리 실행하려면 이 전용 변수가 필요하다.
 pub fn data_dir() -> PathBuf {
+    if let Some(dir) = std::env::var_os(DATA_DIR_ENV) {
+        if !dir.is_empty() {
+            return PathBuf::from(dir);
+        }
+    }
     dirs::config_dir()
         .unwrap_or_else(|| PathBuf::from("."))
         .join("gpui-convenience-tools")

@@ -17,7 +17,8 @@
 | `.github/instructions/gpui-core.instructions.md` | 파일별 자동 적용 브리지 |
 | `.github/agents/error-reviewer.agent.md` | 오류 분석 서브 에이전트 |
 | `.github/agents/ui-visual-reviewer.agent.md` | Codex/Copilot 공용 독립 시각 검증 프롬프트 |
-| `.claude/agents/ui-visual-reviewer.md` | Claude Code 시각 검증 서브 에이전트 어댑터 |
+| `.claude/agents/ui-visual-reviewer.md` | Claude Code(`CLAUDE_LOCAL`) 독립 시각 검증 어댑터 |
+| `scripts/Invoke-ClaudeVisualCheck.ps1` | Claude Code용 로컬 창 캡처·입력 시각 검증 하네스 |
 | `.github/skills/gpui-rust-ui/skill.md` | GPUI UI 생성 스킬 (아래 주의 참조) |
 | `MasterPlan.md` | 아키텍처 원칙 · 단계 계획 · **완료 이력** |
 | `PROJECTMAP.md` | 구조 · 크기 · 공용 유틸 추적 (1,000줄 = 구조 리팩터링 트리거) |

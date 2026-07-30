@@ -315,9 +315,15 @@ GPUI 레이아웃, 색상·테마, 가시성, 스크롤·클리핑, 포커스 �
 
 | 현재 표면 | 판정 | 허용되는 검증 |
 | --- | --- | --- |
-| VS Code/Cursor의 Codex·Copilot 확장, Claude Code, 일반 터미널 | `IDE` | 정적 검사, Rust/GPUI 테스트, 데스크톱 인계 준비 |
+| VS Code/Cursor의 Codex·Copilot 확장, 일반 터미널 | `IDE` | 정적 검사, Rust/GPUI 테스트, 데스크톱 인계 준비 |
+| Windows에서 실행 중인 Claude Code | `CLAUDE_LOCAL` | IDE 검증 전부 + 로컬 하네스로 실제 화면 검증 |
 | Windows ChatGPT 데스크톱 앱의 Work 또는 Codex | `DESKTOP` | 인계된 빌드의 Computer Use 실제 화면 검증 |
-| 제품 표면을 확정할 수 없음 | `IDE` | 안전하게 IDE 절차만 수행 |
+| 비Windows Claude Code, 제품 표면을 확정할 수 없음 | `IDE` | 안전하게 IDE 절차만 수행 |
+
+`IDE`와 `DESKTOP`을 가르던 기존 규칙은 **ChatGPT 데스크톱의 Computer Use를 전제로** 만들어졌다.
+VS Code의 Codex·Copilot 확장에서 그 wrapper·native pipe를 억지로 살리려다 오작동이 반복됐기
+때문에 그 표면에서는 시도 자체를 금지한다. Claude Code는 애초에 그 API를 갖고 있지 않아
+같은 오작동이 발생할 수 없고, 대신 저장소가 소유한 다른 경로가 있으므로 별도 표면으로 둔다.
 
 ### IDE 표면
 
@@ -332,6 +338,43 @@ GPUI 레이아웃, 색상·테마, 가시성, 스크롤·클리핑, 포커스 �
   `target/visual-validation/handoff.json`과 해시 고정 바이너리를 생성한다. IDE 작업은 여기서
   종료하며 같은 요청에서 Computer Use를 재시도하지 않는다.
 - 과거 `native pipe` 오류를 `MasterPlan.md`나 `TODO.md`에 반복 기록하지 않는다.
+
+### CLAUDE_LOCAL 표면 (Windows Claude Code)
+
+Claude Code에는 ChatGPT 데스크톱의 Computer Use(`sky.*`, `codex-computer-use.exe`, native pipe)에
+해당하는 도구가 **아예 없다.** 그러므로 이 표면에는 "Computer Use 초기화 시도"나 "wrapper 우회"라는
+개념 자체가 성립하지 않는다. 대신 저장소가 소유한 `scripts/Invoke-ClaudeVisualCheck.ps1`이
+Win32 창 캡처·입력을 제공하고, Claude는 저장된 PNG를 Read 도구로 직접 관찰한다.
+
+- 캡처는 `PrintWindow(..., PW_RENDERFULLCONTENT)`로 **대상 창만** 가져온다. 전체 데스크톱을
+  캡처하지 않으므로 창이 가려져 있어도 되고, 사용자의 다른 화면 내용은 파일에 남지 않는다.
+  GPU 렌더링(GPUI/Blade) 내용도 이 플래그가 있어야 비트맵에 들어온다.
+- 입력은 `SendInput` 휠·좌클릭과 `MoveWindow` 크기 변경을 지원한다. 좌표는 클라이언트 영역
+  기준 0~1 비율이라 창 크기가 달라져도 같은 지점을 가리킨다.
+- 검증 대상 프로세스는 작업 전용 임시 루트를 `GPUI_CONVENIENCE_TOOLS_DATA_DIR`로 지정해
+  실행한다. 앱은 `dirs::config_dir()`(= `SHGetKnownFolderPath`)로 데이터 루트를 찾으므로
+  **`APPDATA` 환경 변수만 바꾸는 격리는 동작하지 않는다.**
+- 검증이 끝나면 `-Action Stop`으로 기록된 PID와 작업 전용 임시 루트만 정리한다.
+
+```powershell
+scripts\Invoke-ClaudeVisualCheck.ps1 -Action Start -Width 920 -Height 480
+scripts\Invoke-ClaudeVisualCheck.ps1 -Action Capture -Name sidebar-before
+scripts\Invoke-ClaudeVisualCheck.ps1 -Action Wheel -X 0.12 -Y 0.65 -Delta -8
+scripts\Invoke-ClaudeVisualCheck.ps1 -Action Capture -Name sidebar-after
+scripts\Invoke-ClaudeVisualCheck.ps1 -Action Stop
+```
+
+이 표면의 한계는 그대로 보고한다. 한계를 넘는 수용 기준은 `PASS`로 판정하지 않는다.
+
+- `SendInput`은 데스크톱 전역 입력이라 실제 커서가 움직이고 대상 창이 포그라운드여야 한다.
+  하네스는 포그라운드 확보에 실패하면 입력을 보내지 않고 중단하지만, **사용자가 다른 작업을
+  하는 중에는 실행하지 않는다.** 검증 전에 사용자에게 알린다.
+- 대상 앱이 관리자 권한이고 Claude Code가 아니면 UIPI가 입력을 차단한다.
+- 접근성 트리 조회가 없어 좌표는 기하학적으로 정한다. 요소 단위 단언은 여전히
+  `debug_selector` 기반 GPUI 자체 테스트가 정본이고, 캡처는 그것을 대체하지 않는다.
+- 캡처는 정지 화면이라 애니메이션·순간 상태는 잡지 못한다.
+- 키보드 텍스트 입력은 하네스가 지원하지 않는다. 텍스트 입력이 필요한 수용 기준은
+  GPUI 자체 테스트로 검증한다.
 
 ### DESKTOP 표면
 
@@ -350,7 +393,10 @@ GPUI 레이아웃, 색상·테마, 가시성, 스크롤·클리핑, 포커스 �
 
 - `IDE_VERIFIED`: 코드·GPUI 자동 검증 통과. IDE 구현 작업은 완료해 인계할 수 있다.
 - `DESKTOP_PENDING`: 실제 화면 검증 대기. 시각·릴리즈 수용은 아직 `PASS`가 아니다.
-- `PASS` / `FAIL` / `BLOCKED`: DESKTOP 표면에서 실제 조작을 시도한 결과에만 사용한다.
+  `IDE` 표면에서만 쓰는 정상 인계 상태다.
+- `PASS` / `FAIL` / `BLOCKED`: `CLAUDE_LOCAL` 또는 `DESKTOP` 표면에서 실제 조작을 시도한
+  결과에만 사용한다. `CLAUDE_LOCAL`에서 하네스가 커버하지 못하는 수용 기준이 남으면 그
+  항목만 한계로 명시하고, 그 항목을 근거로 종합 `PASS`를 내지 않는다.
 
 ## GPUI 시각 검증 및 독립 크로스체크
 
@@ -359,9 +405,11 @@ GPUI 자체 테스트만으로 완료하지 않는다. 위 필수 테스트가 �
 **순차적으로** 수행한다. 같은 데스크톱을 동시에 조작하면 상태와 증거가 섞일 수 있으므로
 병렬 실행하지 않는다.
 
-Computer Use 실행 표면은 위 하드 게이트에서 `DESKTOP`으로 판정된 경우뿐이다. IDE에서
-구현했다면 `Verify-Workspace.ps1 -PrepareDesktopHandoff`가 만든 manifest와 해시 고정
+실제 화면 검증을 수행할 수 있는 표면은 `CLAUDE_LOCAL`과 `DESKTOP` 두 가지다.
+`IDE`에서 구현했다면 `Verify-Workspace.ps1 -PrepareDesktopHandoff`가 만든 manifest와 해시 고정
 바이너리, 수용 기준을 ChatGPT 데스크톱 검증 세션에 인계한다.
+`CLAUDE_LOCAL`에서는 인계 없이 `scripts/Invoke-ClaudeVisualCheck.ps1`으로 두 검증을 모두
+수행한다. ChatGPT 데스크톱 Computer Use(`sky.*`)를 쓰는 것은 `DESKTOP` 표면뿐이다.
 
 1. 구현 담당자가 실제 빌드의 앱을 Computer Use로 직접 조작하고 수용 기준별 캡처를 남긴다.
 2. 구현에 참여하지 않고 파일을 편집하지 않는 Visual Reviewer가 별도 검증 세션에서 같은
@@ -376,15 +424,20 @@ Computer Use 실행 표면은 위 하드 게이트에서 `DESKTOP`으로 판정�
 - 별도 검증 세션은 검증자가 첫 캡처부터 직접 조작한다는 뜻이며 사용자 설정 초기화를 뜻하지
   않는다. `%APPDATA%` 설정을 삭제·교체하지 않는다. 파일 동기화 검증은 실행·삭제 버튼과
   옵션 값을 바꾸지 않고 탐색·스크롤만 수행한다.
-- 파일 동기화 화면을 검증할 앱 프로세스는 작업 전용 임시 루트 아래의 빈 디렉터리를
-  process-scoped `APPDATA`로 지정해 실행한다. 필요한 원본·대상 폴더도 같은 임시 루트 아래에
-  만들고 그 범위에서만 테스트 작업을 구성한다. 기존 앱 프로세스나 사용자 `%APPDATA%`를
-  재사용하지 않는다. 격리 실행이 불가능하면 해당 시나리오는 `BLOCKED`로 보고한다.
+- 검증할 앱 프로세스는 작업 전용 임시 루트 아래의 빈 디렉터리를 process-scoped
+  `GPUI_CONVENIENCE_TOOLS_DATA_DIR`로 지정해 실행한다. **`APPDATA`만 바꾸면 격리되지 않는다** —
+  앱은 `dirs::config_dir()`(= `SHGetKnownFolderPath`)로 데이터 루트를 찾으므로 그 환경 변수를
+  읽지 않는다. 파일 동기화 검증에 필요한 원본·대상 폴더도 같은 임시 루트 아래에 만들고 그
+  범위에서만 테스트 작업을 구성한다. 기존 앱 프로세스나 사용자 `%APPDATA%`를 재사용하지
+  않는다. 격리 실행이 불가능하면 해당 시나리오는 `BLOCKED`로 보고한다.
+- 격리가 실제로 걸렸는지는 캡처로 확인한다. 격리된 프로필은 기본 테마·빈 상태로 뜨므로,
+  사용자의 저장된 설정이 보이면 격리가 깨진 것이다.
 
 Codex는 Visual Reviewer를 생성할 때 `.github/agents/ui-visual-reviewer.agent.md`를 먼저
 읽도록 위임한다. Claude Code는 `.claude/agents/ui-visual-reviewer.md`의 프로젝트
-서브에이전트를 사용한다. 두 어댑터 모두 이 문서의 같은 계약을 적용한다. 현재 표면이
-`IDE`이면 Visual Reviewer를 실행하지 않고 `DESKTOP_PENDING`으로 인계한다.
+서브에이전트를 사용한다. 두 어댑터 모두 이 문서의 같은 계약을 적용한다.
+현재 표면이 `IDE`이면 Visual Reviewer를 실행하지 않고 `DESKTOP_PENDING`으로 인계한다.
+`CLAUDE_LOCAL`이면 Visual Reviewer가 로컬 하네스로 자체 세션을 열어 독립 검증을 수행한다.
 
 ### ChatGPT 데스크톱 Computer Use health check
 
@@ -398,7 +451,9 @@ Codex는 Visual Reviewer를 생성할 때 `.github/agents/ui-visual-reviewer.age
   선택한 뒤 `sky.get_window_state({ window: targetWindow })`의 첫 캡처까지 성공해야 앱
   검증을 시작한다.
 - `@oai/sky` 직접 import, `codex-computer-use.exe` 직접 실행, 사용자 정의 native-pipe
-  클라이언트, PowerShell UI 자동화로의 우회는 금지한다.
+  클라이언트, PowerShell UI 자동화로의 우회는 금지한다. 이 금지는 **공식 Computer Use API가
+  존재하는 `DESKTOP` 표면 한정**이다. 그 API가 없는 `CLAUDE_LOCAL`에서 저장소가 소유한
+  `Invoke-ClaudeVisualCheck.ps1`을 쓰는 것은 우회가 아니라 유일한 정규 경로다.
 - 초기화나 첫 캡처가 실패하면 새 `node_repl` 세션에서 공식 wrapper 경로로 한 번 재시도한다.
   지원되는 ChatGPT 데스크톱 표면에서도 네이티브 helper·pipe가 계속 없으면 데스크톱 앱을
   완전히 재시작한 다음 새 세션에서 다시 확인한다. 현재 세션에서 직접 helper를 띄우거나
@@ -417,14 +472,15 @@ Codex는 Visual Reviewer를 생성할 때 `.github/agents/ui-visual-reviewer.age
 
 ### 증거와 차단 보고
 
-DESKTOP 검증 결과에는 `Overall(PASS|FAIL|BLOCKED)`, 검증자 역할, 빌드/커밋·SHA-256,
-도구·런타임,
+`CLAUDE_LOCAL`·`DESKTOP` 검증 결과에는 `Overall(PASS|FAIL|BLOCKED)`, 검증자 역할,
+빌드/커밋·SHA-256, 도구·런타임,
 시나리오별 사전 조건(테마·창 크기·앱 상태), 동작, 기대 결과, 관찰 결과, 캡처 식별자·시각,
 결과, 검증 간 불일치, 잔여 위험을 기록한다.
 
 `BLOCKED`에는 실패 단계(surface/import/setup/attach/capture/input), 실행한 정확한 API 또는
 명령, 원문 오류, 복구 시도, 대체 정적·자동 검증 결과, ChatGPT 데스크톱 인계 필요 여부,
-아직 확인하지 못한 수용 기준을 함께 적는다.
+아직 확인하지 못한 수용 기준을 함께 적는다. `CLAUDE_LOCAL`에서는 캡처 PNG 경로를 증거
+식별자로 쓰고, 하네스 한계로 확인하지 못한 항목을 분리해 적는다.
 기존 스크린샷이나 구두 설명만으로 시각 검증을 통과 처리하지 않는다.
 
 IDE 보고에는 `IDE_VERIFIED` 또는 자동 검증 실패, `DESKTOP_PENDING`, 실행한 VS Code

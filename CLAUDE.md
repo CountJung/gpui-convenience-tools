@@ -229,9 +229,14 @@ SCM 코드(`install_win_service` 등)는 남아 있지만 이 용도로는 쓰�
 - GPUI UI 변경은 정본의 「GPUI 자체 테스트 컨텍스트 필수 검증」과
   「GPUI 시각 검증 및 독립 크로스체크」를 적용하고, 독립 검증에는
   [.claude/agents/ui-visual-reviewer.md](.claude/agents/ui-visual-reviewer.md)를 사용한다.
-- Claude Code와 VS Code는 정본의 `IDE` 표면이다. Computer Use wrapper·native pipe를
-  초기화하거나 재시도하지 않고, `scripts/Verify-Workspace.ps1`로 검증한 뒤
-  `IDE_VERIFIED / DESKTOP_PENDING`으로 ChatGPT 데스크톱에 인계한다.
+- **Windows의 Claude Code는 정본의 `CLAUDE_LOCAL` 표면이다.** ChatGPT의 Computer Use
+  (`sky.*`·native pipe)는 Claude Code에 존재하지 않으므로 초기화·재시도하지 않되,
+  `scripts/Verify-Workspace.ps1`로 자동 검증을 마친 뒤
+  `scripts/Invoke-ClaudeVisualCheck.ps1`로 실제 화면 검증까지 직접 수행하고
+  `PASS`/`FAIL`/`BLOCKED`를 판정한다. VS Code의 Codex·Copilot 확장과 비Windows는 여전히
+  `IDE` 표면이라 `IDE_VERIFIED / DESKTOP_PENDING`으로 인계한다.
+- 검증용 앱 격리는 `GPUI_CONVENIENCE_TOOLS_DATA_DIR`로 한다. 앱이 `dirs::config_dir()`로
+  데이터 루트를 찾으므로 **`APPDATA`만 바꾸면 사용자의 실제 설정·로그를 그대로 쓴다.**
 - 작업 범위는 `MasterPlan.md` 단계 기준. **완료 이력은 `MasterPlan.md`「구현 완료 단계」,
   미착수 대기열은 `TODO.md`** 두 곳만 쓴다(체크리스트를 복제하던 `TASKS.md`는 제거됨).
 - 사용자에게 보이는 텍스트(설명, 주석, 커밋 메시지)는 한국어 또는 영어만 사용한다.
