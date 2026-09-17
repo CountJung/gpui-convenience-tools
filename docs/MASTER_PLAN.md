@@ -19,6 +19,7 @@ gpui-convenience-tools/          ← 저장소 루트
 │   ├── DEVELOPMENT_GUIDE.md
 │   ├── MASTER_PLAN.md
 │   ├── PROJECT_MAP.md
+│   ├── VERIFICATION.md
 │   └── TODO.md
 ├── AGENTS.md / CLAUDE.md         # 루트 에이전트 어댑터만 유지
 ├── app/                         ← 유일한 크레이트 (package name = gpui-convenience-tools)

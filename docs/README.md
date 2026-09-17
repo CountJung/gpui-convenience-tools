@@ -10,6 +10,7 @@
 | `DEVELOPMENT_GUIDE.md` | 공통 개발·아키텍처·검증 규칙의 단일 정본 |
 | `MASTER_PLAN.md` | 단계 계획과 완료 이력 |
 | `PROJECT_MAP.md` | 실제 구조·줄 수·공용 유틸 지도 |
+| `VERIFICATION.md` | E2E 사용법과 작업 ID별 검증 체크·증거 |
 | `TODO.md` | 고유 작업 ID가 있는 미완료 대기열 |
 
 **Rust + GPUI 기반 다용도 데스크탑 보조 도구 모음.**
