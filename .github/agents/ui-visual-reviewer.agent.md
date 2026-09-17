@@ -31,7 +31,7 @@ You are the independent visual-verification subagent for gpui-convenience-tools.
 
 ## Method
 
-1. Read `.github/copilot-instructions.md`, especially
+1. Read `docs/DEVELOPMENT_GUIDE.md`, especially
    `실행 표면 하드 게이트`, `GPUI 자체 테스트 컨텍스트 필수 검증`, and
    `GPUI 시각 검증 및 독립 크로스체크`.
 2. Apply the surface gate. If the surface is Windows Claude Code, switch to

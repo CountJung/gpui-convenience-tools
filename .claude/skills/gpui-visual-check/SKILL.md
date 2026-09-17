@@ -6,7 +6,7 @@ description: GPUI 레이아웃·시각 회귀를 조사하고 실제 화면으�
 절차 정본은 **`.github/skills/gpui-visual-check/SKILL.md`**다. 먼저 그 파일을 끝까지 읽고
 그대로 수행한다. 이 파일은 Claude Code 어댑터이며 아래 표면 사항만 덧붙인다.
 
-판정 기준과 증거 요건은 `.github/copilot-instructions.md`의 「실행 표면 하드 게이트」와
+판정 기준과 증거 요건은 `docs/DEVELOPMENT_GUIDE.md`의 「실행 표면 하드 게이트」와
 「GPUI 시각 검증 및 독립 크로스체크」가 정본이다.
 
 ## 표면

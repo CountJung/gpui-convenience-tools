@@ -1,41 +1,21 @@
-# AGENTS
+# AGENTS.md
 
-**gpui-convenience-tools** — Rust + GPUI 기반 다용도 데스크탑 보조 도구 모음.
-편의 기능을 독립 패널로 모아 두는 것이 이 저장소의 정체성이다.
+이 파일은 에이전트별 진입점이다. 공통 프로젝트 규칙과 현재 상태를 복사하지 않고
+`docs/`의 정본을 참조한다.
 
-코딩 지침의 **단일 정본**은 다음 파일이다.
+## 먼저 읽을 문서
 
-- `.github/copilot-instructions.md`
+1. `docs/README.md` — 프로젝트 목적과 사용 범위
+2. `docs/DEVELOPMENT_GUIDE.md` — 공통 구현·검증 규칙
+3. `docs/PROJECT_MAP.md` — 실제 코드 구조와 공용 유틸
+4. `docs/TODO.md` — 작업 ID와 현재 미완료 항목
+5. `docs/MASTER_PLAN.md` — 단계 범위와 완료 이력
 
-이 문서에는 규칙을 중복 작성하지 않는다. 세부 규칙 변경은 메인 지침 문서에서만 수행한다.
+## AGENTS 전용 잊기 쉬운 항목
 
-## Reference Map
-
-| 문서 | 역할 |
-| --- | --- |
-| `.github/copilot-instructions.md` | 코딩 지침 단일 정본 |
-| `.github/instructions/gpui-core.instructions.md` | 파일별 자동 적용 브리지 |
-| `.github/agents/error-reviewer.agent.md` | 오류 분석 서브 에이전트 |
-| `.github/agents/ui-visual-reviewer.agent.md` | Codex/Copilot 공용 독립 시각 검증 프롬프트 |
-| `.claude/agents/ui-visual-reviewer.md` | Claude Code(`CLAUDE_LOCAL`) 독립 시각 검증 어댑터 |
-| `scripts/Invoke-ClaudeVisualCheck.ps1` | Claude Code용 로컬 창 캡처·입력 시각 검증 하네스 |
-| `.github/skills/gpui-rust-ui/skill.md` | GPUI UI 생성 스킬 (아래 주의 참조) |
-| `.github/skills/gpui-visual-check/SKILL.md` | GPUI 시각·레이아웃 검증 **실행 절차**(공통 정본) |
-| `.claude/skills/gpui-visual-check/SKILL.md` | 위 절차의 Claude Code 어댑터 (`/gpui-visual-check`) |
-| `MasterPlan.md` | 아키텍처 원칙 · 단계 계획 · **완료 이력** |
-| `PROJECTMAP.md` | 구조 · 크기 · 공용 유틸 추적 (1,000줄 = 구조 리팩터링 트리거) |
-| `TODO.md` | 미착수 구현 대기열 |
-| `CLAUDE.md` | Claude Code용 저장소 안내 |
-| `README.md` | 사용자 문서 |
-
-## 스킬과 정본의 역할 분담
-
-`.github/skills/`의 스킬 문서는 **절차(어떻게)** 만 담는다. 규칙과 판정 기준(무엇을·왜)은
-`.github/copilot-instructions.md`가 정본이며 스킬에 복제하지 않는다. 스킬을 고치다 규칙을
-바꿔야 한다는 판단이 서면 정본을 먼저 고친다.
-
-## 주의: 문서 간 우선순위
-
-`.github/skills/gpui-rust-ui/skill.md`는 GPUI 작업 절차를 보조하지만 **메인 지침이 우선한다**.
-카드 표면은 `secondary`/`list`, 위험 상태는 `danger`를 사용한다. 스킬 문서의 Windows 빌드
-트러블슈팅 절(매니페스트 중복, 콘솔 서브시스템)은 여전히 유효하다.
+- 사용자 승인 없이 파일 삭제·대량 덮어쓰기·릴리즈·외부 발송을 실행하지 않는다.
+- 사용자가 보고한 문제를 재현하지 못했으면 재현한 것처럼 보고하지 않는다.
+- 검증용 앱과 파일 작업은 `GPUI_CONVENIENCE_TOOLS_DATA_DIR`로 격리한다. 사용자
+  `%APPDATA%`를 검증 대상으로 사용하지 않는다.
+- 문서 정본의 내용을 이 파일에 다시 작성하지 않는다. 프로젝트 규칙을 바꿀 때는
+  `docs/DEVELOPMENT_GUIDE.md`를 먼저 갱신한다.

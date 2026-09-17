@@ -6,7 +6,7 @@ description: GPUI 레이아웃·시각 회귀를 조사하고 실제 화면으�
 # GPUI 시각·레이아웃 검증 실행 절차
 
 > **정책이 아니라 절차 문서다.** 어느 표면에서 무엇을 `PASS`로 판정하는지, 어떤 증거를
-> 남기는지는 `.github/copilot-instructions.md`의 「실행 표면 하드 게이트」와
+> 남기는지는 `docs/DEVELOPMENT_GUIDE.md`의 「실행 표면 하드 게이트」와
 > 「GPUI 시각 검증 및 독립 크로스체크」가 정본이다. 여기에는 규칙을 다시 쓰지 않고
 > **어떻게 하는가**만 적는다.
 
@@ -98,7 +98,7 @@ div().debug_selector(|| "sync-apply-paths".to_string())
 - 글자가 잘리거나 두 줄로 접힌다 → 고정 폭(`w(px(..))`)이 라벨보다 작다.
   `min_w` + `whitespace_nowrap`으로 고치고, 같은 칸이 두 파일에 있으면 `ui.rs`로 승격한다.
 
-가설에 따라 구조적으로 막았다면 **"가설 기반"임을 결과 보고와 `MasterPlan.md`에 명시한다.**
+가설에 따라 구조적으로 막았다면 **"가설 기반"임을 결과 보고와 `docs/MASTER_PLAN.md`에 명시한다.**
 
 ---
 

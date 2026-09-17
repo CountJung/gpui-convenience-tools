@@ -157,7 +157,7 @@ try {
             startScript = (Join-Path $repoRoot "scripts\Start-DesktopVisualValidation.ps1")
             stopScript = (Join-Path $repoRoot "scripts\Stop-DesktopVisualValidation.ps1")
             lastSession = (Join-Path $repoRoot "target\visual-validation\last-session.json")
-            policy = (Join-Path $repoRoot ".github\copilot-instructions.md")
+            policy = (Join-Path $repoRoot "docs\DEVELOPMENT_GUIDE.md")
             state = "DESKTOP_PENDING"
         }
     }

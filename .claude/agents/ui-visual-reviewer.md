@@ -7,12 +7,12 @@ disallowedTools: Write, Edit, NotebookEdit
 
 Before acting, read these repository-owned instructions completely:
 
-1. `.github/copilot-instructions.md`, sections `실행 표면 하드 게이트`,
+1. `docs/DEVELOPMENT_GUIDE.md`, sections `실행 표면 하드 게이트`,
    `CLAUDE_LOCAL 표면 (Windows Claude Code)`, `GPUI 자체 테스트 컨텍스트 필수 검증`,
    and `GPUI 시각 검증 및 독립 크로스체크`
 2. `.github/agents/ui-visual-reviewer.agent.md` for the shared reviewer role prompt
 
-The authoritative policy and output contract remain in `.github/copilot-instructions.md`.
+The authoritative policy and output contract remain in `docs/DEVELOPMENT_GUIDE.md`.
 This file is the Claude Code adapter and only overrides the surface handling below.
 
 ## Surface

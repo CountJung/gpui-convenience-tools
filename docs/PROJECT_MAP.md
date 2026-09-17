@@ -1,11 +1,29 @@
-# PROJECTMAP — 구조 · 크기 · 공용 유틸 추적
+# PROJECT MAP — 구조 · 크기 · 공용 유틸 추적
 
 > 이 문서는 저장소의 **구조·크기·공용 유틸을 추적하는 단일 문서**다.
 > 소스 파일을 추가·삭제·분할했거나 **헬퍼를 공용으로 승격했으면 같은 작업에서 이 문서를 갱신한다.**
-> 규칙 정의는 `.github/copilot-instructions.md`의 「구조 리팩터링 기준(1,000줄 트리거)」과
+> 규칙 정의는 `DEVELOPMENT_GUIDE.md`의 「구조 리팩터링 기준(1,000줄 트리거)」과
 > 「공용 유틸 승격 기준」 절을 정본으로 한다.
 >
 > **새 헬퍼를 만들기 전에 「공용 유틸 인벤토리」를 먼저 확인한다.**
+
+## 예정 구조 — VirtualBox 오프라인 디스크 탐색
+
+아래 경로는 아직 생성하지 않은 설계 대상이다. 구현 시 파일을 추가하는 같은 작업에서
+줄 수와 책임을 실측해 현재 파일 목록으로 승격한다.
+
+| 예정 경로 | 책임 | 관련 작업 ID |
+| --- | --- | --- |
+| `app/src/virtual_disk/mod.rs` | `GuestFileSource`·파일 항목·오류 타입·백엔드 선택 | VDE-003 |
+| `app/src/virtual_disk/vdi.rs` | VDI 헤더·블록 맵·동적/고정 이미지 read-only 읽기 | VDE-004~005 |
+| `app/src/virtual_disk/partition.rs` | MBR/GPT 파티션 범위 검증 | VDE-006 |
+| `app/src/virtual_disk/ntfs.rs` | NTFS 디렉터리 열거·스트림 읽기·속성 보존 | VDE-007~008 |
+| `app/src/virtual_disk/copy.rs` | 안전한 호스트 경로 매핑·청크 복사·충돌 정책 | VDE-009~012 |
+| `app/src/window/virtual_disk.rs` | VDI 선택·파티션·탐색·선택·단축키·진행 UI | VDE-013~017 |
+| `app/src/app/virtual_disk_ops.rs` | 탐색기 상태·이벤트·복사 작업 조작 | VDE-013~016 |
+
+안전 경계: 원본 VDI는 read-only로만 열고, 실행 중 VM의 VDI 직접 읽기는 구현하지 않는다.
+실행 중 VM 지원은 후속 `GuestFileSource` 구현으로만 추가한다(VDE-021).
 
 **최종 측정**: 2026-07-30 · 총 38개 파일 · 11,422줄
 
@@ -246,6 +264,7 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 
 | 날짜 | 대상 | 종류 | 이전 | 이후 | 비고 |
 | --- | --- | --- | ---: | --- | --- |
+| 2026-09-17 | 프로젝트 문서 | 정본 디렉터리 통합 | 루트 문서 5개 + 에이전트 규칙 중복 | `docs/` 5개 정본 + 루트 에이전트 어댑터 | 공통 내용은 `DEVELOPMENT_GUIDE.md`로 통합하고 어댑터에는 표면별 주의사항만 유지 |
 | 2026-07-29 | 편의 기능 스플리터 3곳 | 공용 레이아웃 승격 | 패널별 고정 초기 폭 | `window::balanced_split` | 설정 pane 과도 축소 방지, 양쪽 가용폭 사용 |
 | 2026-07-29 | `app.rs` | 책임 단위 분할 + 재배치 | 1,798 | `app/` 7파일 (최대 564) | 대시보드·로그 렌더는 소유가 잘못돼 있어 `window/`로 이동 |
 | 2026-07-29 | `platform/windows.rs` | 책임 단위 분할 + 승격 | 1,361 | `platform/windows/` 6파일 (최대 344) | `wide_null`을 `windows/mod.rs`로 **공용 승격** |

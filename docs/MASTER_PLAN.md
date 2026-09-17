@@ -14,7 +14,13 @@
 ```text
 gpui-convenience-tools/          ← 저장소 루트
 ├── Cargo.toml                   # workspace (members = ["app"])
-├── MasterPlan.md / TODO.md / PROJECTMAP.md / README.md / CLAUDE.md / AGENTS.md
+├── docs/                         # 프로젝트 문서 정본
+│   ├── README.md
+│   ├── DEVELOPMENT_GUIDE.md
+│   ├── MASTER_PLAN.md
+│   ├── PROJECT_MAP.md
+│   └── TODO.md
+├── AGENTS.md / CLAUDE.md         # 루트 에이전트 어댑터만 유지
 ├── app/                         ← 유일한 크레이트 (package name = gpui-convenience-tools)
 │   ├── Cargo.toml
 │   ├── build.rs                 # /MANIFEST:NO (gpui 임베드 매니페스트 중복 방지)
@@ -113,8 +119,8 @@ GPUI 엘리먼트를 반환하는 UI 프리미티브는 `window/ui.rs`, 순수 �
 모듈(`config`·`sync`·`logging`), Win32 래퍼는 `platform/windows/mod.rs`가 소유한다.
 패널 파일에는 그 기능 고유의 헬퍼만 남긴다.
 
-리팩터링은 동작 변경 없이 수행하고 결과를 `PROJECTMAP.md`에 기록한다.
-규칙 정본은 `.github/copilot-instructions.md`의 「구조 리팩터링 기준」과
+리팩터링은 동작 변경 없이 수행하고 결과를 `PROJECT_MAP.md`에 기록한다.
+규칙 정본은 `DEVELOPMENT_GUIDE.md`의 「구조 리팩터링 기준」과
 「공용 유틸 승격 기준」 절이다.
 
 ---
@@ -152,12 +158,12 @@ cargo workspace, Hello World 앱 동작 확인
 - **파일 동기화** 기능 신규 구현(엔진 + 패널 + 실패 알림 억제)
 - **롤링 파일 로거** 구현(개수 · 날짜 · 용량 3중 보존 기준)
 - 사용하지 않던 `window/dashboard.rs`, `target_list.rs`, `log_view.rs` 제거
-- 문서 전면 개편, `copilot-instructions.md` 인코딩 손상 복구
+- 문서 전면 개편, 공통 개발 지침 정본과 에이전트 어댑터 분리
 
 ### Phase G — 1,000줄 규칙 도입과 구조 분할 ✅
 
 - 지침에 「파일 크기 기준(1,000줄 규칙)」과 「프로젝트 맵 관리 기준」 추가
-- `PROJECTMAP.md` 신규 — 파일 구조·줄 수·책임 추적
+- `PROJECT_MAP.md` 신규 — 파일 구조·줄 수·책임 추적
 - `app.rs`(1,798줄) → `app/` 7파일 분할, 대시보드·로그 렌더는 `window/`로 이동
 - `platform/windows.rs`(1,361줄) → `platform/windows/` 6파일 분할
 - 결과: 최대 파일 690줄, 1,000줄 초과 파일 없음
@@ -169,7 +175,7 @@ cargo workspace, Hello World 앱 동작 확인
 - 「파일 크기 기준」 → **「구조 리팩터링 기준(1,000줄 트리거)」**: 기계적 분할 금지,
   ① 중복 제거 → ② 오배치 책임 이동 → ③ 책임 단위 분할 순서로 재정의
 - **「공용 유틸 승격 기준」 신설** — 1,000줄과 무관하게 상시 적용, 「즉시」 판정은 즉시 처리
-- `PROJECTMAP.md`에 「공용 유틸 인벤토리」·「중복 헬퍼 추적」 추가
+- `PROJECT_MAP.md`에 「공용 유틸 인벤토리」·「중복 헬퍼 추적」 추가
 
 ### Phase I — 공용 UI 프리미티브 승격 ✅
 
@@ -308,7 +314,7 @@ Windows 쪽은 34개 테스트 통과와 실제 앱 캡처로 회귀 없음을 �
 
 ### Phase L — 🟡 경고 해소 리팩터링 ✅
 
-`PROJECTMAP.md`가 추적하던 리팩터링 대상을 정본의 순서대로 처리했다
+`PROJECT_MAP.md`가 추적하던 리팩터링 대상을 정본의 순서대로 처리했다
 (**① 중복 제거 → ② 오배치 이동 → ③ 책임 단위 분할**, ②는 대상 없음).
 
 - **① 공용 승격** — `ui::stat_tile`·`ui::option_row`·`ui::choice_chip` 신설.
@@ -396,13 +402,47 @@ Windows 쪽은 34개 테스트 통과와 실제 앱 캡처로 회귀 없음을 �
   (`sidebar_divider_drag_resizes_navigation_and_content`,
   `file_sync_run_button_saves_current_inputs_and_queues_selected_job`)로만 검증된 상태다
 - 앞으로 실제 화면 검증은 대기열에 쌓지 않고 UI를 바꾼 작업에서 그때 수행한다
-  (정본: copilot-instructions「실행 표면 하드 게이트」)
+  (정본: `DEVELOPMENT_GUIDE.md`「실행 표면 하드 게이트」)
 
 ---
+
+### Phase P — 프로젝트 문서 정본 통합 ✅
+
+- 기존 루트의 프로젝트 문서 5개와 공통 Copilot 지침을
+  `docs/`의 `README.md`, `MASTER_PLAN.md`, `PROJECT_MAP.md`, `TODO.md`,
+  `DEVELOPMENT_GUIDE.md`로 이동했다
+- 루트에는 `AGENTS.md`, `CLAUDE.md` 에이전트 어댑터만 남겼다
+- `.github`·`.claude`·`.agents`의 공통 규칙 중복을 제거하고 `docs/` 정본 참조로 바꿨다
+- `scripts/Verify-Workspace.ps1`의 정책 해시 대상도 `docs/DEVELOPMENT_GUIDE.md`로 변경했다
 
 ## 진행 예정 단계
 
 세부 체크리스트는 `TODO.md`를 정본으로 한다.
+
+### Phase O — VirtualBox 오프라인 디스크 탐색·복사 🗓
+
+종료된 VirtualBox VM의 VDI에서 숨김·시스템 파일을 탐색하고 현재 PC로 복사하는 기능이다.
+초기 범위는 **오프라인·읽기 전용 VDI 접근**으로 고정한다.
+
+```text
+종료된 VM
+  └─ VDI read-only handle
+       └─ VDI block reader
+            └─ MBR/GPT partition reader
+                 └─ NTFS guest filesystem reader
+                      └─ 공통 GuestFileSource
+                           └─ GPUI 탐색기·선택·호스트 복사
+```
+
+- 원본 VDI에는 절대 쓰지 않으며, 실행 중 VM의 VDI 직접 읽기는 지원하지 않는다
+- VDI 파일 잠금·크기/mtime 안정성·범위/오버플로를 검증한 뒤에만 탐색한다
+- 숨김·시스템·읽기 전용 파일을 목록에서 누락하지 않고, 복사 실패는 항목별 사유와 함께
+  토스트/로그에 남긴다
+- 경로 탈출, 예약 이름, 심볼릭 링크·리파스 포인트 추적을 차단하고 대상 폴더에만 쓴다
+- Windows 게스트 NTFS를 1차 대상으로 하며, ext4와 실행 중 VM의 `VBoxManage guestcontrol`
+  백엔드는 오프라인 경로가 안정화된 후 별도 단계로 검토한다
+
+세부 작업은 `TODO.md`의 `VDE-001`~`VDE-021` ID로 추적한다.
 
 ### Phase D — 파일 동기화 고도화 🗓
 
