@@ -13,6 +13,7 @@ mod platform;
 mod sync;
 mod theme;
 mod util;
+pub(crate) mod virtual_disk;
 mod window;
 
 use app::AppRoot;

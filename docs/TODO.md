@@ -39,7 +39,6 @@
 
 ### O-2. 읽기 전용 디스크 백엔드
 
-- [ ] VDE-003 | 0% | `GuestFileSource`, `VdiImage`, `VdiPartition`, `GuestFileEntry` 도메인 모델과 `platform` 비의존 오류 타입 설계
 - [ ] VDE-004 | 0% | VDI 헤더·블록 맵을 검증하고 동적/고정 이미지를 경계 검사와 오버플로 방지 하에 읽는 블록 리더 구현
 - [ ] VDE-005 | 0% | VM 종료 상태·VirtualBox 잠금·파일 크기/mtime 안정성을 확인하고 원본을 read-only 핸들로만 여는 안전 가드 구현
 - [ ] VDE-006 | 0% | MBR/GPT 파티션 검색과 파티션 범위 검증 구현

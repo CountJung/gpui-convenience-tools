@@ -7,14 +7,14 @@
 >
 > **새 헬퍼를 만들기 전에 「공용 유틸 인벤토리」를 먼저 확인한다.**
 
-## 예정 구조 — VirtualBox 오프라인 디스크 탐색
+## 구조 — VirtualBox 오프라인 디스크 탐색
 
-아래 경로는 아직 생성하지 않은 설계 대상이다. 구현 시 파일을 추가하는 같은 작업에서
-줄 수와 책임을 실측해 현재 파일 목록으로 승격한다.
+구현된 파일과 예정 경로를 함께 추적한다. 새 파일을 추가하는 같은 작업에서 줄 수와 책임을
+실측해 이 문서의 현재 파일 목록으로 승격한다.
 
-| 예정 경로 | 책임 | 관련 작업 ID |
+| 경로 | 책임 | 관련 작업 ID |
 | --- | --- | --- |
-| `app/src/virtual_disk/mod.rs` | `GuestFileSource`·파일 항목·오류 타입·백엔드 선택 | VDE-003 |
+| `app/src/virtual_disk/mod.rs` | **구현됨** — `GuestFileSource`·파일 항목·오류 타입·백엔드 경계 | VDE-003 |
 | `app/src/virtual_disk/vdi.rs` | VDI 헤더·블록 맵·동적/고정 이미지 read-only 읽기 | VDE-004~005 |
 | `app/src/virtual_disk/partition.rs` | MBR/GPT 파티션 범위 검증 | VDE-006 |
 | `app/src/virtual_disk/ntfs.rs` | NTFS 디렉터리 열거·스트림 읽기·속성 보존 | VDE-007~008 |
@@ -25,7 +25,7 @@
 안전 경계: 원본 VDI는 read-only로만 열고, 실행 중 VM의 VDI 직접 읽기는 구현하지 않는다.
 실행 중 VM 지원은 후속 `GuestFileSource` 구현으로만 추가한다(VDE-021).
 
-**최종 측정**: 2026-07-30 · 총 38개 파일 · 11,422줄
+**최종 측정**: 2026-09-17 · `app/src` 총 39개 파일 · 11,936줄
 
 ## 크기 기준 — 줄 수는 증상이다
 
@@ -68,6 +68,12 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `logging.rs` | 560 | 롤링 파일 로거 (`log::Log` 구현, 테스트용 출력 경로 주입) |
 | `util.rs` | 139 | 도메인 주인이 없는 순수 헬퍼 — `format_interval`·`interval_to_secs`·`TimeUnit` |
 
+### VirtualBox 도메인 (`app/src/virtual_disk/`) — 403줄 / 1파일
+
+| 파일 | 줄 | 책임 |
+| --- | ---: | --- |
+| `mod.rs` | 403 | VDI·파티션·게스트 파일 항목 모델, 정규화된 게스트 경로, `GuestFileSource`, 플랫폼 비의존 오류 계약 |
+
 ### 동기화 엔진 (`app/src/sync/`) — 1,059줄 / 2파일
 
 `sync.rs`(831줄, 🟡)를 본문과 테스트로 나눈 결과다.
@@ -92,7 +98,7 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `ops.rs` | 195 | 광고 차단·서비스 관리·로그 설정 조작 |
 | `inputs.rs` | 129 | 입력 위젯(`InputState`) 지연 생성과 값 동기화 |
 
-### GPUI 회귀 테스트 (`app/src/app/tests/`) — 1,369줄 / 5파일
+### GPUI 회귀 테스트 (`app/src/app/tests/`) — 1,442줄 / 5파일
 
 `app/tests.rs`(929줄, 🟡)를 시나리오별로 나눈 결과다. 픽스처는 `mod.rs`가 단독 소유하고
 하위 모듈은 `use super::*`로 가져다 쓴다.
@@ -100,16 +106,16 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | 파일 | 줄 | 책임 |
 | --- | ---: | --- |
 | `file_sync.rs` | 639 | 동기화 조작·진행 표시줄·중지·로그 요약·섹션 너비·전역 스위치·커서 무효화 |
-| `layout.rs` | 251 | 사이드바·스플리터·divider drag·스크롤 |
+| `layout.rs` | 324 | 사이드바·스플리터·divider drag·스크롤 |
 | `interval.rs` | 226 | 주기 드롭다운·프리셋 추가/삭제·패널 간 공유 |
 | `mod.rs` | 168 | 공용 픽스처 (`test_app_root`·`TestPlatform`·`refresh`·`click_debug_element` 등) |
 | `theme.rs` | 85 | 테마 전환과 스위치 가시성 |
 
-### 패널 (`app/src/window/`) — 3,244줄 / 10파일
+### 패널 (`app/src/window/`) — 3,281줄 / 10파일
 
 | 파일 | 줄 | 책임 |
 | --- | ---: | --- |
-| `service_mgr.rs` | 635 | 편의 기능 — Windows 서비스 (목록/제어 ↔ 검색·필터·권한) |
+| `service_mgr.rs` | 672 | 편의 기능 — Windows 서비스 (목록/제어 ↔ 검색·필터·권한) |
 | `file_sync.rs` | 612 | 편의 기능 — 파일 동기화 (작업 목록 → 설정 → 실패 기록 + 하단 고정 진행 표시줄) |
 | `settings.rs` | 444 | 전역 설정 — 테마 선택·로그 보관 정책 |
 | `ad_block.rs` | 400 | 편의 기능 — 웹뷰 광고 차단 (상태·타겟 ↔ 스캔 주기·프로세스 추가) |
@@ -265,6 +271,7 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | 날짜 | 대상 | 종류 | 이전 | 이후 | 비고 |
 | --- | --- | --- | ---: | --- | --- |
 | 2026-09-17 | 프로젝트 문서 | 정본 디렉터리 통합 | 루트 문서 5개 + 에이전트 규칙 중복 | `docs/` 5개 정본 + 루트 에이전트 어댑터 | 공통 내용은 `DEVELOPMENT_GUIDE.md`로 통합하고 어댑터에는 표면별 주의사항만 유지 |
+| 2026-09-17 | `virtual_disk/mod.rs` | VDE-003 도메인 경계 추가 | VirtualBox 탐색 모델 없음 | 403줄의 플랫폼 비의존 모델·읽기 계약·오류 분류 | VDI 실제 파서와 GPUI 화면은 VDE-004 이후 연결 |
 | 2026-07-29 | 편의 기능 스플리터 3곳 | 공용 레이아웃 승격 | 패널별 고정 초기 폭 | `window::balanced_split` | 설정 pane 과도 축소 방지, 양쪽 가용폭 사용 |
 | 2026-07-29 | `app.rs` | 책임 단위 분할 + 재배치 | 1,798 | `app/` 7파일 (최대 564) | 대시보드·로그 렌더는 소유가 잘못돼 있어 `window/`로 이동 |
 | 2026-07-29 | `platform/windows.rs` | 책임 단위 분할 + 승격 | 1,361 | `platform/windows/` 6파일 (최대 344) | `wide_null`을 `windows/mod.rs`로 **공용 승격** |

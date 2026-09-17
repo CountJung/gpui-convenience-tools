@@ -448,10 +448,12 @@ Windows 쪽은 34개 테스트 통과와 실제 앱 캡처로 회귀 없음을 �
 
 #### 오류 계약과 출처
 
-도메인 오류는 구현 단계에서 다음 의미를 유지한다: `InvalidContainer`, `UnsupportedFormat`,
-`InvalidPartitionTable`, `UnsupportedFileSystem`, `UnsupportedFileStream`, `SourceChanged`,
-`ReadOnlyViolation`, `BoundsViolation`, `Io`. 사용자에게는 형식·경로·항목·복구 가능 여부를
-함께 표시하고, 같은 원인에 대한 반복 알림은 억제 키로 묶는다.
+도메인 오류는 구현 단계에서 다음 의미를 유지한다: 컨테이너·파티션 검증 오류,
+`UnsupportedFormat`, `SourceChanged`, `ReadOnlyViolation`, `BoundsViolation`, `Io`.
+VDE-003은 플랫폼 비의존 공통 타입과 `UnsupportedFormatKind`·`IoOperation` 분류를 먼저
+고정하고, VDE-004 이후의 파서가 컨테이너·파티션·파일시스템·파일 스트림별 상세 사유를
+이 계약에 매핑한다. 사용자에게는 형식·경로·항목·복구 가능 여부를 함께 표시하고, 같은
+원인에 대한 반복 알림은 억제 키로 묶는다.
 
 - [VirtualBox 디스크 이미지 설명](https://docs.oracle.com/en/virtualization/virtualbox/6.0/user/vdidetails.html)
   — VDI와 fixed/dynamic 이미지 구분
@@ -463,6 +465,22 @@ Windows 쪽은 34개 테스트 통과와 실제 앱 캡처로 회귀 없음을 �
   — 읽기/쓰기 관리 API를 제공하므로 직접 채택하지 않는 비교 대상
 
 이 결정으로 O-1은 완료 처리하며, 구현 추적은 `TODO.md`의 `VDE-003`부터 계속한다.
+
+### Phase O-2 — VDE-003 오프라인 탐색 도메인 계약 완료 ✅
+
+`app/src/virtual_disk/mod.rs`에 VDI 오프라인 탐색의 플랫폼 비의존 경계를 추가했다.
+
+- `VdiVersion`, `VdiImage`, `VdiImageType`, `VdiPartition`으로 컨테이너·파티션 메타데이터를
+  표현하고, 현재 오프라인 범위에서 dynamic/fixed 이미지만 지원하도록 분류했다
+- `GuestFileSystem`, `GuestPath`, `GuestFileKind`, `GuestFileAttributes`, `GuestFileEntry`로
+  NTFS 파일 목록의 경로·종류·크기·Windows 숨김/시스템 속성을 보존한다
+- `GuestFileSource`를 읽기 전용 디렉터리 열거·offset 기반 파일 읽기 계약으로 정의하여,
+  후속 VDI/파티션/NTFS 구현과 GPUI 탐색기 사이의 의존성을 분리했다
+- `VirtualDiskError`에 경로·항목·지원 형식·읽기 전용·범위·원본 변경·I/O 오류를 담고,
+  형식과 I/O 연산 분류를 토스트·로그 억제 키에 사용할 수 있게 했다
+
+검증은 모듈 단위 테스트 5개, 전체 대상 테스트 59개 통과로 완료했다. 이 단계는 도메인
+계약만 제공하며 VDI 실제 파싱·파티션 검색·NTFS 열거는 각각 VDE-004 이후 작업에서 연결한다.
 
 ## 진행 예정 단계
 
