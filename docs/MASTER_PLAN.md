@@ -415,6 +415,54 @@ Windows 쪽은 34개 테스트 통과와 실제 앱 캡처로 회귀 없음을 �
 - `.github`·`.claude`·`.agents`의 공통 규칙 중복을 제거하고 `docs/` 정본 참조로 바꿨다
 - `scripts/Verify-Workspace.ps1`의 정책 해시 대상도 `docs/DEVELOPMENT_GUIDE.md`로 변경했다
 
+### Phase O-1 — VDI 형식·의존성 조사 완료 ✅
+
+`VDE-001`, `VDE-002`를 공식 형식 구현·크레이트 문서와 대조하여 다음 범위로 확정했다.
+
+#### 선택한 계층
+
+| 계층 | 결정 | 이유 |
+| --- | --- | --- |
+| VDI 컨테이너 | 자체 read-only 파서 | 블록 맵·오프셋·정수 범위·오버플로를 우리 오류 계약으로 검증해야 하며, VirtualBox SDK를 통해 쓰기 가능한 객체를 열지 않는다 |
+| MBR/GPT | 자체 read-only 파서 | `gptman`·`mbrman`은 읽기뿐 아니라 쓰기/관리 API를 제공하므로 초기 안전 경계에는 과하다. GPT는 헤더·배열 CRC를 직접 검증한다 |
+| NTFS | `ntfs` 0.4.x를 `GuestFileSource` 어댑터 뒤에서 사용 | `Read + Seek` 기반이고 루트·디렉터리 인덱스·파일 속성·데이터 스트림을 제공한다. 호스트 파일 API와 게스트 파일 API를 분리한다 |
+
+#### 초기 지원 계약
+
+- 컨테이너는 VirtualBox 현재 VDI major 1 계열만 허용한다. legacy major 0과 알 수 없는 버전은
+  `UnsupportedFormat::VdiVersion`으로 거부한다.
+- 이미지 유형은 normal/dynamic과 fixed만 허용한다. parent chain이 필요한 differencing
+  이미지는 단일 파일 탐색의 안전 경계를 벗어나므로 `UnsupportedFormat::VdiImageType`으로
+  거부한다.
+- VDI 헤더의 논리 섹터 크기는 512바이트만 허용한다. 게스트 파티션의 논리 블록 크기는
+  512 또는 4096바이트만 허용하고 모든 LBA 계산은 checked arithmetic과 이미지 범위 검증을
+  거친다.
+- 파티션 테이블은 MBR과 GPT만 지원한다. GPT protective MBR은 GPT로 재판정하며, GPT 주/백업
+  헤더와 파티션 배열 CRC 및 파티션 범위를 검증한다.
+- 게스트 파일시스템은 NTFS 3.x만 1차 지원한다. ext4·FAT 등은
+  `UnsupportedFormat::FileSystem`으로 거부한다.
+- NTFS의 Windows 파일 속성(Read-only, Hidden, System, Archive 등)은 목록 모델에 보존하여
+  숨김·시스템 파일을 누락하지 않는다. 압축·암호화·sparse 데이터 스트림은 인식하되 1차
+  복사 경로에서 지원하지 않으면 `UnsupportedFormat::FileStream`으로 항목별 기록한다.
+
+#### 오류 계약과 출처
+
+도메인 오류는 구현 단계에서 다음 의미를 유지한다: `InvalidContainer`, `UnsupportedFormat`,
+`InvalidPartitionTable`, `UnsupportedFileSystem`, `UnsupportedFileStream`, `SourceChanged`,
+`ReadOnlyViolation`, `BoundsViolation`, `Io`. 사용자에게는 형식·경로·항목·복구 가능 여부를
+함께 표시하고, 같은 원인에 대한 반복 알림은 억제 키로 묶는다.
+
+- [VirtualBox 디스크 이미지 설명](https://docs.oracle.com/en/virtualization/virtualbox/6.0/user/vdidetails.html)
+  — VDI와 fixed/dynamic 이미지 구분
+- [VirtualBox VDI 구현](https://github.com/VirtualBox/virtualbox/blob/main/src/VBox/Storage/VDI.cpp)
+  — 버전·이미지 유형·섹터·블록·오프셋 검증 기준
+- [`ntfs` 0.4.0 문서](https://docs.rs/ntfs/0.4.0/ntfs/)
+  — `Read + Seek`, 디렉터리 인덱스와 NTFS 파일 속성 접근
+- [`gptman` 문서](https://docs.rs/gptman/latest/gptman/) 및 [`mbrman` 문서](https://docs.rs/mbrman/latest/mbrman/)
+  — 읽기/쓰기 관리 API를 제공하므로 직접 채택하지 않는 비교 대상
+
+이 결정으로 O-1은 완료 처리하며, 구현 추적은 `TODO.md`의 `VDE-003`부터 계속한다.
+
 ## 진행 예정 단계
 
 세부 체크리스트는 `TODO.md`를 정본으로 한다.
@@ -442,7 +490,8 @@ Windows 쪽은 34개 테스트 통과와 실제 앱 캡처로 회귀 없음을 �
 - Windows 게스트 NTFS를 1차 대상으로 하며, ext4와 실행 중 VM의 `VBoxManage guestcontrol`
   백엔드는 오프라인 경로가 안정화된 후 별도 단계로 검토한다
 
-세부 작업은 `TODO.md`의 `VDE-001`~`VDE-021` ID로 추적한다.
+세부 작업은 `TODO.md`의 `VDE-003`~`VDE-021` ID로 추적한다. `VDE-001`·`VDE-002`의 결정은
+위의 Phase O-1 완료 기록을 정본으로 한다.
 
 ### Phase D — 파일 동기화 고도화 🗓
 
