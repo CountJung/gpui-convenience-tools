@@ -229,6 +229,10 @@ flowchart LR
   } | Sort-Object Lines -Descending)
   ```
 
+- `scripts/Assert-ProjectStructure.ps1`는 `app/src/**/*.rs`의 파일 수·전체 줄 수·최대
+  파일·800~1,000줄 경고 수를 `PROJECT_MAP.md`의 최종 측정값과 대조한다. 1,000줄 이상은
+  즉시 실패하며, `Verify-Workspace.ps1`가 이 검사를 코드 테스트보다 먼저 실행한다.
+
 - 각 파일에는 **한 줄 책임 설명**을 함께 적는다. 설명이 두 문장 이상 필요하면
   책임이 섞였다는 신호이므로 리팩터링을 검토한다.
 - **공용 유틸 인벤토리**와 **중복 헬퍼 추적** 표를 유지한다. 새 헬퍼를 만들기 전에

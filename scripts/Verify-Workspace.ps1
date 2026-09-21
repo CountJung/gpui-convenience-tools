@@ -63,6 +63,10 @@ try {
         "-NoProfile", "-File", (Join-Path $repoRoot "scripts\Assert-ProjectDocs.ps1")
     )
 
+    Invoke-CheckedCommand -Executable "pwsh" -Arguments @(
+        "-NoProfile", "-File", (Join-Path $repoRoot "scripts\Assert-ProjectStructure.ps1")
+    )
+
     Invoke-CheckedCommand -Executable "cargo" -Arguments @(
         "check", "-p", $packageName
     )

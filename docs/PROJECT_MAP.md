@@ -47,6 +47,9 @@
 현재 🔴 위반 **없음**, 🟡 경고 **3개**. 최대 파일은 834줄(`virtual_disk/copy.rs`)이며, 다음 VirtualBox UI 작업 전에 책임 단위 분할을 검토한다.
 줄 수와 무관하게 처리하는 중복 헬퍼는 아래 「중복 헬퍼 추적」에서 관리한다.
 
+`scripts/Assert-ProjectStructure.ps1`가 이 측정값을 자동 대조한다. 소스 파일을 추가·삭제·
+분할하거나 줄 수가 바뀌면 이 문서의 측정값을 같은 커밋에서 갱신해야 한다.
+
 ### 줄 수 측정 명령
 
 ```powershell
@@ -352,6 +355,7 @@ G-001 판단: `muted`는 비활성 의미이므로 테두리와 hover를 추가�
 | 2026-09-22 | `app/src/virtual_disk/vdi.rs`·`app/src/virtual_disk/vdi/fixtures.rs` | VDI 테스트 fixture 책임 분리 | VDI 리더 본문에 합성 VDI·raw fixture 생성과 임시 파일 정리 코드가 함께 있어 966줄까지 증가함 | 테스트 전용 `vdi/fixtures.rs`로 fixture/export helper를 이동하고 `vdi.rs`를 821줄로 축소; `virtual_disk::vdi` 14개 테스트·전체 157 passed·4 ignored·locked check·Clippy `-D warnings`·`Verify-Workspace.ps1` 통과, 최대 파일 834줄·54개 파일·20,894줄로 지도 갱신 | 동작 변경 없는 구조 리팩터링; 전체 rustfmt check는 기존 baseline 포맷 불일치로 별도 정리 범위 |
 | 2026-09-22 | `scripts/Assert-ProjectDocs.ps1`·`docs/TODO.md`·`docs/DEVELOPMENT_GUIDE.md` | 판단·환경 보류 항목 정합성 게이트 | TODO에 보류 항목 절은 있었지만 검증 스크립트가 활성 TODO·검증 매트릭스만 검사함 | `decision-task-ids` 메타데이터를 추가하고 활성 ID 존재·중복·형식·고아 ID를 자동 검사; 구현·환경 선택이 필요한 작업을 별도 기록한 상태와 검증 경계를 같은 게이트에서 확인 | 제품 판단이 필요한 항목의 완료 여부를 자동 결정하지 않으며, 사용자가 선택해야 하는 범위는 계속 TODO에 남김 |
 | 2026-09-22 | `scripts/Invoke-ClaudeVisualCheck.ps1`·`docs/TODO.md`·`docs/VERIFICATION.md`·`docs/MASTER_PLAN.md` | VDE-019 최신 release 화면 재검증 | 기존 표준 VDI 캡처 이후 최신 release에서 숨김/시스템 목록과 자동 복사 요약을 다시 확인할 최신 증거가 필요함 | VirtualBox 7.2.14 표준 VDI를 1200×1000 격리 release 앱에 주입하고 `continuation-vde019-current-release-040648.png`에서 숨김·시스템 행, 17개·915.3KB·실패 1건과 `many_subdirs` 손상 사유 확인; 세션 종료 후 process/session 0 | 구현 담당자 화면 확인만 추가했으며 독립 Visual Reviewer·외부 키보드·오류 억제 버튼 조작은 완료로 승격하지 않음 |
+| 2026-09-22 | `scripts/Assert-ProjectStructure.ps1`·`scripts/Verify-Workspace.ps1`·`docs/DEVELOPMENT_GUIDE.md` | 1,000줄 구조 트리거 자동 게이트 | PROJECT_MAP의 수동 측정값과 실제 소스가 어긋나거나 1,000줄 초과가 다음 작업까지 숨겨질 수 있음 | `app/src/**/*.rs` 파일 수·전체 줄 수·최대 파일·800~1,000줄 경고 수를 PROJECT_MAP과 대조하고, 1,000줄 이상을 실패 처리; `Verify-Workspace.ps1` 선행 단계에 연결 | 구조 리팩터링 자체를 자동 수행하지 않으며, 위반 시 해당 작업에서 책임 분할을 먼저 수행해야 함 |
 | 2026-09-22 | `app/src/virtual_disk/vdi.rs`·`scripts/Invoke-ClaudeVisualCheck.ps1`·`docs/TODO.md`·`docs/VERIFICATION.md` | VDE-017 실제 미지원 파티션 릴리스 E2E | GPUI 상태 렌더와 단위 fixture만 있어 실제 release 앱에서 미지원 파티션 메시지를 확인하지 못함 | `exports_unsupported_partition_vdi_fixture_when_requested`로 MBR 타입 `0x83`·NTFS 시그니처 없는 VDI를 격리 생성하고, `reads_unsupported_partition_fixture_without_claiming_ntfs`로 NTFS 오인 방지를 확인; release 캡처 `vde017-unsupported-partition-release-fixed-033450.png`에서 오류 카드·파티션 경고 확인, 전체 157 passed·4 ignored·Clippy exit 0, process/session 0 | 실제 실행 중 VM E2E와 독립 Visual Reviewer는 후속 |
 | 2026-09-22 | `app/src/sync_history.rs`·`app/src/app/background.rs`·`app/src/main.rs` | D-018 동기화 실행 이력 저장 | 실행 결과가 화면 로그와 설정 상태에만 남아 앱 재시작 후 이력을 조회할 파일이 없음 | `sync-history.json`에 실행 순서·작업 식별자·시각·결과 건수·중지·요약을 append하고 손상 JSON은 덮어쓰지 않음, 전용 2개 테스트와 전체 143 passed·4 ignored·Clippy 기존 경고 7건, 52개 파일·19,884줄 기준 지도 갱신 | 이력 보존 정책은 로그와 동일하게 D-019에서, UI 목록은 D-020에서 후속; commit `97009c3` push 완료 |
 | 2026-09-22 | `app/src/sync_history.rs` | D-019 동기화 이력 보존 정책 | JSON 이력은 추가만 되어 오래된 실행 결과가 무한히 남을 수 있음 | `LogConfig.max_age_days`·`max_files`로 기간·개수 초과분을 새 append 전에 제거하고 최소 한 건을 유지, 보존 경계 테스트·전체 144 passed·4 ignored·Clippy 기존 경고 7건, 52개 파일·19,946줄 기준 지도 갱신 | 파일 용량 롤링은 JSON 이력에 적용하지 않으며 최근 이력 화면은 D-020 후속; commit `ed71af4` push 완료 |
