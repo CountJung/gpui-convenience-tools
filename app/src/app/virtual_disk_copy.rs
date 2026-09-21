@@ -338,14 +338,36 @@ impl AppRoot {
             error: outcome.error,
         };
         let line = summary.line();
+        let has_error = summary.error.is_some();
         let failed = summary.failed_entries > 0 || summary.error.is_some();
+        let unsuppressed_issue_count = summary
+            .issues
+            .iter()
+            .filter(|issue| !self.virtual_disk.suppressed_issue_keys.contains(&issue.key()))
+            .count();
         self.virtual_disk.copy.progress = None;
         self.virtual_disk.copy.summary = Some(summary);
         self.push_log(
             if failed { "ERROR" } else { "INFO" },
             format!("[VDI] {line}"),
         );
-        if failed {
+        let issue_log_lines: Vec<String> = self
+            .virtual_disk
+            .copy
+            .summary
+            .as_ref()
+            .map(|summary| {
+                summary
+                    .issues
+                    .iter()
+                    .map(|issue| format!("[VDI][{}] {}: {}", issue.kind, issue.path, issue.detail))
+                    .collect()
+            })
+            .unwrap_or_default();
+        for message in issue_log_lines {
+            self.push_log("ERROR", message);
+        }
+        if failed && (has_error || unsuppressed_issue_count > 0) {
             self.notify_toast(
                 "VDI 복사에 실패한 항목이 있습니다",
                 NotificationType::Warning,

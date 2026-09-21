@@ -52,6 +52,7 @@ use gpui_component::{
     v_flex, PixelsExt, VirtualListScrollHandle, TITLE_BAR_HEIGHT,
 };
 use std::{
+    collections::BTreeSet,
     sync::{Arc, Mutex},
     time::Duration,
 };
@@ -115,10 +116,16 @@ impl AppRoot {
         let mut initial_interval_presets = default_interval_presets();
         let mut sync_enabled = true;
         let mut sidebar_width = DEFAULT_SIDEBAR_WIDTH;
+        let mut virtual_disk_suppressed_issue_keys = BTreeSet::new();
 
         if let Ok(Some(cfg)) = load_config() {
             sync_enabled = cfg.sync_enabled;
             sidebar_width = normalize_sidebar_width(cfg.sidebar_width);
+            virtual_disk_suppressed_issue_keys.extend(
+                cfg.virtual_disk_suppressed_issue_keys
+                    .into_iter()
+                    .filter(|key| !key.trim().is_empty()),
+            );
             app_state.is_active = cfg.service_enabled;
             if !cfg.targets.is_empty() {
                 app_state.targets = cfg.targets;
@@ -245,7 +252,10 @@ impl AppRoot {
             },
             ad_block: AdBlockState::default(),
 
-            virtual_disk: VirtualDiskSession::default(),
+            virtual_disk: VirtualDiskSession {
+                suppressed_issue_keys: virtual_disk_suppressed_issue_keys,
+                ..VirtualDiskSession::default()
+            },
             virtual_disk_page_scroll: ScrollHandle::default(),
 
             log_config,

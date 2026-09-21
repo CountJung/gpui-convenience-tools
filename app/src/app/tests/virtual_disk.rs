@@ -232,6 +232,24 @@ fn virtual_disk_panel_renders_copy_progress_and_issue_summary(cx: &mut TestAppCo
 
     assert!(cx.debug_bounds("virtual-disk-copy-summary").is_some());
     assert!(cx.debug_bounds("virtual-disk-copy-start").is_some());
+    assert!(
+        cx.debug_bounds("virtual-disk-issue-suppress-0").is_some(),
+        "each copy issue should expose a repeat-notification suppression action"
+    );
+
+    cx.update(|window, app| {
+        view.update(app, |root, cx| {
+            root.toggle_virtual_disk_issue_suppression("지원 불가:.hidden.sys", window, cx);
+        });
+    });
+    refresh(cx);
+    let suppressed = cx.update(|_, app| {
+        view.read(app)
+            .virtual_disk
+            .suppressed_issue_keys
+            .contains("지원 불가:.hidden.sys")
+    });
+    assert!(suppressed, "confirming an issue should suppress repeat notifications");
 }
 
 #[gpui::test]

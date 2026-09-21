@@ -525,11 +525,40 @@ fn render_copy_card(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElement
             .p_2()
             .bg(theme.background)
             .child(ui::badge(summary.line(), summary_tone, ui::Size::Sm, cx));
-        for issue in summary.issues.iter().take(5) {
+        for (index, issue) in summary.issues.iter().take(5).enumerate() {
+            let key = issue.key();
+            let suppressed = this.virtual_disk.suppressed_issue_keys.contains(&key);
+            let selector = format!("virtual-disk-issue-suppress-{index}");
+            let key_for_click = key.clone();
             summary_view = summary_view.child(
-                div()
-                    .text_color(theme.muted_foreground)
-                    .child(format!("{} · {}", issue.path, issue.detail)),
+                h_flex()
+                    .w_full()
+                    .min_w_0()
+                    .gap_2()
+                    .items_center()
+                    .child(
+                        div()
+                            .flex_1()
+                            .min_w_0()
+                            .text_color(theme.muted_foreground)
+                            .child(format!("{} · {}", issue.path, issue.detail)),
+                    )
+                    .child(
+                        ui::action_button(
+                                ("virtual-disk-issue-action", index),
+                                if suppressed { "알림 해제" } else { "다음부터 숨기기" },
+                                ui::Size::Sm,
+                                ButtonStyle::secondary(cx),
+                                cx.listener(move |this, _event, window, cx| {
+                                    this.toggle_virtual_disk_issue_suppression(
+                                        &key_for_click,
+                                        window,
+                                        cx,
+                                    );
+                                }),
+                            )
+                            .debug_selector(move || selector.clone()),
+                    ),
             );
         }
         card = card.child(summary_view);

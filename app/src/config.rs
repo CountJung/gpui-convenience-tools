@@ -46,6 +46,9 @@ pub struct AppConfig {
     /// 앱 셸 사이드바 폭(px).
     #[serde(default = "default_sidebar_width")]
     pub sidebar_width: f32,
+    /// 사용자가 확인하고 반복 알림을 억제한 VDI 복사 오류 키.
+    #[serde(default)]
+    pub virtual_disk_suppressed_issue_keys: Vec<String>,
     /// 로그 롤링 파일 설정.
     #[serde(default)]
     pub log: LogConfig,
@@ -283,6 +286,7 @@ impl Default for AppConfig {
             sync_enabled: true,
             sync_jobs: Vec::new(),
             sidebar_width: DEFAULT_SIDEBAR_WIDTH,
+            virtual_disk_suppressed_issue_keys: Vec::new(),
             log: LogConfig::default(),
         }
     }
@@ -499,6 +503,7 @@ mod tests {
         assert!(config.log.file_enabled);
         assert_eq!(config.log.max_files, default_max_files());
         assert_eq!(config.sidebar_width, DEFAULT_SIDEBAR_WIDTH);
+        assert!(config.virtual_disk_suppressed_issue_keys.is_empty());
     }
 
     #[test]
@@ -605,6 +610,7 @@ mod tests {
             ..SyncJob::default()
         }];
         initial.sidebar_width = 320.0;
+        initial.virtual_disk_suppressed_issue_keys = vec!["지원 불가:.hidden.sys".to_string()];
         initial.log.max_files = 17;
         save_config(&initial).expect("save initial config");
 
@@ -618,6 +624,10 @@ mod tests {
         assert_eq!(updated.sync_jobs[0].last_run_unix, Some(1_700_000_000));
         assert_eq!(updated.sidebar_width, 320.0);
         assert_eq!(
+            updated.virtual_disk_suppressed_issue_keys,
+            vec!["지원 불가:.hidden.sys"]
+        );
+        assert_eq!(
             updated.sync_jobs[0].resume_cursor.as_deref(),
             Some("nested/file.txt")
         );
@@ -630,6 +640,10 @@ mod tests {
         assert_eq!(persisted.sync_jobs[0].source, r"D:\source");
         assert_eq!(persisted.sync_jobs[0].target, r"D:\target");
         assert_eq!(persisted.sidebar_width, 320.0);
+        assert_eq!(
+            persisted.virtual_disk_suppressed_issue_keys,
+            vec!["지원 불가:.hidden.sys"]
+        );
     }
 
     /// `label()`은 이름이 비었을 때 원본 폴더명으로 대체된다.

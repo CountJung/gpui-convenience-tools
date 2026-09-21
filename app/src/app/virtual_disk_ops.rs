@@ -4,10 +4,10 @@
 //! `VdiReader`의 read-only 경계로 열며, 디스크·파티션·현재 경로·선택·포커스 상태와
 //! 안전/지원 범위 오류 메시지를 관리한다.
 
-use std::{collections::HashSet, path::PathBuf};
+use std::{collections::{BTreeSet, HashSet}, path::PathBuf};
 
 use gpui::{AppContext, Context, Entity, FocusHandle, Window};
-use gpui_component::input::{InputEvent, InputState};
+use gpui_component::{input::{InputEvent, InputState}, notification::NotificationType};
 
 use crate::virtual_disk::{
     ntfs::NtfsGuestFileSource, partition::discover_partitions, vdi::VdiReader, GuestFileAttributes,
@@ -32,6 +32,7 @@ pub(crate) struct VirtualDiskSession {
     pub(crate) copy: VirtualDiskCopyState,
     pub(crate) source: Option<Box<dyn GuestFileSource>>,
     pub(crate) error: Option<String>,
+    pub(crate) suppressed_issue_keys: BTreeSet<String>,
 }
 
 impl Default for VirtualDiskSession {
@@ -49,11 +50,66 @@ impl Default for VirtualDiskSession {
             copy: VirtualDiskCopyState::default(),
             source: None,
             error: None,
+            suppressed_issue_keys: BTreeSet::new(),
         }
     }
 }
 
 impl AppRoot {
+    pub(crate) fn toggle_virtual_disk_issue_suppression(
+        &mut self,
+        key: &str,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let suppressed = if !self.virtual_disk.suppressed_issue_keys.remove(key) {
+            self.virtual_disk
+                .suppressed_issue_keys
+                .insert(key.to_string());
+            true
+        } else {
+            false
+        };
+        let keys: Vec<String> = self
+            .virtual_disk
+            .suppressed_issue_keys
+            .iter()
+            .cloned()
+            .collect();
+
+        #[cfg(test)]
+        let should_persist = self.sync.external_side_effects_enabled;
+        #[cfg(not(test))]
+        let should_persist = true;
+        if should_persist {
+            if let Err(err) = crate::config::update_config(|config| {
+                config.virtual_disk_suppressed_issue_keys = keys;
+            }) {
+                self.push_log("ERROR", format!("VDI 알림 억제 설정 저장 실패: {err}"));
+            }
+        }
+
+        self.push_log(
+            "INFO",
+            if suppressed {
+                format!("VDI 오류 반복 알림을 억제했습니다: {key}")
+            } else {
+                format!("VDI 오류 반복 알림을 다시 표시합니다: {key}")
+            },
+        );
+        self.notify_toast(
+            if suppressed {
+                "VDI 오류 반복 알림을 억제했습니다"
+            } else {
+                "VDI 오류 반복 알림을 다시 표시합니다"
+            },
+            NotificationType::Info,
+            window,
+            cx,
+        );
+        cx.notify();
+    }
+
     /// 탐색기 목록이 키보드 단축키를 받을 수 있도록 포커스 핸들을 준비한다.
     pub(crate) fn ensure_virtual_disk_focus(&mut self, cx: &mut Context<Self>) {
         if self.virtual_disk.focus_handle.is_none() {
