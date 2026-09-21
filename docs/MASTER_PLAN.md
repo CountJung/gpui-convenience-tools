@@ -1055,7 +1055,7 @@ passed·4 ignored, Clippy exit 0, `git diff --check`를 통과했으며 구현 �
   재포맷하지 않았다.
 - `scripts/Verify-Workspace.ps1` IDE 안전 모드에서 필수 GPUI 테스트 25개와 전체 테스트를
   재실행해 `IDE_VERIFIED`를 확인했다. 실제 데스크톱 검증은 `DESKTOP_PENDING`으로 남겼다.
-- 같은 실행의 문서 게이트에서 활성 TODO 23개와 검증 매트릭스 23개의 중복·누락·고아 ID가
+- 같은 실행의 문서 게이트에서 활성 TODO 27개와 검증 매트릭스 27개의 중복·누락·고아 ID가
   없음을 확인했다.
 
 - 실시간 감시(`notify` 직접 의존성·스키마·디바운스·강등·설정 UI는 D-009~D-013 완료)

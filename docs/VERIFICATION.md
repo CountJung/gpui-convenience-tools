@@ -27,7 +27,7 @@
 테스트를 재실행해 `IDE_VERIFIED`를 출력했다. 실제 데스크톱 표면은 별도 포그라운드 조건이
 필요하므로 같은 실행에서 `DESKTOP_PENDING`으로 분리했다. 전체 `cargo fmt --check`는 기존
 baseline 포맷 차이가 남아 있어 별도 구조 정리 범위로 유지한다.
-이번 실행에서는 `DOCS_VERIFIED active=23 matrix=23`도 먼저 통과해 활성 TODO와 검증
+이번 실행에서는 `DOCS_VERIFIED active=27 matrix=27`도 먼저 통과해 활성 TODO와 검증
 매트릭스의 일대일 대응을 확인했다.
 
 ## 작업마다 적용하는 순서
@@ -145,6 +145,10 @@ SHA-256을 기록한다. 다른 검증자의 독립 검토가 요구되는 UI �
 | K-001 | RUST | [ ] | [ ] | — | — | [ ] | [ ] | — |
 | G-003 | E2E | [x] | [x] | [x] | [ ] | [x] | [x] | `sidebar_width` 설정 필드와 200~360px 보정·기본 240px 복원; `sidebar_width_is_normalized_to_supported_range`, `update_config_preserves_unedited_fields`, GPUI `sidebar_divider_drag_resizes_navigation_and_content`; 전체 140 passed·4 ignored; Clippy 기존 경고 7건; 격리 release 기본 캡처 `target/visual-validation/captures/g003-default-003709.png`, `sidebar_width=320` 시드 복원 캡처 `target/visual-validation/captures/g003-restored-width-003742.png`; 하네스가 divider 드래그를 지원하지 않아 실제 mouse-up 저장 콜백·독립 Visual Reviewer는 후속; commit `0a793b8` push 완료 |
 | G-004 | RUST | [ ] | [ ] | — | — | [ ] | [ ] | — |
+| K-002 | RUST | [ ] | [ ] | — | — | [ ] | [ ] | macOS 메뉴 막대 지원은 macOS 실행 환경 확인 후 진행 |
+| K-003 | RUST | [ ] | [ ] | — | — | [ ] | [ ] | `launchd` 자동 시작은 macOS 실행 환경 확인 후 진행 |
+| K-004 | RUST | [ ] | [ ] | — | — | [ ] | [ ] | `.icns` 배포 아이콘은 macOS 패키징 환경 확인 후 진행 |
+| K-005 | RUST | [ ] | [ ] | — | — | [ ] | [ ] | 코드 서명·공증은 Apple Developer 계정 확보 후 진행 |
 
 최신 VDE-019 릴리스 보강 검증은 `exports_ntfs_vdi_fixture_when_requested`로 격리 합성 VDI를
 재생성한 뒤 수행했다. 최신 release 앱에서 표준 VBox VDI와 재생성 합성 VDI 모두 파일 행,

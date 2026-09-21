@@ -55,7 +55,9 @@ if (-not (Test-Path -LiteralPath $verificationPath -PathType Leaf)) {
 
 $todoLines = @(Get-Content -LiteralPath $todoPath)
 $verificationLines = @(Get-Content -LiteralPath $verificationPath)
-$activeIds = @(Get-TaskIds -Lines $todoLines -Pattern '^\- \[ \] ((?:VDE|D|E|G|K)-\d{3}) \|')
+$taskIdPattern = '^\s*-\s*\[ \]\s+([A-Z][A-Z0-9]{0,7}-\d{1,4})\s+\|'
+$matrixIdPattern = '^\|\s*([A-Z][A-Z0-9]{0,7}-\d{1,4})\s*\|'
+$activeIds = @(Get-TaskIds -Lines $todoLines -Pattern $taskIdPattern)
 
 if ($activeIds.Count -eq 0) {
     throw "No active TODO IDs were found."
@@ -73,7 +75,7 @@ if ($matrixStart -lt 0 -or $matrixEnd -le $matrixStart) {
 }
 
 $matrixLines = @($verificationLines[($matrixStart + 1)..($matrixEnd - 1)])
-$matrixIds = @(Get-TaskIds -Lines $matrixLines -Pattern '^\| ((?:VDE|D|E|G|K)-\d{3}) \|')
+$matrixIds = @(Get-TaskIds -Lines $matrixLines -Pattern $matrixIdPattern)
 $duplicateMatrixIds = @($matrixIds | Group-Object | Where-Object Count -gt 1)
 if ($duplicateMatrixIds.Count -gt 0) {
     throw ("Duplicate verification matrix IDs: " + ($duplicateMatrixIds.Name -join ", "))
