@@ -158,10 +158,6 @@ fn split_relative(path: &str) -> Vec<OsString> {
 /// 경로 조각 하나를 넘어가야 할 때는 `**`를 독립 조각으로 사용한다.
 /// 따라서 `**/*.tmp`는 루트와 모든 하위 폴더의 `.tmp` 파일을 모두 가리킨다.
 /// 패턴과 경로의 `/`·`\\`는 같은 구분자로 취급하며, 비교는 대소문자를 구분한다.
-///
-/// D-003에서 순회 엔진이 이 함수를 호출할 때까지는 설정 스키마만 존재하므로,
-/// 그 단계 전까지의 일반 빌드에서 발생하는 미사용 경고를 억제한다.
-#[allow(dead_code)]
 pub(crate) fn matches_exclude_pattern(pattern: &str, relative_path: &str) -> bool {
     let pattern = pattern.trim();
     if pattern.is_empty() {
@@ -181,7 +177,6 @@ pub(crate) fn matches_exclude_pattern(pattern: &str, relative_path: &str) -> boo
     match_glob_segments(&pattern_segments, &path_segments, 0, 0, &mut memo)
 }
 
-#[allow(dead_code)]
 fn match_glob_segments(
     pattern: &[&str],
     path: &[&str],
@@ -211,13 +206,11 @@ fn match_glob_segments(
     result
 }
 
-#[allow(dead_code)]
 fn is_globstar(segment: &str) -> bool {
     segment.len() >= 2 && segment.chars().all(|character| character == '*')
 }
 
 /// 경로 구분자를 제외한 한 조각을 `*`·`?`로 비교한다.
-#[allow(dead_code)]
 fn match_glob_segment(pattern: &str, text: &str) -> bool {
     let pattern: Vec<_> = pattern.chars().collect();
     let text: Vec<_> = text.chars().collect();
@@ -425,6 +418,19 @@ fn sync_dir(
             ResumeProbe::Skip => continue,
             ResumeProbe::Descend => resume_depth = depth + 1,
             ResumeProbe::Process => {}
+        }
+
+        let relative_path = relative_label(&src_path, root);
+        if job
+            .exclude_patterns
+            .iter()
+            .any(|pattern| matches_exclude_pattern(pattern, &relative_path))
+        {
+            // 제외된 디렉터리는 하위 순회와 대상 생성도 하지 않는다. 이름은 이미
+            // `seen_names`에 들어갔으므로 mirror_deletes가 보호 영역을 지우지 않는다.
+            outcome.skipped += 1;
+            control.report(&relative_path, outcome);
+            continue;
         }
 
         // symlink_metadata: 심볼릭 링크를 따라가지 않고 링크 자체를 본다.

@@ -68,6 +68,52 @@ fn exclude_glob_normalizes_path_separators_and_ignores_blank_patterns() {
 }
 
 #[test]
+fn excluded_files_are_not_copied_and_count_as_skipped() {
+    let root = temp_dir("exclude-files");
+    let src = root.join("src");
+    let dst = root.join("dst");
+    fs::create_dir_all(src.join("nested")).unwrap();
+    fs::write(src.join("keep.txt"), b"keep").unwrap();
+    fs::write(src.join("skip.tmp"), b"skip").unwrap();
+    fs::write(src.join("nested/skip.tmp"), b"skip nested").unwrap();
+
+    let mut sync_job = job(&src, &dst);
+    sync_job.exclude_patterns = vec!["**/*.tmp".to_string()];
+    let outcome = run_sync_job(&sync_job);
+
+    assert_eq!(outcome.copied, 1, "failures: {:?}", outcome.failures);
+    assert_eq!(outcome.skipped, 2);
+    assert!(dst.join("keep.txt").exists());
+    assert!(!dst.join("skip.tmp").exists());
+    assert!(!dst.join("nested/skip.tmp").exists());
+
+    let _ = fs::remove_dir_all(&root);
+}
+
+#[test]
+fn excluded_directories_are_not_created_or_removed_by_mirror_deletes() {
+    let root = temp_dir("exclude-directory");
+    let src = root.join("src");
+    let dst = root.join("dst");
+    fs::create_dir_all(src.join("cache")).unwrap();
+    fs::create_dir_all(dst.join("cache")).unwrap();
+    fs::write(src.join("cache/new.bin"), b"new").unwrap();
+    fs::write(dst.join("cache/old.bin"), b"old").unwrap();
+
+    let mut sync_job = job(&src, &dst);
+    sync_job.exclude_patterns = vec!["cache".to_string()];
+    sync_job.mirror_deletes = true;
+    let outcome = run_sync_job(&sync_job);
+
+    assert_eq!(outcome.copied, 0, "failures: {:?}", outcome.failures);
+    assert_eq!(outcome.skipped, 1);
+    assert!(dst.join("cache/old.bin").exists());
+    assert!(!dst.join("cache/new.bin").exists());
+
+    let _ = fs::remove_dir_all(&root);
+}
+
+#[test]
 fn copies_nested_files_and_skips_unchanged_on_second_run() {
     let root = temp_dir("basic");
     let src = root.join("src");
