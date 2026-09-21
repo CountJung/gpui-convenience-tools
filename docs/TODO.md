@@ -84,7 +84,6 @@
 
 ### D-1. 제외 패턴 (우선순위 높음)
 
-- [ ] D-001 | 0% | `SyncJob`에 `exclude_patterns: Vec<String>` 추가(`#[serde(default)]`)
 - [ ] D-002 | 0% | glob 매칭 구현 — 의존성 추가 없이 `*`, `?`, `**` 정도만 자체 구현하거나
       `glob` 크레이트 추가 검토
 - [ ] D-003 | 0% | `sync::sync_dir`에서 상대 경로 기준으로 매칭해 건너뛰기(`skipped`로 계상)

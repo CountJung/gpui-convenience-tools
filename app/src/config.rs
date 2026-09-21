@@ -107,6 +107,12 @@ pub struct SyncJob {
     /// 숨김/시스템 속성 파일도 동기화할지 여부. 기본값은 전체 동기화이므로 true.
     #[serde(default = "default_true")]
     pub include_hidden: bool,
+    /// 상대 경로 기준으로 동기화에서 제외할 패턴.
+    ///
+    /// 패턴 해석과 실제 건너뛰기는 D-002~D-005에서 구현한다. 필드를 먼저 설정
+    /// 스키마에 포함해도 기존 config.json을 계속 읽을 수 있도록 기본값은 빈 목록이다.
+    #[serde(default)]
+    pub exclude_patterns: Vec<String>,
 
     // ── 아래 두 필드는 동기화 엔진 계층이 소유한다 ──
     //
@@ -174,6 +180,7 @@ impl Default for SyncJob {
             interval_secs: default_sync_interval_secs(),
             mirror_deletes: false,
             include_hidden: true,
+            exclude_patterns: Vec::new(),
             last_run_unix: None,
             resume_cursor: None,
         }
@@ -448,6 +455,7 @@ mod tests {
         let mut job: SyncJob = serde_json::from_str(legacy).expect("구버전 SyncJob 파싱");
 
         assert!(job.id.is_empty());
+        assert!(job.exclude_patterns.is_empty());
         job.ensure_id();
         assert!(!job.id.is_empty());
 
@@ -463,6 +471,22 @@ mod tests {
         let a = SyncJob::default();
         let b = SyncJob::default();
         assert_ne!(a.id, b.id);
+        assert!(a.exclude_patterns.is_empty());
+        assert!(b.exclude_patterns.is_empty());
+    }
+
+    /// 제외 패턴은 설정 파일에 저장·복원할 수 있어야 한다.
+    #[test]
+    fn sync_job_exclude_patterns_round_trip() {
+        let job = SyncJob {
+            exclude_patterns: vec!["**/*.tmp".to_string(), "cache/?".to_string()],
+            ..SyncJob::default()
+        };
+
+        let json = serde_json::to_string(&job).expect("SyncJob 직렬화");
+        let restored: SyncJob = serde_json::from_str(&json).expect("SyncJob 역직렬화");
+
+        assert_eq!(restored.exclude_patterns, job.exclude_patterns);
     }
 
     /// UI 스냅샷을 저장해도 엔진이 기록한 실행 진행 상황은 살아남아야 한다.
