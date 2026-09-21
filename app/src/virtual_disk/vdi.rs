@@ -576,6 +576,7 @@ mod tests {
     use super::*;
     use crate::virtual_disk::{
         ntfs::NtfsGuestFileSource, partition::discover_partitions, GuestFileSource, GuestFileSystem,
+        PartitionTableKind,
     };
     use std::{
         fs,
@@ -754,6 +755,21 @@ mod tests {
     }
 
     #[test]
+    fn reads_unsupported_partition_fixture_without_claiming_ntfs() {
+        let path = write_unsupported_partition_vdi_fixture();
+        let mut reader = VdiReader::open(&path).unwrap();
+
+        let partitions = discover_partitions(&mut reader).unwrap();
+        assert_eq!(partitions.len(), 1);
+        assert_eq!(partitions[0].filesystem, None);
+        assert_eq!(partitions[0].table, PartitionTableKind::Mbr);
+        assert_eq!(partitions[0].start_lba, 1);
+        assert_eq!(partitions[0].sector_count, 1);
+
+        remove_fixture(&path);
+    }
+
+    #[test]
     fn exports_ntfs_vdi_fixture_when_requested() {
         let Ok(destination) = std::env::var("GPUI_CONVENIENCE_TOOLS_EXPORT_VDI_FIXTURE") else {
             return;
@@ -763,6 +779,23 @@ mod tests {
             fs::create_dir_all(parent).unwrap();
         }
         let source = write_ntfs_vdi_fixture();
+        fs::copy(&source, &destination).unwrap();
+        remove_fixture(&source);
+        assert!(destination.is_file());
+    }
+
+    #[test]
+    fn exports_unsupported_partition_vdi_fixture_when_requested() {
+        let Ok(destination) =
+            std::env::var("GPUI_CONVENIENCE_TOOLS_EXPORT_UNSUPPORTED_VDI_FIXTURE")
+        else {
+            return;
+        };
+        let destination = PathBuf::from(destination);
+        if let Some(parent) = destination.parent() {
+            fs::create_dir_all(parent).unwrap();
+        }
+        let source = write_unsupported_partition_vdi_fixture();
         fs::copy(&source, &destination).unwrap();
         remove_fixture(&source);
         assert!(destination.is_file());
@@ -845,6 +878,28 @@ mod tests {
     fn write_ntfs_raw_fixture() -> PathBuf {
         let path = fixture_path().with_file_name("disk.raw");
         fs::write(&path, ntfs_disk_bytes()).unwrap();
+        path
+    }
+
+    fn write_unsupported_partition_vdi_fixture() -> PathBuf {
+        let path = fixture_path();
+        let mut header = base_header(IMAGE_TYPE_DYNAMIC, 2, 2);
+        write_u32(&mut header, 0x154, 512);
+        write_u32(&mut header, 0x158, 1024);
+
+        let mut mbr = vec![0u8; BLOCK_SIZE as usize];
+        mbr[446 + 4] = 0x83;
+        mbr[446 + 8..446 + 12].copy_from_slice(&1u32.to_le_bytes());
+        mbr[446 + 12..446 + 16].copy_from_slice(&1u32.to_le_bytes());
+        mbr[510..512].copy_from_slice(&[0x55, 0xaa]);
+
+        let mut file = fs::File::create(&path).unwrap();
+        file.write_all(&header).unwrap();
+        let mut block_map = vec![0u8; 512];
+        block_map[..8].copy_from_slice(&[0, 0, 0, 0, 1, 0, 0, 0]);
+        file.write_all(&block_map).unwrap();
+        file.write_all(&mbr).unwrap();
+        file.write_all(&vec![0; BLOCK_SIZE as usize]).unwrap();
         path
     }
 

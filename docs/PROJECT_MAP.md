@@ -30,7 +30,7 @@
 안전 경계: 원본 VDI는 read-only로만 열고, 실행 중 VM의 VDI 직접 읽기는 구현하지 않는다.
 실행 중 VM 지원은 후속 `GuestFileSource` 구현으로만 추가한다(VDE-021).
 
-**최종 측정**: 2026-09-22 · `app/src` 총 53개 파일 · 20,828줄
+**최종 측정**: 2026-09-22 · `app/src` 총 53개 파일 · 20,883줄
 
 ## 크기 기준 — 줄 수는 증상이다
 
@@ -44,7 +44,7 @@
 | 800~1,000 | 🟡 경고 | 다음 작업 전에 구조 리팩터링 |
 | 1,000 초과 | 🔴 위반 | **즉시 리팩터링.** 다른 작업보다 우선 |
 
-현재 🔴 위반 **없음**, 🟡 경고 **3개**. 최대 파일은 911줄(`virtual_disk/vdi.rs`)이며, 다음 VirtualBox UI 작업 전에 책임 단위 분할을 검토한다.
+현재 🔴 위반 **없음**, 🟡 경고 **3개**. 최대 파일은 966줄(`virtual_disk/vdi.rs`)이며, 다음 VirtualBox UI 작업 전에 책임 단위 분할을 검토한다.
 줄 수와 무관하게 처리하는 중복 헬퍼는 아래 「중복 헬퍼 추적」에서 관리한다.
 
 ### 줄 수 측정 명령
@@ -74,12 +74,12 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `sync_history.rs` | 223 | 동기화 완료 이력의 JSON 배열 저장·순서 보장·손상 파일 보존·개수/기간 보존·최신 목록 로드·소요 시간 계산 |
 | `util.rs` | 139 | 도메인 주인이 없는 순수 헬퍼 — `format_interval`·`interval_to_secs`·`TimeUnit` |
 
-### VirtualBox 도메인 (`app/src/virtual_disk/`) — 4,677줄 / 8파일
+### VirtualBox 도메인 (`app/src/virtual_disk/`) — 4,732줄 / 8파일
 
 | 파일 | 줄 | 책임 |
 | --- | ---: | --- |
 | `mod.rs` | 456 | VDI·파티션·게스트 파일 항목 모델, 정규화된 게스트 경로·시간 메타데이터, `GuestFileSource`, 플랫폼 비의존 오류 계약 |
-| `vdi.rs` | 911 | 표준 VDI 1.1 read-only 헤더·블록 맵·동적/고정 블록 읽기, 잠금·VM 사용·크기/mtime 안정성 가드, 합성 NTFS raw/VDI fixture export |
+| `vdi.rs` | 966 | 표준 VDI 1.1 read-only 헤더·블록 맵·동적/고정 블록 읽기, 잠금·VM 사용·크기/mtime 안정성 가드, NTFS·미지원 파티션 VDI fixture export와 파서 경계 테스트 |
 | `partition.rs` | 791 | read-only `PartitionSource` 경계, MBR·EBR·protective MBR·GPT 검색, 양쪽 CRC·LBA 범위 검증, NTFS 3.1 부트 섹터 판정 |
 | `ntfs.rs` | 801 | 파티션 범위 `Read + Seek` 어댑터, NTFS 3.1 디렉터리·기본 데이터 스트림 읽기, 압축·암호화·범위·손상 오류와 속성·시간 보존, 고정/손상 픽스처 테스트 |
 | `path_policy.rs` | 335 | 절대 대상 루트 기준 게스트 경로 매핑, Windows 예약 이름·경로 길이 검증, 게스트·호스트 리파스 포인트/심볼릭 링크 추적 차단 |
@@ -345,6 +345,7 @@ G-001 판단: `muted`는 비활성 의미이므로 테두리와 hover를 추가�
 | 2026-09-22 | `scripts/Verify-Workspace.ps1`·`docs/VERIFICATION.md`·`docs/MASTER_PLAN.md` | IDE 안전 통합 검증 재실행 | 코드·필수 GPUI 테스트·전체 테스트 결과를 한 번에 확인한 최신 증거가 문서에 연결되지 않음 | 필수 GPUI 테스트 25개와 전체 테스트 155 passed·4 ignored를 재실행하고 `IDE_VERIFIED` 출력 확인 | 데스크톱 표면은 `DESKTOP_PENDING`; 포그라운드 조건 확보 후 별도 하네스 실행 |
 | 2026-09-22 | `scripts/Assert-ProjectDocs.ps1`·`scripts/Verify-Workspace.ps1` | 활성 TODO·검증 매트릭스 자동 정합성 게이트 | 새 작업 ID가 TODO에만 추가되거나 검증 매트릭스에 중복으로 기록될 수 있음 | 중첩 항목을 포함한 활성 ID 27개와 매트릭스 ID 27개의 중복·누락·고아 항목을 자동 검사하고 `Verify-Workspace.ps1` 첫 단계에 연결 | `DOCS_VERIFIED active=27 matrix=27`; 향후 작업 ID 변경은 코드 테스트 전에 즉시 실패 |
 | 2026-09-22 | `scripts/Invoke-ClaudeVisualCheck.ps1`·`docs/TODO.md`·`docs/VERIFICATION.md` | VDE-016·019 포그라운드 입력 한계 재검증 | 기본 `SetForegroundWindow` 경로만으로는 실제 VDI 목록에 외부 키를 보낼 수 없음 | UI Automation `SetFocus`와 `SetWindowPos` 최상위 전환을 추가 시도했지만 현재 데스크톱 포그라운드가 유지됨; 하네스 안전 차단으로 입력 누출을 방지하고 세션 종료 후 프로세스·세션 0과 임시 루트 삭제 확인 | 외부 키보드 E2E와 독립 Visual Reviewer는 미검증; 별도 사용자 포커스/검증 표면이 필요 |
+| 2026-09-22 | `app/src/virtual_disk/vdi.rs`·`scripts/Invoke-ClaudeVisualCheck.ps1`·`docs/TODO.md`·`docs/VERIFICATION.md` | VDE-017 실제 미지원 파티션 릴리스 E2E | GPUI 상태 렌더와 단위 fixture만 있어 실제 release 앱에서 미지원 파티션 메시지를 확인하지 못함 | `exports_unsupported_partition_vdi_fixture_when_requested`로 MBR 타입 `0x83`·NTFS 시그니처 없는 VDI를 격리 생성하고, `reads_unsupported_partition_fixture_without_claiming_ntfs`로 NTFS 오인 방지를 확인; release 캡처 `vde017-unsupported-partition-release-fixed-033450.png`에서 오류 카드·파티션 경고 확인, 전체 157 passed·4 ignored·Clippy exit 0, process/session 0 | 실제 실행 중 VM E2E와 독립 Visual Reviewer는 후속 |
 | 2026-09-22 | `app/src/sync_history.rs`·`app/src/app/background.rs`·`app/src/main.rs` | D-018 동기화 실행 이력 저장 | 실행 결과가 화면 로그와 설정 상태에만 남아 앱 재시작 후 이력을 조회할 파일이 없음 | `sync-history.json`에 실행 순서·작업 식별자·시각·결과 건수·중지·요약을 append하고 손상 JSON은 덮어쓰지 않음, 전용 2개 테스트와 전체 143 passed·4 ignored·Clippy 기존 경고 7건, 52개 파일·19,884줄 기준 지도 갱신 | 이력 보존 정책은 로그와 동일하게 D-019에서, UI 목록은 D-020에서 후속; commit `97009c3` push 완료 |
 | 2026-09-22 | `app/src/sync_history.rs` | D-019 동기화 이력 보존 정책 | JSON 이력은 추가만 되어 오래된 실행 결과가 무한히 남을 수 있음 | `LogConfig.max_age_days`·`max_files`로 기간·개수 초과분을 새 append 전에 제거하고 최소 한 건을 유지, 보존 경계 테스트·전체 144 passed·4 ignored·Clippy 기존 경고 7건, 52개 파일·19,946줄 기준 지도 갱신 | 파일 용량 롤링은 JSON 이력에 적용하지 않으며 최근 이력 화면은 D-020 후속; commit `ed71af4` push 완료 |
 | 2026-09-22 | `app/src/sync_history.rs`·`app/src/app/mod.rs`·`app/src/app/events.rs`·`app/src/window/file_sync.rs`·`app/src/app/tests/file_sync.rs`·`scripts/Invoke-ClaudeVisualCheck.ps1` | D-020 최근 동기화 이력 카드 부분 구현 | 저장된 실행 결과를 앱 재시작 후 패널에서 볼 수 없고 완료 직후 목록 갱신도 없음 | 최신 20건 로드·완료 이벤트 새로고침·상태/결과 건수/소요 시간 카드·폭 회귀 테스트와 GPUI 시드 렌더 테스트, `-SeedHistory`·`-InitialPanel FileSync` 검증 경로 추가, 전체 145 passed·4 ignored·Clippy 기존 경고 7건, 52개 파일·20,101줄 기준 지도 갱신 | 격리 release 시드 패널 캡처 `d020-history-panel-012458.png`에서 중지/실패/성공 3행 확인, processCount=0·sessionCount=0; 독립 Visual Reviewer는 후속; commits `031148e`, `ff9dc72` push 완료 |
