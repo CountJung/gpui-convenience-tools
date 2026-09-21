@@ -60,7 +60,7 @@
 
 ### O-5. 검증·후속 백엔드
 
-- [ ] VDE-019 | 95% | GPUI 자체 테스트와 격리 릴리스 실행으로 실제 파일 목록·숨김/시스템 항목·복사 진행/실패 요약·대상 폴더 복사를 확인 — VirtualBox 7.2.14가 `convertfromraw`로 생성한 표준 VDI까지 검증 완료; 독립 Visual Reviewer 확인은 후속
+- [ ] VDE-019 | 95% | GPUI 자체 테스트와 격리 릴리스 실행으로 실제 파일 목록·숨김/시스템 항목·복사 진행/실패 요약·대상 폴더 복사를 확인 — VirtualBox 7.2.14가 `convertfromraw`로 생성한 표준 VDI까지 검증 완료; UI Automation·`SetWindowPos` 포커스 시도도 현재 데스크톱 포그라운드를 바꾸지 못해 외부 키보드 입력은 미검증; 독립 Visual Reviewer 확인은 후속
 - [ ] VDE-021 | 70% | 공식 `VBoxManage guestcontrol` 명령 계약·read-only 안전 경계·`GuestFileSource` 분리 설계를 `VIRTUAL_DISK_BACKENDS.md`에 기록 완료; VDE-019 실제 패널/복사 E2E, 격리 VM·Guest Additions 준비 전에는 구현·완료 처리하지 않음
 
 > VDE-021은 필수 오프라인 경로의 선행 작업이다. Guest Control이 추가되더라도 실행 중 VDI
@@ -155,7 +155,9 @@
 - `D-014`~`D-016`: 기본 `Skip`에서 `Follow`·`Recreate`를 실제로 허용할지, 원본 루트 밖 추적·순환 링크·관리자 권한/개발자 모드의
   허용 범위에 대한 제품 판단이 필요하다. 현재는 미구현 모드를 명시적 실패로 남겨 조용한 오작동을 막는다.
 - `VDE-019`: 실제 VBox 생성 VDI의 파일 행·호스트 복사 대상과 `-SelectAllVdi` 시드 선택 상태는 확인했지만,
-  하네스의 foreground 입력 제한 때문에 외부 키보드 E2E와 독립 Visual Reviewer 확인은 남아 있다.
+  기본 포커스 전환, UI Automation `SetFocus`, `SetWindowPos` 최상위 전환 모두 현재 데스크톱
+  포그라운드를 바꾸지 못했다. 하네스는 다른 창으로 입력이 새지 않도록 중단했으며, 외부 키보드
+  E2E와 독립 Visual Reviewer 확인은 남아 있다.
 - Phase O 전체 완료 이력: VDE-020 문서 정합성은 완료했지만, Phase O 전체 완료 표시는
   VDE-019의 실제 E2E가 끝난 뒤 확정한다.
 - `VDE-021`: `VBoxManage.exe`는 `C:\Program Files\Oracle\VirtualBox\VBoxManage.exe`에

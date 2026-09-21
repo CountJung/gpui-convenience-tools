@@ -773,7 +773,9 @@ VirtualBox 7.2.14의 `convertfromraw`로 만든 표준 VDI를 사용해 표준 �
 foreground 안전 차단으로 입력을 보내지 않았다. 캡처는
 `vde019-vbox-standard-loaded-023912.png`, `vde019-vbox-key-before-024822.png`,
 `vde019-vbox-select-all-seed-025058.png`이며, 세션 종료 후 프로세스·세션 루트·임시 대상이
-모두 정리되었다. 외부 키보드 입력과 독립 Visual Reviewer 확인은 잔여다.
+모두 정리되었다. 기본 포커스 전환·UI Automation `SetFocus`·`SetWindowPos` 최상위 전환을
+추가로 시도했지만 현재 데스크톱 포그라운드는 바뀌지 않았고, 하네스는 안전하게 입력을 중단했다.
+외부 키보드 입력과 독립 Visual Reviewer 확인은 잔여다.
 표준 VDI 파서·raw fixture export와 검증 커밋은 `bed5914`이다.
 
 ### Phase T-1 — T-001·T-002 회귀 테스트 보강 완료 ✅
