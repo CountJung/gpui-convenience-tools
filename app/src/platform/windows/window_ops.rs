@@ -14,11 +14,13 @@ use windows_sys::Win32::{
     System::Threading::{
         OpenProcess, QueryFullProcessImageNameW, PROCESS_QUERY_LIMITED_INFORMATION,
     },
+    UI::Input::KeyboardAndMouse::{EnableWindow, IsWindowEnabled},
     UI::WindowsAndMessaging::{
         EnumWindows, GetClassNameW, GetWindow, GetWindowLongPtrW, GetWindowRect,
         GetWindowThreadProcessId, IsIconic, IsWindow, IsWindowVisible, IsZoomed, SetWindowPos,
-        ShowWindow, GWL_EXSTYLE, GW_OWNER, SW_HIDE, SW_SHOWMAXIMIZED, SW_SHOWMINNOACTIVE,
-        SW_SHOWNOACTIVATE, SWP_NOACTIVATE, SWP_NOZORDER, WS_EX_TOOLWINDOW,
+        ShowWindow, GWL_EXSTYLE, GW_OWNER, SW_HIDE,
+        SW_SHOWMAXIMIZED, SW_SHOWMINNOACTIVE, SW_SHOWNOACTIVATE, SWP_NOACTIVATE, SWP_NOMOVE,
+        SWP_NOZORDER, WS_EX_TOOLWINDOW,
     },
 };
 
@@ -120,7 +122,42 @@ pub(super) fn capture_ad_window_state(hwnd: HWND) -> Result<AdWindowSnapshot> {
         width,
         height,
         show_state,
+        enabled: unsafe { IsWindowEnabled(hwnd) != 0 },
     })
+}
+
+/// 광고 후보 창을 0×0으로 축소하고 입력 대상에서 제외한다.
+pub(super) fn collapse_ad_window(hwnd: HWND) -> Result<()> {
+    if unsafe { IsWindow(hwnd) } == 0 {
+        return Err(anyhow!("invalid HWND for collapse_ad_window"));
+    }
+
+    // SAFETY: the verified HWND remains valid for this synchronous Win32 call. NOMOVE keeps
+    // the saved screen position while NOACTIVATE/NOZORDER avoid focus and stacking changes.
+    if unsafe {
+        SetWindowPos(
+            hwnd,
+            0,
+            0,
+            0,
+            0,
+            0,
+            SWP_NOMOVE | SWP_NOACTIVATE | SWP_NOZORDER,
+        )
+    } == 0
+    {
+        return Err(anyhow!("SetWindowPos failed while collapsing the ad window"));
+    }
+
+    // SAFETY: disabling a verified window is synchronous and does not transfer ownership.
+    unsafe {
+        EnableWindow(hwnd, 0);
+    }
+    if unsafe { IsWindowEnabled(hwnd) } != 0 {
+        return Err(anyhow!("EnableWindow failed while collapsing the ad window"));
+    }
+
+    Ok(())
 }
 
 /// 캡처한 창 상태를 같은 프로세스에 속한 동일 HWND에만 복원한다.
@@ -170,6 +207,11 @@ pub(super) fn restore_ad_window_state(snapshot: &AdWindowSnapshot) -> Result<()>
     // SAFETY: HWND and command are validated Win32 values.
     unsafe {
         ShowWindow(hwnd, show_command);
+        EnableWindow(hwnd, if snapshot.enabled { 1 } else { 0 });
+    }
+
+    if unsafe { IsWindowEnabled(hwnd) != 0 } != snapshot.enabled {
+        return Err(anyhow!("EnableWindow failed while restoring the saved window state"));
     }
 
     Ok(())
@@ -319,7 +361,9 @@ fn query_process_image_name(process_handle: HANDLE) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{capture_ad_window_state, class_filter_matches, restore_ad_window_state};
+    use super::{
+        capture_ad_window_state, class_filter_matches, collapse_ad_window, restore_ad_window_state,
+    };
     use crate::platform::{AdWindowShowState, AdWindowSnapshot};
 
     #[test]
@@ -358,8 +402,85 @@ mod tests {
             width: 300,
             height: 200,
             show_state: AdWindowShowState::Normal,
+            enabled: true,
         };
 
         assert!(restore_ad_window_state(&snapshot).is_err());
+    }
+
+    #[test]
+    fn invalid_window_cannot_be_collapsed() {
+        assert!(collapse_ad_window(0).is_err());
+    }
+
+    #[test]
+    fn collapse_and_restore_preserve_a_fixture_window_state() {
+        use std::ptr::null;
+        use windows_sys::Win32::{
+            Foundation::{RECT, HWND},
+            UI::{
+                Input::KeyboardAndMouse::{IsWindowEnabled},
+                WindowsAndMessaging::{
+                    CreateWindowExW, DestroyWindow, GetWindowRect, IsWindowVisible, WS_POPUP,
+                    WS_VISIBLE,
+                },
+            },
+        };
+
+        let class_name = super::super::wide_null("STATIC");
+        let title = super::super::wide_null("gpui-ad-003-fixture");
+        // The fixture is visible but placed off-screen so this test does not cover the user's
+        // windows. It is created and destroyed entirely within this test.
+        let hwnd: HWND = unsafe {
+            CreateWindowExW(
+                0,
+                class_name.as_ptr(),
+                title.as_ptr(),
+                WS_POPUP | WS_VISIBLE,
+                -32000,
+                -32000,
+                120,
+                80,
+                0,
+                0,
+                0,
+                null(),
+            )
+        };
+        assert_ne!(hwnd, 0, "fixture window should be created");
+
+        let snapshot = capture_ad_window_state(hwnd).expect("fixture state should be captured");
+        assert_eq!(snapshot.width, 120);
+        assert_eq!(snapshot.height, 80);
+        assert!(snapshot.enabled);
+
+        collapse_ad_window(hwnd).expect("fixture should collapse");
+        let mut collapsed = RECT {
+            left: 0,
+            top: 0,
+            right: 0,
+            bottom: 0,
+        };
+        assert_ne!(unsafe { GetWindowRect(hwnd, &mut collapsed) }, 0);
+        assert_eq!(collapsed.right - collapsed.left, 0);
+        assert_eq!(collapsed.bottom - collapsed.top, 0);
+        assert_eq!(unsafe { IsWindowEnabled(hwnd) }, 0);
+
+        restore_ad_window_state(&snapshot).expect("fixture state should be restored");
+        let mut restored = RECT {
+            left: 0,
+            top: 0,
+            right: 0,
+            bottom: 0,
+        };
+        assert_ne!(unsafe { GetWindowRect(hwnd, &mut restored) }, 0);
+        assert_eq!(restored.right - restored.left, snapshot.width);
+        assert_eq!(restored.bottom - restored.top, snapshot.height);
+        assert_ne!(unsafe { IsWindowVisible(hwnd) }, 0);
+        assert_ne!(unsafe { IsWindowEnabled(hwnd) }, 0);
+
+        unsafe {
+            DestroyWindow(hwnd);
+        }
     }
 }

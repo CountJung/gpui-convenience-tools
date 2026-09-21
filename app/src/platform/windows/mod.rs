@@ -4,7 +4,7 @@
 //!
 //! | 모듈 | 책임 |
 //! | --- | --- |
-//! | [`window_ops`] | 창·프로세스 열거와 광고 창 숨김 |
+//! | [`window_ops`] | 창·프로세스 열거와 광고 창 0×0 축소 |
 //! | [`tray`] | 시스템 트레이 아이콘 |
 //! | [`scm`] | Windows 서비스 등록·서비스 모드 실행 |
 //! | [`task_scheduler`] | 로그온 시 자동 시작(`schtasks`) |
@@ -98,6 +98,10 @@ impl Platform for WindowsPlatform {
         }
 
         Ok(())
+    }
+
+    fn collapse_ad(&self, handle: HWND) -> Result<()> {
+        window_ops::collapse_ad_window(handle)
     }
 
     fn is_process_id_running(&self, process_id: u32) -> bool {

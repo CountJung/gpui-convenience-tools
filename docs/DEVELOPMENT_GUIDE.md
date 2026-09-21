@@ -26,7 +26,7 @@
 
 | 기능 | 사이드바 명칭 | 모듈 |
 | --- | --- | --- |
-| WebView 광고 창 숨김 | 웹뷰 광고 차단 | `window/ad_block.rs` |
+| WebView 광고 창 0×0 축소 | 웹뷰 광고 차단 | `window/ad_block.rs` |
 | 폴더 → 폴더 주기 동기화 | 파일 동기화 | `window/file_sync.rs` |
 | Win32 서비스 제어 | Windows 서비스 | `window/service_mgr.rs` |
 

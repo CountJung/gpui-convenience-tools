@@ -161,13 +161,13 @@ impl AppRoot {
                                 && restore_hidden_ad_window(platform.as_ref(), &mut last_hidden)
                             {
                                 match platform.capture_ad_window_state(hwnd) {
-                                    Ok(snapshot) => match platform.hide_ad(hwnd) {
+                                    Ok(snapshot) => match platform.collapse_ad(hwnd) {
                                         Ok(()) => {
                                             last_hidden = Some(snapshot);
                                             let _ = event_tx.send(PlatformEvent::AdBlocked);
                                         }
                                         Err(err) => {
-                                            log::warn!("광고 창 숨김 실패: {err}");
+                                            log::warn!("광고 창 0×0 축소 실패: {err}");
                                         }
                                     },
                                     Err(err) => {
@@ -177,8 +177,8 @@ impl AppRoot {
                             } else if !is_new_window {
                                 // 사용자가 숨겨진 창을 다시 표시했을 수 있으므로 같은 HWND도
                                 // 다시 숨긴다. 원래 상태 스냅샷은 덮어쓰지 않는다.
-                                if let Err(err) = platform.hide_ad(hwnd) {
-                                    log::warn!("광고 창 재숨김 실패: {err}");
+                                if let Err(err) = platform.collapse_ad(hwnd) {
+                                    log::warn!("광고 창 재축소 실패: {err}");
                                 }
                             }
                         } else if !any_running

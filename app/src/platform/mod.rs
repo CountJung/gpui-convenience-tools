@@ -19,6 +19,7 @@ pub(crate) struct AdWindowSnapshot {
     pub(crate) width: i32,
     pub(crate) height: i32,
     pub(crate) show_state: AdWindowShowState,
+    pub(crate) enabled: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -100,6 +101,11 @@ pub trait Platform: Send + Sync {
     ) -> Result<Option<NativeWindowHandle>>;
     fn hide_ad(&self, handle: NativeWindowHandle) -> Result<()>;
     fn show_ad(&self, handle: NativeWindowHandle) -> Result<()>;
+
+    /// 광고 창을 활성화하지 않은 채 화면 크기를 0×0으로 축소하고 입력을 막는다.
+    fn collapse_ad(&self, _handle: NativeWindowHandle) -> Result<()> {
+        Err(anyhow::anyhow!("광고 창 0×0 축소는 지원되지 않습니다."))
+    }
 
     /// 저장된 창이 속한 프로세스가 아직 실행 중인지 확인한다.
     fn is_process_id_running(&self, _process_id: u32) -> bool {

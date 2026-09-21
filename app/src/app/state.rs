@@ -204,7 +204,11 @@ pub enum ActivePanel {
 /// 안내만 나오는 항목을 남겨 두면 앱이 고장 난 것처럼 보인다.
 #[cfg(target_os = "windows")]
 pub(crate) const NAV_TOOLS: [(ActivePanel, &str, &str); 3] = [
-    (ActivePanel::AdBlock, "웹뷰 광고 차단", "카카오톡 등 WebView 광고 숨김"),
+    (
+        ActivePanel::AdBlock,
+        "웹뷰 광고 차단",
+        "카카오톡 등 WebView 광고 창 0×0 축소",
+    ),
     (ActivePanel::FileSync, "파일 동기화", "폴더 → 폴더 주기적 복사"),
     (ActivePanel::Services, "Windows 서비스", "서비스 시작·중지·삭제"),
 ];

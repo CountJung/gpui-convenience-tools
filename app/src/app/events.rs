@@ -61,8 +61,16 @@ impl AppRoot {
             match event {
                 PlatformEvent::AdBlocked => {
                     self.app_state.blocked_count += 1;
-                    self.push_log("SUCCESS", "광고 창을 감지하여 숨겼습니다.".to_string());
-                    self.notify_toast("광고를 차단했습니다", NotificationType::Success, window, cx);
+                    self.push_log(
+                        "SUCCESS",
+                        "광고 창을 감지하여 0×0으로 축소했습니다.".to_string(),
+                    );
+                    self.notify_toast(
+                        "광고 창을 0×0으로 축소했습니다",
+                        NotificationType::Success,
+                        window,
+                        cx,
+                    );
                 }
                 PlatformEvent::TargetStatusChanged(is_running) => {
                     self.app_state.is_target_running = is_running;

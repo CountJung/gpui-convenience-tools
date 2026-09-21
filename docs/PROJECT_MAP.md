@@ -25,7 +25,7 @@
 안전 경계: 원본 VDI는 read-only로만 열고, 실행 중 VM의 VDI 직접 읽기는 구현하지 않는다.
 실행 중 VM 지원은 후속 `GuestFileSource` 구현으로만 추가한다(VDE-021).
 
-**최종 측정**: 2026-09-21 · `app/src` 총 39개 파일 · 12,270줄
+**최종 측정**: 2026-09-21 · `app/src` 총 39개 파일 · 12,413줄
 
 ## 크기 기준 — 줄 수는 증상이다
 
@@ -83,7 +83,7 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `mod.rs` | 545 | 폴더 동기화 엔진 (UI 비의존 순수 로직) — 진행 보고·중지·이어서 시작 제어 포함 |
 | `tests.rs` | 514 | 복사·건너뜀·미러 삭제·실패 사유·진행 보고·중지·이어서 시작 단위 테스트 |
 
-### 앱 루트 (`app/src/app/`) — 2,666줄 / 8파일
+### 앱 루트 (`app/src/app/`) — 2,678줄 / 8파일
 
 `app.rs`(1,798줄)를 책임별로 분할한 결과다.
 
@@ -126,19 +126,19 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `log_view.rs` | 110 | 시스템 — 화면 로그 가상 리스트와 로그 파일 현황 |
 | `mod.rs` | 96 | 패널 모듈 선언 + `balanced_split`·`scroll_pane` 레이아웃 헬퍼 |
 
-### 플랫폼 (`app/src/platform/`) — 1,920줄 / 8파일
+### 플랫폼 (`app/src/platform/`) — 2,051줄 / 8파일
 
 `windows.rs`(1,361줄)를 책임별로 분할한 결과다.
 
 | 파일 | 줄 | 책임 |
 | --- | ---: | --- |
-| `mod.rs` | 187 | `Platform` trait 정의 + 광고 창 상태 스냅샷·서비스 타입, `NativePlatform` 타깃별 별칭 |
+| `mod.rs` | 193 | `Platform` trait 정의 + 광고 창 상태 스냅샷·서비스 타입, `NativePlatform` 타깃별 별칭 |
 | `fallback.rs` | 59 | 비Windows `Platform` 구현 — 광고 차단 계열 미지원을 명시적으로 반환 |
 | `windows/scm.rs` | 389 | Windows 서비스(SCM) 등록과 서비스 모드 실행 |
 | `windows/services.rs` | 340 | 설치된 Win32 서비스 조회·시작·중지·삭제, 권한 확인 |
 | `windows/tray.rs` | 274 | 시스템 트레이 아이콘과 메시지 루프 |
-| `windows/window_ops.rs` | 365 | 프로세스별 최상위 창 열거, 클래스 필터, 메인 WebView 제외, 광고 팝업 후보 탐색, 창 상태 캡처·복원 |
-| `windows/mod.rs` | 158 | `WindowsPlatform` + `Platform` 구현, 하위 모듈 re-export |
+| `windows/window_ops.rs` | 486 | 프로세스별 최상위 창 열거, 클래스 필터, 메인 WebView 제외, 광고 팝업 후보 탐색, 창 상태 캡처·0×0 축소·복원 |
+| `windows/mod.rs` | 162 | `WindowsPlatform` + `Platform` 구현, 하위 모듈 re-export |
 | `windows/task_scheduler.rs` | 148 | 로그온 시 자동 시작(`schtasks`) |
 
 ### 빌드

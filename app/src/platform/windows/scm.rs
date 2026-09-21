@@ -332,13 +332,13 @@ fn run_service_loop(_arguments: Vec<OsString>) -> Result<()> {
                         && restore_hidden_ad_window(platform_bg.as_ref(), &mut last_hidden)
                     {
                         match platform_bg.capture_ad_window_state(hwnd) {
-                            Ok(snapshot) => match platform_bg.hide_ad(hwnd) {
+                            Ok(snapshot) => match platform_bg.collapse_ad(hwnd) {
                                 Ok(()) => {
                                     log::info!("Ad window hidden (service mode)");
                                     last_hidden = Some(snapshot);
                                 }
                                 Err(e) => {
-                                    log::warn!("hide_ad failed: {e}");
+                                    log::warn!("collapse_ad failed: {e}");
                                 }
                             },
                             Err(e) => {
@@ -346,8 +346,8 @@ fn run_service_loop(_arguments: Vec<OsString>) -> Result<()> {
                             }
                         }
                     } else if !is_new_window {
-                        if let Err(e) = platform_bg.hide_ad(hwnd) {
-                            log::warn!("hide_ad retry failed: {e}");
+                        if let Err(e) = platform_bg.collapse_ad(hwnd) {
+                            log::warn!("collapse_ad retry failed: {e}");
                         }
                     }
                 } else if !any_running
