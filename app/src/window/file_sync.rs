@@ -22,6 +22,7 @@ pub fn render(this: &mut AppRoot, window: &mut Window, cx: &mut Context<AppRoot>
 
     let page_scroll = this.sync.page_scroll.clone();
     let jobs = render_job_list(this, cx);
+    let history = render_history(this, cx);
     let settings = render_job_settings(this, window, cx);
     let failures = render_failures(this, cx);
     let status_bar = render_status_bar(this, cx);
@@ -45,10 +46,86 @@ pub fn render(this: &mut AppRoot, window: &mut Window, cx: &mut Context<AppRoot>
                     .child(jobs)
                     .child(settings)
                     .child(failures)
+                    .child(history)
                     .into_any_element(),
             )),
         )
         .child(status_bar)
+        .into_any_element()
+}
+
+// ─────────────────────────────────────────────
+// 최근 실행 이력
+// ─────────────────────────────────────────────
+
+fn render_history(this: &AppRoot, cx: &mut Context<AppRoot>) -> AnyElement {
+    let theme = cx.theme();
+    let fg = theme.foreground;
+    let muted_fg = theme.muted_foreground;
+    let border = theme.border;
+    let card = theme.secondary;
+    let mut rows = v_flex().gap_1();
+
+    if this.sync.history.is_empty() {
+        rows = rows.child(
+            div()
+                .text_color(muted_fg)
+                .child("아직 실행된 동기화 이력이 없습니다."),
+        );
+    } else {
+        for (index, entry) in this.sync.history.iter().take(20).enumerate() {
+            let (label, tone) = if entry.cancelled {
+                ("중지", ui::Tone::Info)
+            } else if entry.failed > 0 {
+                ("실패 포함", ui::Tone::Warning)
+            } else {
+                ("성공", ui::Tone::Success)
+            };
+            let counters = format!(
+                "복사 {} · 건너뜀 {} · 삭제 {} · 실패 {}",
+                entry.copied, entry.skipped, entry.deleted, entry.failed
+            );
+            let duration = format_interval(entry.duration_secs().min(u32::MAX as u64) as u32);
+            rows = rows.child(
+                h_flex()
+                    .debug_selector(move || format!("sync-history-row-{index}"))
+                    .w_full()
+                    .gap_2()
+                    .items_center()
+                    .px_2()
+                    .py_1()
+                    .rounded_md()
+                    .bg(theme.list)
+                    .child(ui::badge(label, tone, ui::Size::Sm, cx))
+                    .child(
+                        v_flex()
+                            .flex_1()
+                            .min_w_0()
+                            .child(div().text_color(fg).child(entry.label.clone()))
+                            .child(div().text_color(muted_fg).child(counters)),
+                    )
+                    .child(
+                        div()
+                            .text_color(muted_fg)
+                            .child(format!("소요 {duration}")),
+                    ),
+            );
+        }
+    }
+
+    div()
+        .debug_selector(|| "file-sync-history-card".to_string())
+        .rounded_lg()
+        .bg(card)
+        .border_1()
+        .border_color(border)
+        .p_3()
+        .child(
+            v_flex()
+                .gap_2()
+                .child(div().text_color(fg).child("최근 실행 이력"))
+                .child(rows),
+        )
         .into_any_element()
 }
 

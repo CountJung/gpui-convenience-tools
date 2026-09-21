@@ -7,6 +7,7 @@ use super::state::{SyncJobStatus, SyncRunning, SyncSharedState};
 use crate::config::SyncJob;
 use crate::platform::SysServiceInfo;
 use crate::sync::SyncFailure;
+use crate::sync_history::SyncHistoryEntry;
 use gpui::{Entity, ScrollHandle};
 use gpui_component::{input::InputState, VirtualListScrollHandle};
 use std::collections::{HashMap, HashSet};
@@ -55,6 +56,7 @@ pub struct SyncState {
     pub(crate) jobs: Vec<SyncJob>,
     pub(crate) selected_job: Option<usize>,
     pub(crate) status: HashMap<String, SyncJobStatus>,
+    pub(crate) history: Vec<SyncHistoryEntry>,
     pub(crate) failures: Vec<SyncFailure>,
     pub(crate) running: Option<SyncRunning>,
     pub(crate) suppressed_failures: HashSet<String>,

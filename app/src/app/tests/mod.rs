@@ -90,6 +90,7 @@ fn test_app_root(active_panel: ActivePanel) -> AppRoot {
             jobs: Vec::new(),
             selected_job: None,
             status: HashMap::new(),
+            history: Vec::new(),
             failures: Vec::new(),
             running: None,
             suppressed_failures: HashSet::new(),

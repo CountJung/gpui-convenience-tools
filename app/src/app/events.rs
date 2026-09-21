@@ -236,6 +236,11 @@ impl AppRoot {
             },
         );
 
+        match crate::sync_history::load_recent(20) {
+            Ok(history) => self.sync.history = history,
+            Err(err) => self.push_log("WARN", format!("동기화 이력 새로고침 실패: {err:#}")),
+        }
+
         if outcome.cancelled {
             self.push_log("WARN", format!("[{label}] 중지했습니다 — {}", outcome.summary()));
         } else if outcome.copied > 0 || outcome.deleted > 0 {

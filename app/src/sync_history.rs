@@ -49,10 +49,28 @@ impl SyncHistoryEntry {
             summary: outcome.summary(),
         }
     }
+
+    pub(crate) fn duration_secs(&self) -> u64 {
+        self.finished_at_unix.saturating_sub(self.started_at_unix)
+    }
 }
 
 pub(crate) fn history_path() -> PathBuf {
     config::data_dir().join(HISTORY_FILE_NAME)
+}
+
+pub(crate) fn load_recent(limit: usize) -> Result<Vec<SyncHistoryEntry>> {
+    if limit == 0 {
+        return Ok(Vec::new());
+    }
+
+    let mut entries = read_entries(&history_path())?;
+    if entries.len() > limit {
+        let remove = entries.len() - limit;
+        entries.drain(0..remove);
+    }
+    entries.reverse();
+    Ok(entries)
 }
 
 pub(crate) fn append(entry: &SyncHistoryEntry) -> Result<()> {
@@ -66,18 +84,7 @@ fn append_to_path(
     retention: &LogConfig,
     now_unix: u64,
 ) -> Result<()> {
-    let mut entries = if path.exists() {
-        let data = fs::read_to_string(path)
-            .with_context(|| format!("동기화 이력 읽기 실패: {}", path.display()))?;
-        if data.trim().is_empty() {
-            Vec::new()
-        } else {
-            serde_json::from_str::<Vec<SyncHistoryEntry>>(&data)
-                .with_context(|| format!("동기화 이력 JSON 파싱 실패: {}", path.display()))?
-        }
-    } else {
-        Vec::new()
-    };
+    let mut entries = read_entries(path)?;
 
     retain_entries(&mut entries, retention, now_unix);
     entries.push(entry.clone());
@@ -88,6 +95,21 @@ fn append_to_path(
     }
     fs::write(path, json).with_context(|| format!("동기화 이력 저장 실패: {}", path.display()))?;
     Ok(())
+}
+
+fn read_entries(path: &Path) -> Result<Vec<SyncHistoryEntry>> {
+    if !path.exists() {
+        return Ok(Vec::new());
+    }
+
+    let data = fs::read_to_string(path)
+        .with_context(|| format!("동기화 이력 읽기 실패: {}", path.display()))?;
+    if data.trim().is_empty() {
+        return Ok(Vec::new());
+    }
+
+    serde_json::from_str::<Vec<SyncHistoryEntry>>(&data)
+        .with_context(|| format!("동기화 이력 JSON 파싱 실패: {}", path.display()))
 }
 
 fn retain_entries(entries: &mut Vec<SyncHistoryEntry>, config: &LogConfig, now_unix: u64) {

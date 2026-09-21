@@ -21,6 +21,7 @@ $visualTests = @(
     "file_sync_run_button_saves_current_inputs_and_queues_selected_job",
     "file_sync_status_bar_stays_visible_at_compact_height_while_running",
     "file_sync_stop_button_requests_cancellation_and_clears_pending_queue",
+    "file_sync_renders_recent_history_with_result_counts_and_duration",
     "sync_failures_log_one_summary_line_instead_of_one_entry_per_file",
     "background_sync_event_wakes_render_without_additional_user_input",
     "file_sync_sections_share_one_width_at_every_window_width",

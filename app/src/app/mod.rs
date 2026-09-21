@@ -117,6 +117,10 @@ impl AppRoot {
         let mut sync_enabled = true;
         let mut sidebar_width = DEFAULT_SIDEBAR_WIDTH;
         let mut virtual_disk_suppressed_issue_keys = BTreeSet::new();
+        let initial_sync_history = crate::sync_history::load_recent(20).unwrap_or_else(|err| {
+            log::warn!("동기화 이력 불러오기 실패: {err:#}");
+            Vec::new()
+        });
 
         if let Ok(Some(cfg)) = load_config() {
             sync_enabled = cfg.sync_enabled;
@@ -237,6 +241,7 @@ impl AppRoot {
                 jobs: sync_jobs,
                 selected_job: selected_sync_job,
                 status: Default::default(),
+                history: initial_sync_history,
                 failures: Vec::new(),
                 running: None,
                 suppressed_failures: Default::default(),

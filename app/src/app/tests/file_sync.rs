@@ -1,6 +1,7 @@
 //! 파일 동기화 패널 조작·진행 표시줄·로그 요약 회귀 테스트.
 
 use super::*;
+use crate::sync_history::SyncHistoryEntry;
 
 #[gpui::test]
 fn file_sync_unified_page_uses_full_width_and_scrolls_to_last_record(cx: &mut TestAppContext) {
@@ -69,6 +70,35 @@ fn file_sync_unified_page_uses_full_width_and_scrolls_to_last_record(cx: &mut Te
         "wheel input should move the unified page scroll offset"
     );
     assert_inside_viewport(cx, "file-sync-page", "sync-failure-row-11");
+}
+
+#[gpui::test]
+fn file_sync_renders_recent_history_with_result_counts_and_duration(
+    cx: &mut TestAppContext,
+) {
+    initialize_components(cx);
+    let (_view, cx) = cx.add_window_view(|_, _| {
+        let mut root = test_app_root(ActivePanel::FileSync);
+        root.sync.history = vec![SyncHistoryEntry {
+            job_id: "history-job".to_string(),
+            label: "백업 작업".to_string(),
+            started_at_unix: 100,
+            finished_at_unix: 125,
+            copied: 3,
+            skipped: 2,
+            deleted: 1,
+            failed: 1,
+            cancelled: false,
+            summary: "복사 3건, 건너뜀 2건, 삭제 1건, 실패 1건".to_string(),
+        }];
+        root
+    });
+
+    cx.simulate_resize(size(px(DEFAULT_WINDOW_WIDTH), px(DEFAULT_WINDOW_HEIGHT)));
+    refresh(cx);
+
+    assert!(cx.debug_bounds("file-sync-history-card").is_some());
+    assert!(cx.debug_bounds("sync-history-row-0").is_some());
 }
 
 #[gpui::test]
@@ -520,6 +550,7 @@ fn file_sync_sections_share_one_width_at_every_window_width(cx: &mut TestAppCont
             "file-sync-job-list-card",
             "file-sync-settings-card",
             "file-sync-failures-card",
+            "file-sync-history-card",
         ]
         .map(|selector| {
             (
