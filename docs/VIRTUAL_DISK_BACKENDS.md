@@ -94,6 +94,9 @@ flowchart LR
 - 테스트용 격리 VM, Guest Additions, 테스트 계정, 자격 증명 주입 방식이 준비됨
 - 현재 머신에 설치된 `VBoxManage` 버전과 guestcontrol 옵션을 확인함
 
-현재 검토 환경에서는 `VBoxManage.exe`가 PATH에서 발견되지 않았다. 따라서 이 문서는
-명령 계약과 안전 경계를 확정한 설계 결과이며, 실행 중 VM의 동작·파일 목록·복사 성공을
-검증한 결과가 아니다.
+2026-09-22 현재 `C:\Program Files\Oracle\VirtualBox\VBoxManage.exe`에서
+`7.2.14r174565`를 확인했다. `VBoxManage list vms`에는 `TACS`가 등록되어 있지만
+`list runningvms` 결과는 비어 있고, `showvminfo TACS --machinereadable`의 상태도
+`VMState="poweroff"`였다. 따라서 실행 중 VM을 대상으로 하는 `guestcontrol` 목록·복사
+E2E는 여전히 수행하지 않았다. 테스트 계정·Guest Additions·자격 증명 주입 방식도
+준비되지 않았으므로, 이 문서는 명령 계약과 안전 경계를 확정한 설계 결과로만 취급한다.
