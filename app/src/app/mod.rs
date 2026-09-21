@@ -21,11 +21,13 @@ mod interval;
 mod ops;
 mod state;
 mod sync_ops;
+mod virtual_disk_ops;
 
 pub(crate) use interval::{IntervalPicker, IntervalTarget};
 
 pub use state::{ActivePanel, AppState, LogEntry, SyncJobStatus, SyncRunning, TargetApp};
 use state::{PlatformEvent, ScannerState, SyncSharedState, NAV_SYSTEM, NAV_TOOLS};
+use virtual_disk_ops::VirtualDiskSession;
 
 use gpui::{
     div, px, AnyElement, Context, Entity, InteractiveElement, IntoElement, ParentElement, Render,
@@ -56,6 +58,7 @@ use crate::platform::{NativePlatform, Platform, SysServiceInfo};
 use crate::sync::SyncFailure;
 use crate::window::{
     ad_block, dashboard, file_sync, log_view, service_mgr, service_view, settings, ui,
+    virtual_disk,
 };
 
 #[cfg(target_os = "windows")]
@@ -112,6 +115,10 @@ pub struct AppRoot {
     // ── 광고 차단 패널 ──
     pub(crate) ad_left_scroll: ScrollHandle,
     pub(crate) ad_right_scroll: ScrollHandle,
+
+    // ── VirtualBox 오프라인 디스크 탐색 ──
+    pub(crate) virtual_disk: VirtualDiskSession,
+    pub(crate) virtual_disk_page_scroll: ScrollHandle,
 
     // ── 로그 설정 ──
     pub(crate) log_config: LogConfig,
@@ -272,6 +279,9 @@ impl AppRoot {
 
             ad_left_scroll: ScrollHandle::default(),
             ad_right_scroll: ScrollHandle::default(),
+
+            virtual_disk: VirtualDiskSession::default(),
+            virtual_disk_page_scroll: ScrollHandle::default(),
 
             log_config,
 
@@ -549,6 +559,7 @@ impl AppRoot {
                     self.select_sync_job(0, window, cx);
                 }
             }
+            ActivePanel::VirtualDisk => {}
             _ => {}
         }
 
@@ -567,6 +578,7 @@ impl Render for AppRoot {
             ActivePanel::Dashboard => dashboard::render(self, cx),
             ActivePanel::AdBlock => ad_block::render(self, window, cx),
             ActivePanel::FileSync => file_sync::render(self, window, cx),
+            ActivePanel::VirtualDisk => virtual_disk::render(self, window, cx),
             ActivePanel::Services => service_mgr::render(self, window, cx),
             ActivePanel::AutoStart => service_view::render(self, window, cx),
             ActivePanel::Logs => log_view::render(self, cx),
@@ -598,6 +610,7 @@ impl Render for AppRoot {
                 | ActivePanel::Services
                 | ActivePanel::AdBlock
                 | ActivePanel::FileSync
+                | ActivePanel::VirtualDisk
         );
         let sidebar_scroll = self.sidebar_scroll_handle.clone();
         let content_scroll = self.content_scroll_handle.clone();

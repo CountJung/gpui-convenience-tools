@@ -6,6 +6,7 @@ mod file_sync;
 mod interval;
 mod layout;
 mod theme;
+mod virtual_disk;
 
 use super::*;
 use crate::config::{SyncJob, BUNDLED_THEMES};
@@ -103,6 +104,8 @@ fn test_app_root(active_panel: ActivePanel) -> AppRoot {
         external_side_effects_enabled: false,
         ad_left_scroll: ScrollHandle::default(),
         ad_right_scroll: ScrollHandle::default(),
+        virtual_disk: super::virtual_disk_ops::VirtualDiskSession::default(),
+        virtual_disk_page_scroll: ScrollHandle::default(),
         log_config: LogConfig::default(),
         sidebar_scroll_handle: ScrollHandle::default(),
         content_scroll_handle: ScrollHandle::default(),

@@ -191,6 +191,7 @@ pub enum ActivePanel {
     Dashboard,
     AdBlock,
     FileSync,
+    VirtualDisk,
     Services,
     AutoStart,
     Logs,
@@ -203,22 +204,34 @@ pub enum ActivePanel {
 /// 대응물이 없다. **그 플랫폼에서는 메뉴 자체를 노출하지 않는다** — 눌러 봐야 미지원
 /// 안내만 나오는 항목을 남겨 두면 앱이 고장 난 것처럼 보인다.
 #[cfg(target_os = "windows")]
-pub(crate) const NAV_TOOLS: [(ActivePanel, &str, &str); 3] = [
+pub(crate) const NAV_TOOLS: [(ActivePanel, &str, &str); 4] = [
     (
         ActivePanel::AdBlock,
         "웹뷰 광고 차단",
         "카카오톡 등 WebView 광고 창 0×0 축소",
     ),
     (ActivePanel::FileSync, "파일 동기화", "폴더 → 폴더 주기적 복사"),
+    (
+        ActivePanel::VirtualDisk,
+        "VirtualBox 디스크 탐색",
+        "종료된 VM의 VDI를 읽기 전용 탐색",
+    ),
     (ActivePanel::Services, "Windows 서비스", "서비스 시작·중지·삭제"),
 ];
 
 #[cfg(not(target_os = "windows"))]
-pub(crate) const NAV_TOOLS: [(ActivePanel, &str, &str); 1] = [(
-    ActivePanel::FileSync,
-    "파일 동기화",
-    "폴더 → 폴더 주기적 복사",
-)];
+pub(crate) const NAV_TOOLS: [(ActivePanel, &str, &str); 2] = [
+    (
+        ActivePanel::FileSync,
+        "파일 동기화",
+        "폴더 → 폴더 주기적 복사",
+    ),
+    (
+        ActivePanel::VirtualDisk,
+        "VirtualBox 디스크 탐색",
+        "종료된 VM의 VDI를 읽기 전용 탐색",
+    ),
+];
 
 #[cfg(target_os = "windows")]
 pub(crate) const NAV_SYSTEM: [(ActivePanel, &str, &str); 3] = [

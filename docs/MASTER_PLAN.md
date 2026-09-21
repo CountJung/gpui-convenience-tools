@@ -616,6 +616,24 @@ VDE-011에서 분리된 메타데이터 실패와 복사 중 원본 변경·대�
 121 passed·4 ignored, 일반 Clippy 통과로 수행했다. `-D warnings`는 기존 경고 7건 때문에
 적용하지 않았다.
 
+### Phase O-12 — VDE-013 오프라인 VDI 탐색기 셸 착수
+
+VirtualBox 오프라인 도메인을 GPUI에서 안전하게 시작할 수 있는 첫 화면과 상태 경계를
+연결했다.
+
+- `ActivePanel::VirtualDisk`와 `NAV_TOOLS`에 `VirtualBox 디스크 탐색`을 등록했다. Windows와
+  비Windows 모두 오프라인 read-only 기능을 표시하고, Windows 전용 기능과 섞지 않는다.
+- VDI 경로 입력 후 `VdiReader::open`과 `discover_partitions`를 호출한다. 원본은 계속
+  read-only로 열며, 파티션을 선택할 때 NTFS `GuestFileSource`를 다시 read-only로 연결한다.
+- 현재 게스트 경로(`/`)와 파티션 카드, 새로고침 동작을 화면에 배치했다. 숨김·시스템
+  속성은 목록 필터링 없이 다음 탐색기 단계로 전달할 수 있도록 항목 모델을 유지한다.
+- 폴더 진입·다중 선택·복사·단축키는 VDE-014~016에 남겼고, 실제 VDI 성공 경로와 파일
+  목록 E2E는 VDE-018의 고정 이미지·픽스처 준비 후 검증한다.
+
+검증은 `virtual_disk_panel_registers_navigation_and_renders_read_only_shell` GPUI 테스트와
+릴리즈 `CLAUDE_LOCAL` 920×700·1280×700 캡처로 수행했다. 시각 검증 세션 종료 후 프로세스와
+임시 세션 루트가 모두 0개임을 확인했다.
+
 ## 진행 예정 단계
 
 세부 체크리스트는 `TODO.md`를 정본으로 한다.

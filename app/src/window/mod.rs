@@ -7,6 +7,7 @@ pub mod service_mgr;
 pub mod service_view;
 pub mod settings;
 pub mod ui;
+pub mod virtual_disk;
 
 use gpui::{
     div, AnyElement, InteractiveElement, IntoElement, ParentElement, Pixels, ScrollHandle,

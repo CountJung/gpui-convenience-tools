@@ -117,7 +117,7 @@ SHA-256을 기록한다. 다른 검증자의 독립 검토가 요구되는 UI �
 | VDE-010 | RUST | [x] | [x] | — | — | [x] | [x] | `cargo check -p gpui-convenience-tools --locked`; `cargo test -p gpui-convenience-tools virtual_disk::copy --all-targets --all-features` (7 passed) 및 `virtual_disk::path_policy` (6 passed); `cargo test --all-targets --all-features` (112 passed, 4 ignored); 청크/충돌 오류 리뷰 완료; commit·push 완료 |
 | VDE-011 | RUST | [x] | [x] | — | — | [x] | [x] | `cargo check -p gpui-convenience-tools --locked`; 메타데이터 적용·실패 기록 4개 및 NTFS 시간 변환 1개 단위 테스트; `cargo test --all-targets --all-features` (117 passed, 4 ignored); commit·push 완료 |
 | VDE-012 | RUST | [x] | [x] | — | — | [x] | [x] | `cargo check -p gpui-convenience-tools --locked`; `virtual_disk::issues` 2개 및 `virtual_disk::copy` 9개 단위 테스트; 격리 데이터 경로 전체 테스트 121 passed, 4 ignored; 일반 Clippy 통과(기존 경고 7건 유지); 도메인 커밋·push 완료, GPUI 토스트/로그 E2E는 후속 |
-| VDE-013 | E2E | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | — |
+| VDE-013 | GPUI | [x] | [x] | [x] | [x] | [x] | [ ] | `cargo check -p gpui-convenience-tools --locked`; `cargo test --all-targets --all-features` (123 passed, 4 ignored); GPUI 테스트 `virtual_disk_panel_registers_navigation_and_renders_read_only_shell`; 릴리즈 `CLAUDE_LOCAL` 920×700·1280×700 캡처 `target/visual-validation/captures/vde013-panel-920-final-201106.png`, `vde013-panel-1280-final-201106.png`; 세션 정리 후 프로세스 0·임시 루트 0; 실제 VDI 성공 경로·파티션 파일 목록 E2E는 VDE-018 후속 |
 | VDE-014 | E2E | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | — |
 | VDE-015 | E2E | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | — |
 | VDE-016 | E2E | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | — |
