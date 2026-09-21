@@ -298,13 +298,24 @@ function Send-KeyInput([ushort]$virtualKey, [bool]$keyUp) {
 function Send-KeyChord([string]$chord) {
     switch ($chord) {
         "Ctrl+A" {
-            Send-KeyInput $VK_CONTROL $false
-            Start-Sleep -Milliseconds 80
-            Send-KeyInput $VK_A $false
-            Start-Sleep -Milliseconds 80
-            Send-KeyInput $VK_A $true
-            Start-Sleep -Milliseconds 80
-            Send-KeyInput $VK_CONTROL $true
+            $controlDown = $false
+            try {
+                Send-KeyInput $VK_CONTROL $false
+                $controlDown = $true
+                Start-Sleep -Milliseconds 80
+                Send-KeyInput $VK_A $false
+                Start-Sleep -Milliseconds 80
+                Send-KeyInput $VK_A $true
+                Start-Sleep -Milliseconds 80
+                Send-KeyInput $VK_CONTROL $true
+                $controlDown = $false
+            }
+            finally {
+                if ($controlDown) {
+                    # 중간 실패에도 전역 Ctrl 키가 눌린 채 남지 않게 한다.
+                    Send-KeyInput $VK_CONTROL $true
+                }
+            }
         }
         default { throw "지원하지 않는 키 조합이다: $chord" }
     }
@@ -597,12 +608,19 @@ switch ($Action) {
         $point = Resolve-ClientPoint $hwnd $X $Y
         [void][ClaudeVisualInterop]::SetCursorPos($point.X, $point.Y)
         Start-Sleep -Milliseconds 250
+        $buttonDown = $false
         try {
             Send-MouseInput $MOUSEEVENTF_LEFTDOWN 0
+            $buttonDown = $true
             Start-Sleep -Milliseconds 60
             Send-MouseInput $MOUSEEVENTF_LEFTUP 0
+            $buttonDown = $false
         }
         finally {
+            if ($buttonDown) {
+                # 클릭 중 예외가 나도 전역 마우스 버튼을 누른 채 남기지 않는다.
+                Send-MouseInput $MOUSEEVENTF_LEFTUP 0
+            }
             [void][ClaudeVisualInterop]::SetCursorPos($origin.X, $origin.Y)
         }
         Start-Sleep -Milliseconds $SettleMs
