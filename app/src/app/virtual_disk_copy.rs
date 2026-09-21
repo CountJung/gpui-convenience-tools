@@ -12,7 +12,9 @@ use std::{
     },
 };
 
-use gpui::{actions, App, AppContext, Context, Entity, KeyBinding, PathPromptOptions, Window};
+use gpui::{
+    actions, App, AppContext, Context, Entity, KeyBinding, PathPromptOptions, Timer, Window,
+};
 use gpui_component::{input::InputEvent, input::InputState, notification::NotificationType};
 
 use crate::virtual_disk::{
@@ -107,6 +109,7 @@ pub(crate) struct VirtualDiskCopyState {
     pub(crate) progress: Option<VirtualDiskCopyProgress>,
     pub(crate) summary: Option<VirtualDiskCopySummary>,
     pub(crate) cancel: Arc<AtomicBool>,
+    pub(crate) validation_auto_copy_scheduled: bool,
 }
 
 /// 백그라운드 작업이 UI 채널로 전달하는 종료 결과.
@@ -118,6 +121,32 @@ pub(crate) struct VirtualDiskCopyOutcome {
 }
 
 impl AppRoot {
+    /// 격리 릴리스 검증에서만 시드된 선택 항목의 복사를 예약한다.
+    pub(crate) fn schedule_validation_virtual_disk_copy(
+        &mut self,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if !self.virtual_disk.validation_auto_copy_requested
+            || self.virtual_disk.copy.validation_auto_copy_scheduled
+            || self.virtual_disk.selected_paths.is_empty()
+            || self.virtual_disk.copy.progress.is_some()
+            || self.virtual_disk.copy.summary.is_some()
+        {
+            return;
+        }
+
+        self.virtual_disk.copy.validation_auto_copy_scheduled = true;
+        cx.spawn_in(window, async move |this, cx| {
+            Timer::after(std::time::Duration::from_millis(500)).await;
+            let _ = this.update_in(cx, |this, window, cx| {
+                this.virtual_disk.validation_auto_copy_requested = false;
+                this.start_virtual_disk_copy(window, cx);
+            });
+        })
+        .detach();
+    }
+
     pub(crate) fn ensure_virtual_disk_target_input(
         &mut self,
         window: &mut Window,

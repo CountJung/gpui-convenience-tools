@@ -25,6 +25,12 @@ pub fn render(this: &mut AppRoot, window: &mut Window, cx: &mut Context<AppRoot>
     this.ensure_virtual_disk_input(window, cx);
     this.ensure_virtual_disk_target_input(window, cx);
     this.ensure_virtual_disk_focus(cx);
+    this.schedule_validation_virtual_disk_copy(window, cx);
+    if this.virtual_disk.copy.validation_auto_copy_scheduled
+        && this.virtual_disk.copy.summary.is_some()
+    {
+        this.virtual_disk_page_scroll.scroll_to_bottom();
+    }
 
     let page_scroll = this.virtual_disk_page_scroll.clone();
     scroll_pane(

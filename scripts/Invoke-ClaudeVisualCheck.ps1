@@ -42,8 +42,14 @@ param(
     # 최근 동기화 이력이 표시되는 화면을 재현할 때 쓴다.
     [string]$SeedHistory,
 
+    # Start 전용. 검증 전용 격리 VDI 복사본을 만들 원본 경로.
+    [string]$SeedVdi,
+
+    # Start 전용. 시드 VDI의 선택 항목을 격리 대상 폴더로 자동 복사한다.
+    [switch]$AutoCopyVdi,
+
     # Start 전용. 검증 전용 환경 변수로 패널 전환 입력 없이 특정 화면을 연다.
-    [ValidateSet("Dashboard", "FileSync", "AutoStart")]
+    [ValidateSet("Dashboard", "FileSync", "VirtualDisk", "AutoStart")]
     [string]$InitialPanel = "Dashboard",
 
     [string]$Name = "capture",
@@ -271,6 +277,16 @@ switch ($Action) {
         New-Item -ItemType Directory -Force -Path (Join-Path $sessionRoot "source") | Out-Null
         New-Item -ItemType Directory -Force -Path (Join-Path $sessionRoot "target") | Out-Null
 
+        $validationVdiPath = $null
+        if (-not [string]::IsNullOrWhiteSpace($SeedVdi)) {
+            $seedVdiSource = [System.IO.Path]::GetFullPath($SeedVdi)
+            if (-not (Test-Path -LiteralPath $seedVdiSource -PathType Leaf)) {
+                throw "시드 VDI를 찾을 수 없다: $seedVdiSource"
+            }
+            $validationVdiPath = Join-Path $sessionRoot "source\seed.vdi"
+            Copy-Item -LiteralPath $seedVdiSource -Destination $validationVdiPath -Force
+        }
+
         if (-not [string]::IsNullOrWhiteSpace($SeedConfig)) {
             $seedPath = [System.IO.Path]::GetFullPath($SeedConfig)
             if (-not (Test-Path -LiteralPath $seedPath -PathType Leaf)) {
@@ -293,14 +309,29 @@ switch ($Action) {
         $previousAppData = $env:APPDATA
         $previousDataDir = $env:GPUI_CONVENIENCE_TOOLS_DATA_DIR
         $previousInitialPanel = $env:GPUI_CONVENIENCE_TOOLS_INITIAL_PANEL
+        $previousValidationVdiPath = $env:GPUI_CONVENIENCE_TOOLS_VALIDATION_VDI_PATH
+        $previousValidationVdiTarget = $env:GPUI_CONVENIENCE_TOOLS_VALIDATION_VDI_TARGET
+        $previousValidationVdiSelectAll = $env:GPUI_CONVENIENCE_TOOLS_VALIDATION_VDI_SELECT_ALL
+        $previousValidationVdiAutoCopy = $env:GPUI_CONVENIENCE_TOOLS_VALIDATION_VDI_AUTO_COPY
         try {
             $env:APPDATA = $appData
             $env:GPUI_CONVENIENCE_TOOLS_DATA_DIR = $appData
             if ($InitialPanel -eq "FileSync") {
                 $env:GPUI_CONVENIENCE_TOOLS_INITIAL_PANEL = "file_sync"
             }
+            elseif ($InitialPanel -eq "VirtualDisk") {
+                $env:GPUI_CONVENIENCE_TOOLS_INITIAL_PANEL = "virtual_disk"
+            }
             elseif ($InitialPanel -eq "AutoStart") {
                 $env:GPUI_CONVENIENCE_TOOLS_INITIAL_PANEL = "auto_start"
+            }
+            if ($null -ne $validationVdiPath) {
+                $env:GPUI_CONVENIENCE_TOOLS_VALIDATION_VDI_PATH = $validationVdiPath
+                $env:GPUI_CONVENIENCE_TOOLS_VALIDATION_VDI_TARGET = Join-Path $sessionRoot "target"
+                $env:GPUI_CONVENIENCE_TOOLS_VALIDATION_VDI_SELECT_ALL = "1"
+                if ($AutoCopyVdi) {
+                    $env:GPUI_CONVENIENCE_TOOLS_VALIDATION_VDI_AUTO_COPY = "1"
+                }
             }
             $process = Start-Process -FilePath $BinaryPath -PassThru
         }
@@ -315,6 +346,22 @@ switch ($Action) {
                 Remove-Item Env:\GPUI_CONVENIENCE_TOOLS_INITIAL_PANEL -ErrorAction SilentlyContinue
             }
             else { $env:GPUI_CONVENIENCE_TOOLS_INITIAL_PANEL = $previousInitialPanel }
+            if ($null -eq $previousValidationVdiPath) {
+                Remove-Item Env:\GPUI_CONVENIENCE_TOOLS_VALIDATION_VDI_PATH -ErrorAction SilentlyContinue
+            }
+            else { $env:GPUI_CONVENIENCE_TOOLS_VALIDATION_VDI_PATH = $previousValidationVdiPath }
+            if ($null -eq $previousValidationVdiTarget) {
+                Remove-Item Env:\GPUI_CONVENIENCE_TOOLS_VALIDATION_VDI_TARGET -ErrorAction SilentlyContinue
+            }
+            else { $env:GPUI_CONVENIENCE_TOOLS_VALIDATION_VDI_TARGET = $previousValidationVdiTarget }
+            if ($null -eq $previousValidationVdiSelectAll) {
+                Remove-Item Env:\GPUI_CONVENIENCE_TOOLS_VALIDATION_VDI_SELECT_ALL -ErrorAction SilentlyContinue
+            }
+            else { $env:GPUI_CONVENIENCE_TOOLS_VALIDATION_VDI_SELECT_ALL = $previousValidationVdiSelectAll }
+            if ($null -eq $previousValidationVdiAutoCopy) {
+                Remove-Item Env:\GPUI_CONVENIENCE_TOOLS_VALIDATION_VDI_AUTO_COPY -ErrorAction SilentlyContinue
+            }
+            else { $env:GPUI_CONVENIENCE_TOOLS_VALIDATION_VDI_AUTO_COPY = $previousValidationVdiAutoCopy }
         }
 
         $hwnd = [IntPtr]::Zero

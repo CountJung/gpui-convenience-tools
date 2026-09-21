@@ -33,6 +33,7 @@ pub(crate) struct VirtualDiskSession {
     pub(crate) source: Option<Box<dyn GuestFileSource>>,
     pub(crate) error: Option<String>,
     pub(crate) suppressed_issue_keys: BTreeSet<String>,
+    pub(crate) validation_auto_copy_requested: bool,
 }
 
 impl Default for VirtualDiskSession {
@@ -51,6 +52,7 @@ impl Default for VirtualDiskSession {
             source: None,
             error: None,
             suppressed_issue_keys: BTreeSet::new(),
+            validation_auto_copy_requested: false,
         }
     }
 }

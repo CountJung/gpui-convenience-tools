@@ -751,6 +751,21 @@ mod tests {
         remove_fixture(&path);
     }
 
+    #[test]
+    fn exports_ntfs_vdi_fixture_when_requested() {
+        let Ok(destination) = std::env::var("GPUI_CONVENIENCE_TOOLS_EXPORT_VDI_FIXTURE") else {
+            return;
+        };
+        let destination = PathBuf::from(destination);
+        if let Some(parent) = destination.parent() {
+            fs::create_dir_all(parent).unwrap();
+        }
+        let source = write_ntfs_vdi_fixture();
+        fs::copy(&source, &destination).unwrap();
+        remove_fixture(&source);
+        assert!(destination.is_file());
+    }
+
     fn write_fixture(image_type: u32, map: &[u32], allocated: u32) -> PathBuf {
         let path = fixture_path();
         let mut header = base_header(image_type, map.len() as u32, allocated);
