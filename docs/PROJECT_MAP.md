@@ -30,7 +30,7 @@
 안전 경계: 원본 VDI는 read-only로만 열고, 실행 중 VM의 VDI 직접 읽기는 구현하지 않는다.
 실행 중 VM 지원은 후속 `GuestFileSource` 구현으로만 추가한다(VDE-021).
 
-**최종 측정**: 2026-09-22 · `app/src` 총 52개 파일 · 20,089줄
+**최종 측정**: 2026-09-22 · `app/src` 총 52개 파일 · 20,101줄
 
 ## 크기 기준 — 줄 수는 증상이다
 
@@ -102,7 +102,7 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 
 | 파일 | 줄 | 책임 |
 | --- | ---: | --- |
-| `mod.rs` | 744 | `AppRoot` 정의·생성자·동기화 이력 초기 로드·백그라운드 UI wake·사이드바(전역 스위치 2개 포함)·폭/VDI 억제 설정 복원·최상위 레이아웃 |
+| `mod.rs` | 756 | `AppRoot` 정의·생성자·검증 전용 초기 패널·동기화 이력 초기 로드·백그라운드 UI wake·사이드바(전역 스위치 2개 포함)·폭/VDI 억제 설정 복원·최상위 레이아웃 |
 | `sync_ops.rs` | 457 | 파일 동기화 작업 조작 (추가·삭제·선택·이름·경로·제외 패턴 입력 저장·수동 실행 큐·중지·전역 스위치·커서 무효화) |
 | `interval.rs` | 313 | 주기 선택 상태(`IntervalPicker`)와 조작 — 프리셋 추가·삭제·드롭다운 동기화 |
 | `events.rs` | 303 | `PlatformEvent` 채널 소비, 진행 상태·동기화 이력 반영, 로그·토스트 유틸 |
@@ -183,7 +183,7 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `.codex/agents/code-reviewer.toml` | 9 | Codex용 Code Reviewer 얇은 어댑터 |
 | `.codex/agents/docs-sync.toml` | 9 | Codex용 Documentation Sync 얇은 어댑터 |
 | `scripts/Verify-Workspace.ps1` | 167 | VS Code용 Rust/GPUI 자동 검증과 ChatGPT 데스크톱 handoff manifest·해시 고정 빌드 생성 |
-| `scripts/Invoke-ClaudeVisualCheck.ps1` | 450 | `CLAUDE_LOCAL` 시각 검증 하네스 — 격리 실행(`-SeedConfig`로 상태 재현)·창 캡처(`PrintWindow`)·입력(`SendInput`)·정리 |
+| `scripts/Invoke-ClaudeVisualCheck.ps1` | 474 | `CLAUDE_LOCAL` 시각 검증 하네스 — 격리 실행(`-SeedConfig`·`-SeedHistory`·`-InitialPanel`로 상태 재현)·창 캡처(`PrintWindow`)·입력(`SendInput`)·정리 |
 | `scripts/Verify-AdWindowState.ps1` | 282 | 지정 PID와 앱 조상·자손의 최상위·선택적 자식 창 상태와 클래스 후보를 읽기 전용 점검(AD-002·AD-005 진단) |
 | `scripts/Start-DesktopVisualValidation.ps1` | 126 | manifest 해시 검증 후 단일 임시 데이터 루트 격리 프로세스·세션 파일 생성과 실패 롤백 |
 | `scripts/Stop-DesktopVisualValidation.ps1` | 75 | 기록된 검증 PID·시작 시각과 작업 전용 임시 루트만 검증 후 정리 |
@@ -192,7 +192,7 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `.github/workflows/release.yml` | 140 | `v*` 태그 → Windows·macOS 병렬 빌드 후 단일 Release 생성 |
 | `.github/workflows/macos-build.yml` | 47 | push/PR마다 macOS check·test·패키징 — 비Windows cfg 경로의 **유일한** 검증 지점 |
 
-> `Invoke-ClaudeVisualCheck.ps1`은 450줄이지만 분할하지 않는다. 하나의 Win32 시퀀스
+> `Invoke-ClaudeVisualCheck.ps1`은 474줄이지만 분할하지 않는다. 하나의 Win32 시퀀스
 > (P/Invoke 선언 → 세션 → 캡처 → 입력 → 정리)를 공유하고, 쪼개면 각 파일이 같은 `Add-Type`
 > 블록과 세션 스키마를 중복 소유하게 되어 응집도가 깨진다.
 > 정본의 「구조 리팩터링 기준 > 예외」 조항을 적용한다.
@@ -331,7 +331,7 @@ G-001 판단: `muted`는 비활성 의미이므로 테두리와 hover를 추가�
 | 2026-09-22 | `app/src/sync/mod.rs`·`app/src/sync/tests.rs` | D-017 심볼릭 링크 건너뜀 계상 | 심볼릭 링크·정션을 복사하지 않으면서 실패로 집계해 정상 동기화와 오류가 섞임 | 링크를 따라가지 않고 `skipped`로 계상하며 진행 콜백에 반영, 실제 Windows 심볼릭 링크 회귀 테스트와 전체 141 passed·4 ignored·Clippy 기존 경고 7건, 51개 파일·19,731줄 기준 지도 갱신 | 현재 정책은 안전 `Skip` 고정이며 `Follow`·`Recreate` 옵션과 권한 범위는 사용자·제품 판단으로 D-014~016에 남김; commit `6cf305c` push 완료 |
 | 2026-09-22 | `app/src/sync_history.rs`·`app/src/app/background.rs`·`app/src/main.rs` | D-018 동기화 실행 이력 저장 | 실행 결과가 화면 로그와 설정 상태에만 남아 앱 재시작 후 이력을 조회할 파일이 없음 | `sync-history.json`에 실행 순서·작업 식별자·시각·결과 건수·중지·요약을 append하고 손상 JSON은 덮어쓰지 않음, 전용 2개 테스트와 전체 143 passed·4 ignored·Clippy 기존 경고 7건, 52개 파일·19,884줄 기준 지도 갱신 | 이력 보존 정책은 로그와 동일하게 D-019에서, UI 목록은 D-020에서 후속; commit `97009c3` push 완료 |
 | 2026-09-22 | `app/src/sync_history.rs` | D-019 동기화 이력 보존 정책 | JSON 이력은 추가만 되어 오래된 실행 결과가 무한히 남을 수 있음 | `LogConfig.max_age_days`·`max_files`로 기간·개수 초과분을 새 append 전에 제거하고 최소 한 건을 유지, 보존 경계 테스트·전체 144 passed·4 ignored·Clippy 기존 경고 7건, 52개 파일·19,946줄 기준 지도 갱신 | 파일 용량 롤링은 JSON 이력에 적용하지 않으며 최근 이력 화면은 D-020 후속; commit `ed71af4` push 완료 |
-| 2026-09-22 | `app/src/sync_history.rs`·`app/src/app/mod.rs`·`app/src/app/events.rs`·`app/src/window/file_sync.rs`·`app/src/app/tests/file_sync.rs` | D-020 최근 동기화 이력 카드 부분 구현 | 저장된 실행 결과를 앱 재시작 후 패널에서 볼 수 없고 완료 직후 목록 갱신도 없음 | 최신 20건 로드·완료 이벤트 새로고침·상태/결과 건수/소요 시간 카드·폭 회귀 테스트와 GPUI 시드 렌더 테스트 추가, 전체 145 passed·4 ignored·Clippy 기존 경고 7건, 52개 파일·20,089줄 기준 지도 갱신 | 격리 release 기본 캡처 `d020-default-011352.png`는 성공했지만 이력 행을 시드한 실제 패널 캡처와 독립 Visual Reviewer는 후속; commit `031148e` push 완료 |
+| 2026-09-22 | `app/src/sync_history.rs`·`app/src/app/mod.rs`·`app/src/app/events.rs`·`app/src/window/file_sync.rs`·`app/src/app/tests/file_sync.rs`·`scripts/Invoke-ClaudeVisualCheck.ps1` | D-020 최근 동기화 이력 카드 부분 구현 | 저장된 실행 결과를 앱 재시작 후 패널에서 볼 수 없고 완료 직후 목록 갱신도 없음 | 최신 20건 로드·완료 이벤트 새로고침·상태/결과 건수/소요 시간 카드·폭 회귀 테스트와 GPUI 시드 렌더 테스트, `-SeedHistory`·`-InitialPanel FileSync` 검증 경로 추가, 전체 145 passed·4 ignored·Clippy 기존 경고 7건, 52개 파일·20,101줄 기준 지도 갱신 | 격리 release 시드 패널 캡처 `d020-history-panel-012458.png`에서 중지/실패/성공 3행 확인, processCount=0·sessionCount=0; 독립 Visual Reviewer는 후속; commits `031148e`, `ff9dc72` push 완료 |
 | 2026-07-29 | 편의 기능 스플리터 3곳 | 공용 레이아웃 승격 | 패널별 고정 초기 폭 | `window::balanced_split` | 설정 pane 과도 축소 방지, 양쪽 가용폭 사용 |
 | 2026-07-29 | `app.rs` | 책임 단위 분할 + 재배치 | 1,798 | `app/` 7파일 (최대 564) | 대시보드·로그 렌더는 소유가 잘못돼 있어 `window/`로 이동 |
 | 2026-07-29 | `platform/windows.rs` | 책임 단위 분할 + 승격 | 1,361 | `platform/windows/` 6파일 (최대 344) | `wide_null`을 `windows/mod.rs`로 **공용 승격** |
@@ -387,7 +387,7 @@ G-001 판단: `muted`는 비활성 의미이므로 테두리와 hover를 추가�
 
 ### 2순위 — 책임 재배치·분할 (중복 제거 후에도 크면)
 
-- **`app/mod.rs` (723)** — 최대 파일이며 800줄 경고까지 77줄 남았다. `AppRoot` 필드가 30개에
+- **`app/mod.rs` (756)** — 최대 파일이며 800줄 경고까지 44줄 남았다. `AppRoot` 필드가 30개에
   가깝다. `TODO.md`의 「`AppRoot` 분할 검토」와 같은 항목이다. 다음에 커지면 사이드바 렌더를
   `app/sidebar.rs`로 떼는 것이 가장 자연스럽다.
 - **`app/tests/file_sync.rs` (713)** — 시나리오가 늘어 두 번째로 크다. 800줄에 닿으면

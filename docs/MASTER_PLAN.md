@@ -945,11 +945,12 @@ passed·4 ignored, Clippy exit 0, `git diff --check`를 통과했으며 구현 �
   표시하는 카드가 설정·실패 목록 뒤에 배치된다. 설정 저장 버튼이 최소 화면에서 밀리지 않도록
   기존 설정 카드의 위치를 보존했다.
 - `file_sync_renders_recent_history_with_result_counts_and_duration`와 섹션 폭 회귀 테스트,
-  `Verify-Workspace.ps1` 필수 18개 테스트를 추가·통과했다. 기본 대시보드 릴리스 캡처는 통과했지만
-  실제 이력 행을 시드한 패널 캡처와 독립 Visual Reviewer 확인은 남아 있어 TODO를 유지한다.
+  `Verify-Workspace.ps1` 필수 18개 테스트를 추가·통과했다. 검증 전용 `-SeedHistory`와
+  `-InitialPanel FileSync`로 실제 이력 행을 시드한 릴리스 패널 캡처까지 완료했지만, 독립
+  Visual Reviewer 확인은 남아 있어 TODO를 유지한다.
 
 전체 145 passed·4 ignored, Clippy exit 0(기존 경고 7건), `git diff --check`와 격리 release
-기본 캡처를 통과했으며 구현 커밋은 `031148e`이다.
+기본·시드 패널 캡처를 통과했으며 구현 커밋은 `031148e`, 검증 하네스 커밋은 `ff9dc72`이다.
 
 - 실시간 감시(`notify` 크레이트, 이미 의존성 트리에 존재)
 - 제외 패턴(glob) 지원
