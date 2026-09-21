@@ -96,8 +96,8 @@ pub fn log_level_label(level: &str, cx: &App) -> Div {
 
 /// 액션 버튼의 색 구성.
 ///
-/// 생성자로 의미를 고르고, 개별 화면이 다른 경우에만 `border`/`hover`로 덮어쓴다.
-/// 덮어쓰기가 늘어나면 그 자체가 통일 대상이라는 신호다.
+/// 생성자가 의미별 색과 상호작용 상태를 함께 소유한다.
+/// 개별 패널에서 색을 덮어쓰지 않아 화면별 버튼 의미가 일관된다.
 #[derive(Clone, Copy)]
 pub struct ButtonStyle {
     bg: Hsla,
@@ -173,20 +173,6 @@ impl ButtonStyle {
         }
     }
 
-    pub fn border(mut self, color: Hsla) -> Self {
-        self.border = Some(color);
-        self
-    }
-
-    pub fn hover(mut self, color: Hsla) -> Self {
-        self.hover = Some(color);
-        self
-    }
-
-    pub fn no_hover(mut self) -> Self {
-        self.hover = None;
-        self
-    }
 }
 
 /// 클릭 가능한 액션 버튼. 폭을 고정하려면 반환값에 `.w(px(..))`를 이어 붙인다.

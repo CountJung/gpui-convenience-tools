@@ -235,8 +235,6 @@ fn render_service_list(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElem
                                                             ui::Size::Sm,
                                                             if is_running {
                                                                 ButtonStyle::muted(cx)
-                                                                    .border(theme.border)
-                                                                    .hover(theme.secondary_hover)
                                                             } else {
                                                                 ButtonStyle::neutral(cx)
                                                             },

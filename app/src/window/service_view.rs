@@ -76,15 +76,14 @@ fn state_badge(state: &TaskState, cx: &Context<AppRoot>) -> AnyElement {
 /// 지금 의미 없는 조작(미등록 상태의 '삭제' 등)은 비활성처럼 보이게만 하고
 /// 클릭 자체는 막지 않는다 — 실패 사유를 로그로 남기는 편이 원인 파악에 낫기 때문이다.
 #[cfg(target_os = "windows")]
-fn task_button_style(enabled: bool, danger: bool, t: &ThemeSnap, cx: &Context<AppRoot>) -> ButtonStyle {
-    let style = if !enabled {
+fn task_button_style(enabled: bool, danger: bool, cx: &Context<AppRoot>) -> ButtonStyle {
+    if !enabled {
         ButtonStyle::muted(cx)
     } else if danger {
         ButtonStyle::danger(cx)
     } else {
         ButtonStyle::primary(cx)
-    };
-    style.border(t.border).no_hover()
+    }
 }
 
 // ─────────────────────────────────────────────
@@ -133,7 +132,7 @@ pub fn render(_this: &mut AppRoot, _window: &mut Window, cx: &mut Context<AppRoo
                     "task-refresh",
                     "↺ 새로고침",
                     ui::Size::Md,
-                    ButtonStyle::secondary(cx).no_hover(),
+                    ButtonStyle::secondary(cx),
                     cx.listener(|_this, _ev, _window, cx| {
                         cx.notify();
                     }),
@@ -220,7 +219,7 @@ pub fn render(_this: &mut AppRoot, _window: &mut Window, cx: &mut Context<AppRoo
                                     "task-install",
                                     "등록",
                                     ui::Size::Lg,
-                                    task_button_style(is_not_installed, false, &t, cx),
+                                    task_button_style(is_not_installed, false, cx),
                                     cx.listener(|this, _ev, window, cx| {
                                         match install_task() {
                                             Ok(()) => this.push_service_log(
@@ -238,7 +237,7 @@ pub fn render(_this: &mut AppRoot, _window: &mut Window, cx: &mut Context<AppRoo
                                     "task-run-now",
                                     "지금 실행",
                                     ui::Size::Lg,
-                                    task_button_style(is_installed, false, &t, cx),
+                                    task_button_style(is_installed, false, cx),
                                     cx.listener(|this, _ev, window, cx| {
                                         match run_task_now() {
                                             Ok(()) => this.push_service_log(
@@ -256,7 +255,7 @@ pub fn render(_this: &mut AppRoot, _window: &mut Window, cx: &mut Context<AppRoo
                                     "task-uninstall",
                                     "삭제",
                                     ui::Size::Lg,
-                                    task_button_style(is_installed, true, &t, cx),
+                                    task_button_style(is_installed, true, cx),
                                     cx.listener(|this, _ev, window, cx| {
                                         match uninstall_task() {
                                             Ok(()) => this.push_service_log(

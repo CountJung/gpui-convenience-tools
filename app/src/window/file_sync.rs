@@ -126,18 +126,17 @@ fn render_job_list(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElement 
     let card = theme.secondary;
     let selected_idx = this.selected_sync_job;
 
-    // 이 패널의 버튼은 테두리 색을 hover 색과 같이 쓴다(승격 전 시각 유지).
-    let neutral_btn = ButtonStyle::neutral(cx).hover(border);
-    let primary_btn = ButtonStyle::primary(cx).border(theme.primary_hover);
+    let neutral_btn = ButtonStyle::neutral(cx);
+    let primary_btn = ButtonStyle::primary(cx);
     let is_running = this.sync_running.is_some();
     let stopping = this
         .sync_running
         .as_ref()
         .is_some_and(|running| running.stopping);
     let stop_btn = if is_running {
-        ButtonStyle::danger(cx).border(theme.danger_active)
+        ButtonStyle::danger(cx)
     } else {
-        ButtonStyle::muted(cx).border(border)
+        ButtonStyle::muted(cx)
     };
 
     // ── 작업 행 ──
@@ -291,10 +290,9 @@ fn render_job_settings(
     let border = theme.border;
     let card = theme.secondary;
 
-    // 이 패널의 버튼은 테두리 색을 hover 색과 같이 쓴다(승격 전 시각 유지).
-    let neutral_btn = ButtonStyle::neutral(cx).hover(border);
-    let primary_btn = ButtonStyle::primary(cx).border(theme.primary_hover);
-    let danger_btn = ButtonStyle::danger(cx).border(theme.danger_active);
+    let neutral_btn = ButtonStyle::neutral(cx);
+    let primary_btn = ButtonStyle::primary(cx);
+    let danger_btn = ButtonStyle::danger(cx);
 
     let Some(selected) = this.selected_sync_job else {
         return v_flex()
@@ -506,7 +504,7 @@ fn render_failures(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElement 
     let muted_fg = theme.muted_foreground;
     let border = theme.border;
     let card = theme.secondary;
-    let neutral_btn = ButtonStyle::neutral(cx).hover(border);
+    let neutral_btn = ButtonStyle::neutral(cx);
 
     let mut failures = v_flex().gap_1();
     if this.sync_failures.is_empty() {

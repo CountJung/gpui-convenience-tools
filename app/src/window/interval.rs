@@ -26,9 +26,7 @@ pub fn render(
     let theme = cx.theme();
     let muted_fg = theme.muted_foreground;
     let danger = theme.danger;
-    let border = theme.border;
-
-    let neutral_btn = ButtonStyle::neutral(cx).hover(border);
+    let neutral_btn = ButtonStyle::neutral(cx);
     let current = this.interval_value(target);
     let select = match target {
         IntervalTarget::Scan => this.interval_picker.scan_select.clone(),
