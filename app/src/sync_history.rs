@@ -7,7 +7,10 @@ use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::{fs, path::{Path, PathBuf}};
 
-use crate::{config, sync::SyncOutcome};
+use crate::{
+    config::{self, LogConfig},
+    sync::SyncOutcome,
+};
 
 const HISTORY_FILE_NAME: &str = "sync-history.json";
 
@@ -53,10 +56,16 @@ pub(crate) fn history_path() -> PathBuf {
 }
 
 pub(crate) fn append(entry: &SyncHistoryEntry) -> Result<()> {
-    append_to_path(&history_path(), entry)
+    let retention = config::load_config()?.map(|config| config.log).unwrap_or_default();
+    append_to_path(&history_path(), entry, &retention, current_unix())
 }
 
-fn append_to_path(path: &Path, entry: &SyncHistoryEntry) -> Result<()> {
+fn append_to_path(
+    path: &Path,
+    entry: &SyncHistoryEntry,
+    retention: &LogConfig,
+    now_unix: u64,
+) -> Result<()> {
     let mut entries = if path.exists() {
         let data = fs::read_to_string(path)
             .with_context(|| format!("동기화 이력 읽기 실패: {}", path.display()))?;
@@ -70,6 +79,7 @@ fn append_to_path(path: &Path, entry: &SyncHistoryEntry) -> Result<()> {
         Vec::new()
     };
 
+    retain_entries(&mut entries, retention, now_unix);
     entries.push(entry.clone());
     let json = serde_json::to_string_pretty(&entries).context("동기화 이력 JSON 직렬화 실패")?;
     if let Some(parent) = path.parent() {
@@ -78,6 +88,26 @@ fn append_to_path(path: &Path, entry: &SyncHistoryEntry) -> Result<()> {
     }
     fs::write(path, json).with_context(|| format!("동기화 이력 저장 실패: {}", path.display()))?;
     Ok(())
+}
+
+fn retain_entries(entries: &mut Vec<SyncHistoryEntry>, config: &LogConfig, now_unix: u64) {
+    if config.max_age_days > 0 {
+        let cutoff = now_unix.saturating_sub(config.max_age_days as u64 * 86_400);
+        entries.retain(|entry| entry.finished_at_unix >= cutoff);
+    }
+
+    let keep = config.max_files.max(1) as usize;
+    if entries.len() > keep {
+        let remove = entries.len() - keep;
+        entries.drain(0..remove);
+    }
+}
+
+fn current_unix() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|duration| duration.as_secs())
+        .unwrap_or(0)
 }
 
 #[cfg(test)]
@@ -112,8 +142,11 @@ mod tests {
     #[test]
     fn appends_history_entries_in_execution_order() {
         let path = temp_path();
-        append_to_path(&path, &entry("first", 1)).expect("append first history entry");
-        append_to_path(&path, &entry("second", 3)).expect("append second history entry");
+        let retention = LogConfig::default();
+        append_to_path(&path, &entry("first", 1), &retention, 110)
+            .expect("append first history entry");
+        append_to_path(&path, &entry("second", 3), &retention, 110)
+            .expect("append second history entry");
 
         let entries: Vec<SyncHistoryEntry> =
             serde_json::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
@@ -130,10 +163,39 @@ mod tests {
         let path = temp_path();
         fs::write(&path, b"not-json").unwrap();
 
-        let error = append_to_path(&path, &entry("broken", 1)).unwrap_err();
+        let error = append_to_path(&path, &entry("broken", 1), &LogConfig::default(), 110)
+            .unwrap_err();
 
         assert!(error.to_string().contains("동기화 이력 JSON 파싱 실패"));
         assert_eq!(fs::read_to_string(&path).unwrap(), "not-json");
         let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn applies_log_count_and_age_retention_before_appending() {
+        let mut entries = vec![
+            SyncHistoryEntry {
+                finished_at_unix: 1,
+                ..entry("expired", 1)
+            },
+            SyncHistoryEntry {
+                finished_at_unix: 90,
+                ..entry("old", 2)
+            },
+            SyncHistoryEntry {
+                finished_at_unix: 95,
+                ..entry("recent", 3)
+            },
+        ];
+        let config = LogConfig {
+            max_files: 1,
+            max_age_days: 1,
+            ..LogConfig::default()
+        };
+
+        retain_entries(&mut entries, &config, 86_495);
+
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].job_id, "recent");
     }
 }
