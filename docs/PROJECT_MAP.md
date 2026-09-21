@@ -30,7 +30,7 @@
 안전 경계: 원본 VDI는 read-only로만 열고, 실행 중 VM의 VDI 직접 읽기는 구현하지 않는다.
 실행 중 VM 지원은 후속 `GuestFileSource` 구현으로만 추가한다(VDE-021).
 
-**최종 측정**: 2026-09-22 · `app/src` 총 52개 파일 · 19,884줄
+**최종 측정**: 2026-09-22 · `app/src` 총 52개 파일 · 19,946줄
 
 ## 크기 기준 — 줄 수는 증상이다
 
@@ -71,7 +71,7 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `theme.rs` | 143 | 테마 모드 적용과 스위치 팔레트 최소 대비 보정·번들 테마 감사 테스트 |
 | `config.rs` | 665 | `AppConfig`·`SyncJob`·`LogConfig`·주기 프리셋·사이드바 폭·VDI 오류 억제 키 정의, 동기화 제외 패턴 스키마, `update_config` 단일 저장 경로, 데이터 루트 오버라이드 |
 | `logging.rs` | 560 | 롤링 파일 로거 (`log::Log` 구현, 테스트용 출력 경로 주입) |
-| `sync_history.rs` | 139 | 동기화 완료 이력의 JSON 배열 저장·순서 보장·손상 파일 보존 경계 |
+| `sync_history.rs` | 201 | 동기화 완료 이력의 JSON 배열 저장·순서 보장·손상 파일 보존·개수/기간 보존 경계 |
 | `util.rs` | 139 | 도메인 주인이 없는 순수 헬퍼 — `format_interval`·`interval_to_secs`·`TimeUnit` |
 
 ### VirtualBox 도메인 (`app/src/virtual_disk/`) — 4,634줄 / 8파일
@@ -330,6 +330,7 @@ G-001 판단: `muted`는 비활성 의미이므로 테두리와 hover를 추가�
 | 2026-09-22 | `app/src/config.rs`·`app/src/app/mod.rs`·`app/src/app/virtual_disk_ops.rs`·`app/src/app/virtual_disk_copy.rs`·`app/src/window/virtual_disk.rs`·`app/src/app/tests/virtual_disk.rs` | VDE-012 GPUI 오류 알림 연결 | 도메인 오류 보고는 있었지만 화면 상세 로그·반복 알림 억제 상태·항목별 UI 조작이 연결되지 않음 | 항목별 상세 로그, 미억제 오류에만 반복 토스트, 요약 카드의 억제/재표시 버튼, `AppConfig` 저장·복원, 관련 GPUI 직접 상태 전환 테스트와 전체 140 passed·4 ignored·Clippy 기존 경고 7건, 51개 파일·19,707줄 기준 지도 갱신 | 격리 release 기본 캡처 `vde012-default-004932.png` 성공; 실제 VDI 오류 카드·버튼 click dispatch·복사 대상 E2E는 실제 이미지/하네스 제약으로 미확인하며 VDE-019에서 후속 |
 | 2026-09-22 | `app/src/sync/mod.rs`·`app/src/sync/tests.rs` | D-017 심볼릭 링크 건너뜀 계상 | 심볼릭 링크·정션을 복사하지 않으면서 실패로 집계해 정상 동기화와 오류가 섞임 | 링크를 따라가지 않고 `skipped`로 계상하며 진행 콜백에 반영, 실제 Windows 심볼릭 링크 회귀 테스트와 전체 141 passed·4 ignored·Clippy 기존 경고 7건, 51개 파일·19,731줄 기준 지도 갱신 | 현재 정책은 안전 `Skip` 고정이며 `Follow`·`Recreate` 옵션과 권한 범위는 사용자·제품 판단으로 D-014~016에 남김; commit `6cf305c` push 완료 |
 | 2026-09-22 | `app/src/sync_history.rs`·`app/src/app/background.rs`·`app/src/main.rs` | D-018 동기화 실행 이력 저장 | 실행 결과가 화면 로그와 설정 상태에만 남아 앱 재시작 후 이력을 조회할 파일이 없음 | `sync-history.json`에 실행 순서·작업 식별자·시각·결과 건수·중지·요약을 append하고 손상 JSON은 덮어쓰지 않음, 전용 2개 테스트와 전체 143 passed·4 ignored·Clippy 기존 경고 7건, 52개 파일·19,884줄 기준 지도 갱신 | 이력 보존 정책은 로그와 동일하게 D-019에서, UI 목록은 D-020에서 후속; commit `97009c3` push 완료 |
+| 2026-09-22 | `app/src/sync_history.rs` | D-019 동기화 이력 보존 정책 | JSON 이력은 추가만 되어 오래된 실행 결과가 무한히 남을 수 있음 | `LogConfig.max_age_days`·`max_files`로 기간·개수 초과분을 새 append 전에 제거하고 최소 한 건을 유지, 보존 경계 테스트·전체 144 passed·4 ignored·Clippy 기존 경고 7건, 52개 파일·19,946줄 기준 지도 갱신 | 파일 용량 롤링은 JSON 이력에 적용하지 않으며 최근 이력 화면은 D-020 후속; commit `ed71af4` push 완료 |
 | 2026-07-29 | 편의 기능 스플리터 3곳 | 공용 레이아웃 승격 | 패널별 고정 초기 폭 | `window::balanced_split` | 설정 pane 과도 축소 방지, 양쪽 가용폭 사용 |
 | 2026-07-29 | `app.rs` | 책임 단위 분할 + 재배치 | 1,798 | `app/` 7파일 (최대 564) | 대시보드·로그 렌더는 소유가 잘못돼 있어 `window/`로 이동 |
 | 2026-07-29 | `platform/windows.rs` | 책임 단위 분할 + 승격 | 1,361 | `platform/windows/` 6파일 (최대 344) | `wide_null`을 `windows/mod.rs`로 **공용 승격** |

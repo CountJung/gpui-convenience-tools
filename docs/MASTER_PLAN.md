@@ -927,6 +927,17 @@ passed·4 ignored, Clippy exit 0, `git diff --check`를 통과했으며 구현 �
 `sync_history::tests` 2개, `cargo check --locked`, 전체 143 passed·4 ignored, Clippy exit 0,
 `git diff --check`를 통과했으며 구현 커밋은 `97009c3`이다.
 
+#### D-019 — 동기화 이력 보존 정책 완료 ✅
+
+- 새 이력을 추가하기 전에 로그 설정의 `max_age_days`를 적용해 오래된 완료 기록을 제거하고,
+  `max_files`를 최대 이력 개수로 사용해 최신 결과만 남긴다. `max_files=0`이나 잘못된 설정에도
+  최소 한 건은 유지해 방금 완료한 결과가 즉시 사라지지 않게 한다.
+- 로그의 파일 용량 롤링은 단일 JSON 이력 파일에 그대로 적용하지 않고, 이력에는 로그와 같은
+  개수·기간 정책만 적용한다. 최근 실행 이력 화면은 D-020의 책임으로 남긴다.
+
+`applies_log_count_and_age_retention_before_appending`, `cargo check --locked`, 전체 144
+passed·4 ignored, Clippy exit 0, `git diff --check`를 통과했으며 구현 커밋은 `ed71af4`이다.
+
 - 실시간 감시(`notify` 크레이트, 이미 의존성 트리에 존재)
 - 제외 패턴(glob) 지원
 - 진행률 표시 및 취소

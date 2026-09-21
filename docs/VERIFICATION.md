@@ -136,7 +136,6 @@ SHA-256을 기록한다. 다른 검증자의 독립 검토가 요구되는 UI �
 | D-014 | RUST | [ ] | [ ] | — | — | [ ] | [ ] | — |
 | D-015 | RUST | [ ] | [ ] | — | — | [ ] | [ ] | — |
 | D-016 | RUST | [ ] | [ ] | — | — | [ ] | [ ] | — |
-| D-019 | RUST | [ ] | [ ] | — | — | [ ] | [ ] | — |
 | D-020 | E2E | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | — |
 | E-001 | E2E | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | — |
 | E-002 | E2E | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | — |
@@ -175,6 +174,7 @@ SHA-256을 기록한다. 다른 검증자의 독립 검토가 요구되는 UI �
 | VDE-006 | RUST | [x] | [x] | — | — | [x] | [x] | `virtual_disk::partition` 6개 테스트 통과; MBR 기본·확장 EBR 논리 파티션·protective MBR/GPT·주·백업 GPT 헤더 CRC·MBR 범위 초과 검증; `cargo test -p gpui-convenience-tools --all-targets --all-features --locked`, `cargo check -p gpui-convenience-tools --locked`, `cargo build -p gpui-convenience-tools --locked`, `git diff --check` 통과 |
 | D-017 | RUST | [x] | [x] | — | — | [x] | [x] | `skips_symbolic_links_without_reporting_a_sync_failure`가 실제 Windows 심볼릭 링크를 복사하지 않고 `skipped=1`·실패 목록 비어 있음·일반 파일 복사 성공을 확인; `cargo check -p gpui-convenience-tools --locked`; 전체 141 passed·4 ignored; Clippy exit 0(기존 경고 7건); commit `6cf305c` push 완료 |
 | D-018 | RUST | [x] | [x] | — | — | [x] | [x] | `sync_history::tests` 2개로 실행 순서 append·손상 JSON 보존을 검증; 동기화 백그라운드 완료 경로에서 작업 ID·라벨·시각·복사/건너뜀/삭제/실패·중지·요약을 `sync-history.json`에 기록; `cargo check -p gpui-convenience-tools --locked`; 전체 143 passed·4 ignored; Clippy exit 0(기존 경고 7건); commit `97009c3` push 완료 |
+| D-019 | RUST | [x] | [x] | — | — | [x] | [x] | `sync_history::tests::applies_log_count_and_age_retention_before_appending`로 로그 설정의 개수·기간 기준을 새 이력 추가 전에 적용하고 최소 1개를 유지하는 경계 검증; `cargo check -p gpui-convenience-tools --locked`; 전체 144 passed·4 ignored; Clippy exit 0(기존 경고 7건); commit `ed71af4` push 완료 |
 
 ### 증거 기록 형식
 
