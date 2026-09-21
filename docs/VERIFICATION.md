@@ -23,8 +23,10 @@
 
 최신 품질 게이트 기준은 `cargo check -p gpui-convenience-tools --locked`, 전체 테스트
 155 passed·4 ignored, 표준 `cargo clippy --all-targets --all-features --locked` exit 0·경고
-0건이다. 전체 `cargo fmt --check`는 기존 baseline 포맷 차이가 남아 있어 별도 구조 정리 범위로
-유지한다.
+0건이다. `scripts/Verify-Workspace.ps1`도 IDE 안전 모드에서 필수 GPUI 테스트 20개와 전체
+테스트를 재실행해 `IDE_VERIFIED`를 출력했다. 실제 데스크톱 표면은 별도 포그라운드 조건이
+필요하므로 같은 실행에서 `DESKTOP_PENDING`으로 분리했다. 전체 `cargo fmt --check`는 기존
+baseline 포맷 차이가 남아 있어 별도 구조 정리 범위로 유지한다.
 
 ## 작업마다 적용하는 순서
 

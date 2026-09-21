@@ -1046,6 +1046,8 @@ passed·4 ignored, Clippy exit 0, `git diff --check`를 통과했으며 구현 �
 - `cargo check --locked`, 전체 `cargo test --all-targets --all-features --locked`의 155 passed·4
   ignored, 표준 Clippy의 exit 0·경고 0건을 확인했다. 전체 rustfmt 검사는 기존 baseline 차이로
   재포맷하지 않았다.
+- `scripts/Verify-Workspace.ps1` IDE 안전 모드에서 필수 GPUI 테스트 20개와 전체 테스트를
+  재실행해 `IDE_VERIFIED`를 확인했다. 실제 데스크톱 검증은 `DESKTOP_PENDING`으로 남겼다.
 
 - 실시간 감시(`notify` 직접 의존성·스키마·디바운스·강등·설정 UI는 D-009~D-013 완료)
 - 제외 패턴(glob) 지원
