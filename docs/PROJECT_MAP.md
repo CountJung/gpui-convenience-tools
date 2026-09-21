@@ -30,7 +30,7 @@
 안전 경계: 원본 VDI는 read-only로만 열고, 실행 중 VM의 VDI 직접 읽기는 구현하지 않는다.
 실행 중 VM 지원은 후속 `GuestFileSource` 구현으로만 추가한다(VDE-021).
 
-**최종 측정**: 2026-09-22 · `app/src` 총 51개 파일 · 19,558줄
+**최종 측정**: 2026-09-22 · `app/src` 총 51개 파일 · 19,707줄
 
 ## 크기 기준 — 줄 수는 증상이다
 
@@ -69,7 +69,7 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | --- | ---: | --- |
 | `main.rs` | 132 | 진입점 — 로거 설치 → 테마 시드 → 윈도우 오픈, `--service`/`--tray` 플래그 분기 |
 | `theme.rs` | 143 | 테마 모드 적용과 스위치 팔레트 최소 대비 보정·번들 테마 감사 테스트 |
-| `config.rs` | 651 | `AppConfig`·`SyncJob`·`LogConfig`·주기 프리셋·사이드바 폭 정의, 동기화 제외 패턴 스키마, `update_config` 단일 저장 경로, 데이터 루트 오버라이드 |
+| `config.rs` | 665 | `AppConfig`·`SyncJob`·`LogConfig`·주기 프리셋·사이드바 폭·VDI 오류 억제 키 정의, 동기화 제외 패턴 스키마, `update_config` 단일 저장 경로, 데이터 루트 오버라이드 |
 | `logging.rs` | 560 | 롤링 파일 로거 (`log::Log` 구현, 테스트용 출력 경로 주입) |
 | `util.rs` | 139 | 도메인 주인이 없는 순수 헬퍼 — `format_interval`·`interval_to_secs`·`TimeUnit` |
 
@@ -95,13 +95,13 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `mod.rs` | 650 | 폴더 동기화 엔진 (UI 비의존 순수 로직) — 진행 보고·중지·이어서 시작·제외 glob 적용 포함 |
 | `tests.rs` | 623 | 복사·건너뜀·읽기 전용 대상 덮어쓰기·미러 삭제·실패 사유·진행 보고·중지·이어서 시작·제외 glob 단위 테스트 |
 
-### 앱 루트 (`app/src/app/`) — 3,799줄 / 11파일
+### 앱 루트 (`app/src/app/`) — 3,887줄 / 11파일
 
 `app.rs`(1,798줄)를 책임별로 분할한 결과다.
 
 | 파일 | 줄 | 책임 |
 | --- | ---: | --- |
-| `mod.rs` | 729 | `AppRoot` 정의·생성자·백그라운드 UI wake·사이드바(전역 스위치 2개 포함)·폭 설정 복원/저장·최상위 레이아웃 |
+| `mod.rs` | 739 | `AppRoot` 정의·생성자·백그라운드 UI wake·사이드바(전역 스위치 2개 포함)·폭/VDI 억제 설정 복원·최상위 레이아웃 |
 | `sync_ops.rs` | 457 | 파일 동기화 작업 조작 (추가·삭제·선택·이름·경로·제외 패턴 입력 저장·수동 실행 큐·중지·전역 스위치·커서 무효화) |
 | `interval.rs` | 313 | 주기 선택 상태(`IntervalPicker`)와 조작 — 프리셋 추가·삭제·드롭다운 동기화 |
 | `events.rs` | 298 | `PlatformEvent` 채널 소비, 진행 상태 반영, 로그·토스트 유틸 |
@@ -110,10 +110,10 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `ops.rs` | 195 | 광고 차단·서비스 관리·로그 설정 조작 |
 | `inputs.rs` | 136 | 입력 위젯(`InputState`) 지연 생성과 값 동기화 — 파일 동기화 제외 패턴 멀티라인 편집기 포함 |
 | `ui_state.rs` | 77 | `ServiceState`·`SyncState`·`AdBlockState` — 단일 `AppRoot` 엔티티가 소유하는 기능별 UI 상태 묶음 |
-| `virtual_disk_ops.rs` | 466 | VDI 경로 입력·read-only 열기·파티션 검색/선택·게스트 목록 새로고침·폴더 이동·다중 선택·포커스·안전 오류 안내, `GuestFileSource` 테스트 경계 |
-| `virtual_disk_copy.rs` | 441 | VDI 대상 폴더 입력·선택, 백그라운드 read-only 복사, 진행·중지·완료 요약 상태·탐색기 keymap |
+| `virtual_disk_ops.rs` | 522 | VDI 경로 입력·read-only 열기·파티션 검색/선택·게스트 목록 새로고침·폴더 이동·다중 선택·포커스·안전 오류 안내·항목별 반복 알림 억제 저장, `GuestFileSource` 테스트 경계 |
+| `virtual_disk_copy.rs` | 463 | VDI 대상 폴더 입력·선택, 백그라운드 read-only 복사, 진행·중지·완료 요약·항목별 오류 로그·미억제 토스트 게이트·탐색기 keymap |
 
-### GPUI 회귀 테스트 (`app/src/app/tests/`) — 1,825줄 / 6파일
+### GPUI 회귀 테스트 (`app/src/app/tests/`) — 1,843줄 / 6파일
 
 테스트는 시나리오별 6개 파일로 나뉘며, 픽스처는 `mod.rs`가 단독 소유하고 하위 모듈은
 `use super::*`로 가져다 쓴다.
@@ -125,7 +125,7 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `interval.rs` | 226 | 주기 드롭다운·프리셋 추가/삭제·패널 간 공유 |
 | `mod.rs` | 176 | 공용 픽스처 (`test_app_root`·`TestPlatform`·`refresh`·`click_debug_element` 등) |
 | `theme.rs` | 85 | 테마 전환과 스위치 가시성 |
-| `virtual_disk.rs` | 259 | VirtualBox 탐색 네비게이션·VDI 입력·파티션 카드·현재 경로·상위 이동·실제 목록·숨김/시스템 전체 선택·복사 진행/실패 요약·키보드 단축키·안전/미지원 상태·새로고침 렌더 경계 |
+| `virtual_disk.rs` | 277 | VirtualBox 탐색 네비게이션·VDI 입력·파티션 카드·현재 경로·상위 이동·실제 목록·숨김/시스템 전체 선택·복사 진행/실패 요약·오류 억제 상태·키보드 단축키·안전/미지원 상태·새로고침 렌더 경계 |
 
 ### 패널 (`app/src/window/`) — 4,012줄 / 11파일
 
@@ -141,7 +141,7 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `interval.rs` | 154 | 주기 선택 렌더 — 드롭다운 + (값·단위·추가) 행 + 등록된 프리셋 목록 |
 | `log_view.rs` | 110 | 시스템 — 화면 로그 가상 리스트와 로그 파일 현황 |
 | `mod.rs` | 107 | 패널 모듈 선언 + `balanced_split`·`scroll_pane` 레이아웃 헬퍼 |
-| `virtual_disk.rs` | 592 | 편의 기능 — VDI 경로 입력·파티션 선택·게스트 현재 경로·행 선택·폴더/상위 이동·단축키 포커스·안전/미지원 상태·대상 폴더·복사 진행·목록 새로고침 |
+| `virtual_disk.rs` | 621 | 편의 기능 — VDI 경로 입력·파티션 선택·게스트 현재 경로·행 선택·폴더/상위 이동·단축키 포커스·안전/미지원 상태·대상 폴더·복사 진행·오류 요약 억제/재표시·목록 새로고침 |
 
 ### 플랫폼 (`app/src/platform/`) — 2,390줄 / 8파일
 
@@ -326,6 +326,7 @@ G-001 판단: `muted`는 비활성 의미이므로 테두리와 hover를 추가�
 | 2026-09-22 | `app/src/window/ui.rs`·`file_sync.rs`·`interval.rs`·`service_mgr.rs`·`service_view.rs` | G-001 버튼 스타일 덮어쓰기 정리 | 패널별 `border`·`hover`·`no_hover` 덮어쓰기로 공용 버튼 의미가 화면마다 달랐고 확장 메서드가 dead-code가 됨 | 세 패널을 생성자 기본값으로 통일하고 확장 메서드 제거, 관련 GPUI 테스트·전체 139 passed·4 ignored·Clippy 기존 경고 7건, 50개 파일·19,465줄 기준 지도 갱신 | 격리 release 기본 대시보드 캡처는 성공했지만 파일 동기화 화면 Click이 foreground=0으로 차단되어 변경 화면 캡처와 독립 Visual Reviewer는 후속 |
 | 2026-09-22 | `app/src/app/ui_state.rs`·`app/mod.rs`·기능별 참조 호출부 | G-002 `AppRoot` 기능 상태 묶음 | 서비스·동기화·광고 스크롤과 작업 상태가 루트 엔티티 필드에 혼재해 소유 경계가 흐림 | GPUI 엔티티는 하나로 유지하고 `ServiceState`·`SyncState`·`AdBlockState` 일반 구조체로 상태 소유권 분리, 전체 139 passed·4 ignored·Clippy 기존 경고 7건, 51개 파일·19,496줄 기준 지도 갱신 | 동작 변경 없는 구조 리팩터링; 실제 화면 검증은 UI 동작 변경이 없어 N/A |
 | 2026-09-22 | `app/src/config.rs`·`app/src/app/mod.rs`·`app/tests/mod.rs` | G-003 스플리터 폭 영속화 | 앱 재시작 시 사용자가 조정한 사이드바 폭이 기본 240px로 돌아감 | `sidebar_width` 설정 필드·200~360px 보정, `ResizableState::sizes()` mouse-up 저장, 시작 시 복원, 설정/GPUI 회귀 테스트·전체 140 passed·4 ignored·Clippy 기존 경고 7건, 51개 파일·19,558줄 기준 지도 갱신 | 격리 release 기본 캡처 `g003-default-003709.png`·320px 시드 복원 캡처 `g003-restored-width-003742.png` 성공; 하네스가 divider 드래그를 지원하지 않아 실제 저장 콜백과 독립 Visual Reviewer는 후속 |
+| 2026-09-22 | `app/src/config.rs`·`app/src/app/mod.rs`·`app/src/app/virtual_disk_ops.rs`·`app/src/app/virtual_disk_copy.rs`·`app/src/window/virtual_disk.rs`·`app/src/app/tests/virtual_disk.rs` | VDE-012 GPUI 오류 알림 연결 | 도메인 오류 보고는 있었지만 화면 상세 로그·반복 알림 억제 상태·항목별 UI 조작이 연결되지 않음 | 항목별 상세 로그, 미억제 오류에만 반복 토스트, 요약 카드의 억제/재표시 버튼, `AppConfig` 저장·복원, 관련 GPUI 직접 상태 전환 테스트와 전체 140 passed·4 ignored·Clippy 기존 경고 7건, 51개 파일·19,707줄 기준 지도 갱신 | 격리 release 기본 캡처 `vde012-default-004932.png` 성공; 실제 VDI 오류 카드·버튼 click dispatch·복사 대상 E2E는 실제 이미지/하네스 제약으로 미확인하며 VDE-019에서 후속 |
 | 2026-07-29 | 편의 기능 스플리터 3곳 | 공용 레이아웃 승격 | 패널별 고정 초기 폭 | `window::balanced_split` | 설정 pane 과도 축소 방지, 양쪽 가용폭 사용 |
 | 2026-07-29 | `app.rs` | 책임 단위 분할 + 재배치 | 1,798 | `app/` 7파일 (최대 564) | 대시보드·로그 렌더는 소유가 잘못돼 있어 `window/`로 이동 |
 | 2026-07-29 | `platform/windows.rs` | 책임 단위 분할 + 승격 | 1,361 | `platform/windows/` 6파일 (최대 344) | `wide_null`을 `windows/mod.rs`로 **공용 승격** |
