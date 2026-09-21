@@ -28,7 +28,12 @@ $visualTests = @(
     "background_sync_event_wakes_render_without_additional_user_input",
     "file_sync_sections_share_one_width_at_every_window_width",
     "sidebar_switch_turns_automatic_sync_off_and_on",
-    "changing_the_folders_drops_the_resume_cursor"
+    "changing_the_folders_drops_the_resume_cursor",
+    "virtual_disk_panel_registers_navigation_and_renders_read_only_shell",
+    "virtual_disk_panel_explains_unsupported_partition_state",
+    "virtual_disk_panel_renders_loaded_hidden_entries_and_selects_all_with_ctrl_a",
+    "virtual_disk_panel_renders_copy_progress_and_issue_summary",
+    "virtual_disk_panel_dispatches_explorer_shortcuts_when_directory_is_focused"
 )
 
 function Invoke-CheckedCommand {
