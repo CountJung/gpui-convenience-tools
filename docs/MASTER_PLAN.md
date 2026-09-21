@@ -801,6 +801,18 @@ VDE-017의 미지원 파티션 경계도 같은 격리 릴리스 경로에서 �
 주입했을 때 NTFS 탐색으로 진입하지 않고, 미지원 파일시스템 오류와 파티션 경고를 표시했다.
 실행 중 VM 차단은 실제 VM 환경이 필요하므로 별도 후속으로 남긴다.
 
+### Phase O-20 — VDI 테스트 fixture 책임 분리 완료 ✅
+
+VDI 리더 본문이 커지는 것을 방지하기 위해 테스트 전용 합성 VDI·raw fixture 생성, export,
+임시 파일 정리 helper를 `app/src/virtual_disk/vdi/fixtures.rs`로 이동했다. 운영 리더와
+fixture 생성 책임을 분리했지만 테스트 경계와 환경변수 기반 export 계약은 유지한다.
+
+분리 후 `virtual_disk::vdi` 14개 테스트, 전체 157 passed·4 ignored, locked check,
+Clippy `-D warnings`, `Verify-Workspace.ps1`의 필수 GPUI 25개와 `DOCS_VERIFIED active=26
+matrix=26`을 통과했다. `vdi.rs`는 966줄에서 821줄로 줄었고, 프로젝트맵의 실제 측정값을
+54개 파일·20,894줄로 갱신했다. 전체 rustfmt check는 기존 baseline 포맷 불일치로 별도
+정리 범위에 남긴다.
+
 ### Phase T-1 — T-001·T-002 회귀 테스트 보강 완료 ✅
 
 동기화 엔진이 읽기 전용 대상 파일을 실제로 덮어쓸 수 있는지 확인하는 테스트와,

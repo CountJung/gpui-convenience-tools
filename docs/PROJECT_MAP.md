@@ -30,7 +30,7 @@
 안전 경계: 원본 VDI는 read-only로만 열고, 실행 중 VM의 VDI 직접 읽기는 구현하지 않는다.
 실행 중 VM 지원은 후속 `GuestFileSource` 구현으로만 추가한다(VDE-021).
 
-**최종 측정**: 2026-09-22 · `app/src` 총 53개 파일 · 20,883줄
+**최종 측정**: 2026-09-22 · `app/src` 총 54개 파일 · 20,894줄
 
 ## 크기 기준 — 줄 수는 증상이다
 
@@ -44,7 +44,7 @@
 | 800~1,000 | 🟡 경고 | 다음 작업 전에 구조 리팩터링 |
 | 1,000 초과 | 🔴 위반 | **즉시 리팩터링.** 다른 작업보다 우선 |
 
-현재 🔴 위반 **없음**, 🟡 경고 **3개**. 최대 파일은 966줄(`virtual_disk/vdi.rs`)이며, 다음 VirtualBox UI 작업 전에 책임 단위 분할을 검토한다.
+현재 🔴 위반 **없음**, 🟡 경고 **3개**. 최대 파일은 834줄(`virtual_disk/copy.rs`)이며, 다음 VirtualBox UI 작업 전에 책임 단위 분할을 검토한다.
 줄 수와 무관하게 처리하는 중복 헬퍼는 아래 「중복 헬퍼 추적」에서 관리한다.
 
 ### 줄 수 측정 명령
@@ -74,12 +74,13 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `sync_history.rs` | 223 | 동기화 완료 이력의 JSON 배열 저장·순서 보장·손상 파일 보존·개수/기간 보존·최신 목록 로드·소요 시간 계산 |
 | `util.rs` | 139 | 도메인 주인이 없는 순수 헬퍼 — `format_interval`·`interval_to_secs`·`TimeUnit` |
 
-### VirtualBox 도메인 (`app/src/virtual_disk/`) — 4,732줄 / 8파일
+### VirtualBox 도메인 (`app/src/virtual_disk/`) — 4,743줄 / 9파일
 
 | 파일 | 줄 | 책임 |
 | --- | ---: | --- |
 | `mod.rs` | 456 | VDI·파티션·게스트 파일 항목 모델, 정규화된 게스트 경로·시간 메타데이터, `GuestFileSource`, 플랫폼 비의존 오류 계약 |
-| `vdi.rs` | 966 | 표준 VDI 1.1 read-only 헤더·블록 맵·동적/고정 블록 읽기, 잠금·VM 사용·크기/mtime 안정성 가드, NTFS·미지원 파티션 VDI fixture export와 파서 경계 테스트 |
+| `vdi.rs` | 821 | 표준 VDI 1.1 read-only 헤더·블록 맵·동적/고정 블록 읽기, 잠금·VM 사용·크기/mtime 안정성 가드 |
+| `vdi/fixtures.rs` | 156 | 테스트 전용 합성 VDI·raw fixture 생성/export와 임시 파일 정리 — 운영 리더 본문과 분리 |
 | `partition.rs` | 791 | read-only `PartitionSource` 경계, MBR·EBR·protective MBR·GPT 검색, 양쪽 CRC·LBA 범위 검증, NTFS 3.1 부트 섹터 판정 |
 | `ntfs.rs` | 801 | 파티션 범위 `Read + Seek` 어댑터, NTFS 3.1 디렉터리·기본 데이터 스트림 읽기, 압축·암호화·범위·손상 오류와 속성·시간 보존, 고정/손상 픽스처 테스트 |
 | `path_policy.rs` | 335 | 절대 대상 루트 기준 게스트 경로 매핑, Windows 예약 이름·경로 길이 검증, 게스트·호스트 리파스 포인트/심볼릭 링크 추적 차단 |
@@ -348,6 +349,7 @@ G-001 판단: `muted`는 비활성 의미이므로 테두리와 hover를 추가�
 | 2026-09-22 | `docs/TODO.md`·`docs/VERIFICATION.md`·`docs/MASTER_PLAN.md` | VDE-013 완료 승격 | 실제 VDI 성공 경로 증거가 VDE-019에 추가되었지만 VDE-013 완료 기록과 활성 대기열이 남아 있었음 | VDI 경로·MBR/NTFS 파티션·게스트 루트 연결 캡처와 GPUI 새로고침 테스트를 근거로 VDE-013을 완료 이력으로 이동; 활성 ID·검증 매트릭스 `26/26`, 전체 테스트 기준 157 passed·4 ignored | 폴더 진입·범위 선택·외부 키보드 등은 VDE-014~016의 잔여 범위 |
 | 2026-09-22 | `scripts/Invoke-ClaudeVisualCheck.ps1`·`docs/TODO.md`·`docs/VERIFICATION.md` | VDE-014 실제 목록 재검증 | 기존 캡처 이후 최신 release에서 실제 표준 VDI 목록 상태를 다시 확인할 증거가 필요함 | 1200×1000 격리 release에서 `$Extend`·`many_subdirs` 폴더와 숨김/시스템 파일 행을 캡처; 폴더 진입 Click은 포그라운드 안전 차단으로 입력을 보내지 않았고 정리 후 process/session 0 | 실제 폴더 진입·범위 선택·외부 키보드는 미검증 |
 | 2026-09-22 | `scripts/Invoke-ClaudeVisualCheck.ps1`·`docs/TODO.md`·`docs/VERIFICATION.md` | VDE-015 표준 VDI 자동 복사 재검증 | 기존 복사 E2E 증거 이후 최신 release에서 숨김/시스템 포함 대상 파일과 실패 요약을 다시 대조할 필요가 있음 | 1200×1000 격리 release 자동 복사 캡처 `vde015-continuation-autocopy-1850-035033.png`; 대상 `-Force` 재검사에서 17개·937,234바이트와 손상 `many_subdirs` 실패 사유 일치; 세션·대상 정리 후 process/session 0 | 대용량 폴더 중지 세분화는 후속 |
+| 2026-09-22 | `app/src/virtual_disk/vdi.rs`·`app/src/virtual_disk/vdi/fixtures.rs` | VDI 테스트 fixture 책임 분리 | VDI 리더 본문에 합성 VDI·raw fixture 생성과 임시 파일 정리 코드가 함께 있어 966줄까지 증가함 | 테스트 전용 `vdi/fixtures.rs`로 fixture/export helper를 이동하고 `vdi.rs`를 821줄로 축소; `virtual_disk::vdi` 14개 테스트·전체 157 passed·4 ignored·locked check·Clippy `-D warnings`·`Verify-Workspace.ps1` 통과, 최대 파일 834줄·54개 파일·20,894줄로 지도 갱신 | 동작 변경 없는 구조 리팩터링; 전체 rustfmt check는 기존 baseline 포맷 불일치로 별도 정리 범위 |
 | 2026-09-22 | `app/src/virtual_disk/vdi.rs`·`scripts/Invoke-ClaudeVisualCheck.ps1`·`docs/TODO.md`·`docs/VERIFICATION.md` | VDE-017 실제 미지원 파티션 릴리스 E2E | GPUI 상태 렌더와 단위 fixture만 있어 실제 release 앱에서 미지원 파티션 메시지를 확인하지 못함 | `exports_unsupported_partition_vdi_fixture_when_requested`로 MBR 타입 `0x83`·NTFS 시그니처 없는 VDI를 격리 생성하고, `reads_unsupported_partition_fixture_without_claiming_ntfs`로 NTFS 오인 방지를 확인; release 캡처 `vde017-unsupported-partition-release-fixed-033450.png`에서 오류 카드·파티션 경고 확인, 전체 157 passed·4 ignored·Clippy exit 0, process/session 0 | 실제 실행 중 VM E2E와 독립 Visual Reviewer는 후속 |
 | 2026-09-22 | `app/src/sync_history.rs`·`app/src/app/background.rs`·`app/src/main.rs` | D-018 동기화 실행 이력 저장 | 실행 결과가 화면 로그와 설정 상태에만 남아 앱 재시작 후 이력을 조회할 파일이 없음 | `sync-history.json`에 실행 순서·작업 식별자·시각·결과 건수·중지·요약을 append하고 손상 JSON은 덮어쓰지 않음, 전용 2개 테스트와 전체 143 passed·4 ignored·Clippy 기존 경고 7건, 52개 파일·19,884줄 기준 지도 갱신 | 이력 보존 정책은 로그와 동일하게 D-019에서, UI 목록은 D-020에서 후속; commit `97009c3` push 완료 |
 | 2026-09-22 | `app/src/sync_history.rs` | D-019 동기화 이력 보존 정책 | JSON 이력은 추가만 되어 오래된 실행 결과가 무한히 남을 수 있음 | `LogConfig.max_age_days`·`max_files`로 기간·개수 초과분을 새 append 전에 제거하고 최소 한 건을 유지, 보존 경계 테스트·전체 144 passed·4 ignored·Clippy 기존 경고 7건, 52개 파일·19,946줄 기준 지도 갱신 | 파일 용량 롤링은 JSON 이력에 적용하지 않으며 최근 이력 화면은 D-020 후속; commit `ed71af4` push 완료 |
