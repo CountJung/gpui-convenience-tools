@@ -38,6 +38,14 @@ param(
     # 특정 상태(예: 동기화 작업이 등록된 화면)를 재현할 때 쓴다.
     [string]$SeedConfig,
 
+    # Start 전용. 격리된 데이터 루트에 미리 넣어 둘 `sync-history.json` 경로.
+    # 최근 동기화 이력이 표시되는 화면을 재현할 때 쓴다.
+    [string]$SeedHistory,
+
+    # Start 전용. 검증 전용 환경 변수로 패널 전환 입력 없이 특정 화면을 연다.
+    [ValidateSet("Dashboard", "FileSync")]
+    [string]$InitialPanel = "Dashboard",
+
     [string]$Name = "capture",
     [double]$X = 0.5,
     [double]$Y = 0.5,
@@ -271,14 +279,26 @@ switch ($Action) {
             Copy-Item -LiteralPath $seedPath -Destination (Join-Path $appData "config.json") -Force
         }
 
+        if (-not [string]::IsNullOrWhiteSpace($SeedHistory)) {
+            $historyPath = [System.IO.Path]::GetFullPath($SeedHistory)
+            if (-not (Test-Path -LiteralPath $historyPath -PathType Leaf)) {
+                throw "시드 동기화 이력을 찾을 수 없다: $historyPath"
+            }
+            Copy-Item -LiteralPath $historyPath -Destination (Join-Path $appData "sync-history.json") -Force
+        }
+
         # 앱은 `dirs::config_dir()`(= `SHGetKnownFolderPath`)로 데이터 루트를 찾으므로
         # `APPDATA`만 바꿔서는 격리되지 않는다. 전용 변수를 프로세스 범위로 지정해야
         # 사용자의 실제 config.json·로그를 건드리지 않는다.
         $previousAppData = $env:APPDATA
         $previousDataDir = $env:GPUI_CONVENIENCE_TOOLS_DATA_DIR
+        $previousInitialPanel = $env:GPUI_CONVENIENCE_TOOLS_INITIAL_PANEL
         try {
             $env:APPDATA = $appData
             $env:GPUI_CONVENIENCE_TOOLS_DATA_DIR = $appData
+            if ($InitialPanel -eq "FileSync") {
+                $env:GPUI_CONVENIENCE_TOOLS_INITIAL_PANEL = "file_sync"
+            }
             $process = Start-Process -FilePath $BinaryPath -PassThru
         }
         finally {
@@ -288,6 +308,10 @@ switch ($Action) {
                 Remove-Item Env:\GPUI_CONVENIENCE_TOOLS_DATA_DIR -ErrorAction SilentlyContinue
             }
             else { $env:GPUI_CONVENIENCE_TOOLS_DATA_DIR = $previousDataDir }
+            if ($null -eq $previousInitialPanel) {
+                Remove-Item Env:\GPUI_CONVENIENCE_TOOLS_INITIAL_PANEL -ErrorAction SilentlyContinue
+            }
+            else { $env:GPUI_CONVENIENCE_TOOLS_INITIAL_PANEL = $previousInitialPanel }
         }
 
         $hwnd = [IntPtr]::Zero

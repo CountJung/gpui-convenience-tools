@@ -105,6 +105,18 @@ pub struct AppRoot {
     content_scroll_handle: ScrollHandle,
 }
 
+/// 검증 하네스가 패널 전환 입력 없이 특정 화면을 열 수 있도록 하는 실행 전용 선택값이다.
+/// 일반 사용자 설정에는 저장하지 않으며, 값이 없거나 알 수 없으면 대시보드로 시작한다.
+fn initial_panel_from_validation_env() -> ActivePanel {
+    match std::env::var("GPUI_CONVENIENCE_TOOLS_INITIAL_PANEL")
+        .ok()
+        .as_deref()
+    {
+        Some("file_sync") => ActivePanel::FileSync,
+        _ => ActivePanel::Dashboard,
+    }
+}
+
 impl AppRoot {
     pub fn new(cx: &mut Context<Self>) -> Self {
         let platform: Arc<dyn Platform> = Arc::new(NativePlatform::new());
@@ -213,7 +225,7 @@ impl AppRoot {
         let selected_sync_job = (!sync_jobs.is_empty()).then_some(0);
 
         let root = Self {
-            active_panel: ActivePanel::Dashboard,
+            active_panel: initial_panel_from_validation_env(),
             app_state,
             theme_filter_query: String::new(),
             theme_filter_active_only: false,

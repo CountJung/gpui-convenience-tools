@@ -111,7 +111,7 @@ div().debug_selector(|| "sync-apply-paths".to_string())
 scripts\Invoke-ClaudeVisualCheck.ps1 -Action Stop
 cargo build -p gpui-convenience-tools --release
 
-scripts\Invoke-ClaudeVisualCheck.ps1 -Action Start -SeedConfig <config.json> -Width 994 -Height 702
+scripts\Invoke-ClaudeVisualCheck.ps1 -Action Start -SeedConfig <config.json> -SeedHistory <sync-history.json> -InitialPanel FileSync -Width 994 -Height 702
 scripts\Invoke-ClaudeVisualCheck.ps1 -Action Click -X 0.12 -Y 0.65
 scripts\Invoke-ClaudeVisualCheck.ps1 -Action Capture -Name after-click
 scripts\Invoke-ClaudeVisualCheck.ps1 -Action Stop
@@ -129,10 +129,18 @@ scripts\Invoke-ClaudeVisualCheck.ps1 -Action Stop
 - **눌렀다고 가정하지 말고 다시 캡처해 확인한다.** 특히 패널 전환처럼 무거운 동작
   (예: 서비스 목록 조회)은 기본 대기(700ms)보다 오래 걸릴 수 있어 재캡처가 필요하다.
 
-### 상태 재현 (`-SeedConfig`)
+### 상태 재현 (`-SeedConfig`·`-SeedHistory`·`-InitialPanel`)
 
 특정 화면(등록된 작업, 실패 목록, 특정 테마)을 재현하려면 `config.json`을 만들어 넘긴다.
 격리된 데이터 루트에 복사된 뒤 앱이 그것을 읽는다.
+
+최근 동기화 이력 카드처럼 설정 파일과 분리된 저장 상태는 `sync-history.json`을 만들어
+`-SeedHistory`로 넘긴다. 앱 시작 시 격리 데이터 루트에 복사되므로 실제 사용자 이력은
+변경하지 않는다.
+
+패널 전환 입력이 포그라운드 안전 차단으로 불가능한 경우에는 `-InitialPanel FileSync`를
+사용한다. 이 값은 검증 프로세스에만 전달되는 실행 전용 환경 변수이며 제품 설정에 저장되지
+않는다. 패널 전환 자체의 클릭 동작은 별도 GPUI 수용 테스트로 검증해야 한다.
 
 - JSON을 Bash 힙독으로 쓰지 말 것 — 백슬래시가 먹혀 `Bad JSON escape`가 난다.
   Write 도구로 쓰거나 경로에 `/`를 쓴다.
@@ -142,7 +150,7 @@ scripts\Invoke-ClaudeVisualCheck.ps1 -Action Stop
 
 | 함정 | 결과 | 대응 |
 | --- | --- | --- |
-| `-Action Stop`이 세션 루트(=격리 `appData`)를 통째로 지운다 | 같은 상태로 재시작 불가 | 재시작이 필요하면 **Stop 전에 `config.json`을 밖으로 복사**해 다음 `-SeedConfig`로 넘긴다 |
+| `-Action Stop`이 세션 루트(=격리 `appData`)를 통째로 지운다 | 같은 상태로 재시작 불가 | 재시작이 필요하면 **Stop 전에 `config.json`·`sync-history.json`을 밖으로 복사**해 다음 `-SeedConfig`·`-SeedHistory`로 넘긴다 |
 | 검증 앱이 `target\release\*.exe`를 잠근다 | `cargo build --release`가 `os error 5` | 코드를 고쳤으면 **Stop → build → Start** |
 | 키보드 입력·드래그가 없다 | 텍스트 입력·divider 드래그 검증 불가 | **한계로 분리해 적고 그 항목을 근거로 `PASS`를 내지 않는다.** GPUI 자체 테스트로 덮는다 |
 | `APPDATA`만 바꾸면 격리되지 않는다 | 사용자의 실제 config·로그를 건드린다 | 하네스가 쓰는 `GPUI_CONVENIENCE_TOOLS_DATA_DIR`를 그대로 쓴다 |

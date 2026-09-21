@@ -468,7 +468,7 @@ scripts\Invoke-ClaudeVisualCheck.ps1 -Action Capture -Name sidebar-after
 scripts\Invoke-ClaudeVisualCheck.ps1 -Action Stop
 ```
 
-**실행 절차와 함정**(좌표 지정, `-SeedConfig` 상태 재현, `Stop`이 격리 데이터까지 지우는 점,
+**실행 절차와 함정**(좌표 지정, `-SeedConfig`·`-SeedHistory`·`-InitialPanel` 상태 재현, `Stop`이 격리 데이터까지 지우는 점,
 release 빌드 파일 잠금, 정리 확인)은 `.github/skills/gpui-visual-check/SKILL.md`가 정본이다.
 이 절에는 절차를 복제하지 않는다.
 
