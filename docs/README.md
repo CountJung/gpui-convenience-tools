@@ -36,7 +36,7 @@
 
 > VirtualBox 디스크 탐색은 `MASTER_PLAN.md`의 Phase O-1 결정 완료 후
 > `TODO.md`의 `VDE-003`~`VDE-021` 단계로 구현 중이며, 현재 오프라인 VDI 1.1
-> read-only 블록 리더·VDE-005 안전 가드·VDE-006 MBR/GPT 파티션 검색·VDE-007~008 NTFS 읽기 전용 탐색·오류 경계·VDE-009 호스트 경로 안전 매핑까지 완료했다. `VBoxManage` 실행 중 VM 경로
+> read-only 블록 리더·VDE-005 안전 가드·VDE-006 MBR/GPT 파티션 검색·VDE-007~008 NTFS 읽기 전용 탐색·오류 경계·VDE-009 호스트 경로 안전 매핑·VDE-010 청크 복사까지 완료했다. `VBoxManage` 실행 중 VM 경로
 > 대조를 사용하려면 `GPUI_CONVENIENCE_TOOLS_VBOXMANAGE`에 실행 파일 경로를 지정한다.
 > 실행 중인 VM의 VDI를 직접 읽는 기능은 기본 경로로 제공하지 않으며, 오프라인 읽기 전용
 > 경로가 안정화된 뒤 Guest Additions 기반 `VBoxManage guestcontrol`을 별도 검토한다.

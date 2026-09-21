@@ -9,6 +9,7 @@
 pub mod copy;
 pub mod ntfs;
 pub mod partition;
+pub mod path_policy;
 pub mod vdi;
 
 use std::{fmt, io, path::PathBuf};
@@ -367,6 +368,8 @@ pub enum IoOperation {
     Read,
     Seek,
     ListDirectory,
+    CreateDirectory,
+    Write,
 }
 
 impl fmt::Display for IoOperation {
@@ -376,6 +379,8 @@ impl fmt::Display for IoOperation {
             Self::Read => "읽기",
             Self::Seek => "탐색",
             Self::ListDirectory => "디렉터리 열거",
+            Self::CreateDirectory => "디렉터리 생성",
+            Self::Write => "쓰기",
         };
         f.write_str(label)
     }
