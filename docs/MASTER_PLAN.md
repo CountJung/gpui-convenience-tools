@@ -916,6 +916,17 @@ flowchart TD
 `skips_symbolic_links_without_reporting_a_sync_failure`, `cargo check --locked`, 전체 141
 passed·4 ignored, Clippy exit 0, `git diff --check`를 통과했으며 구현 커밋은 `6cf305c`이다.
 
+#### D-018 — 동기화 실행 이력 저장 완료 ✅
+
+- 동기화 완료 시 작업 ID·라벨·시작/종료 유닉스 시각·복사/건너뜀/삭제/실패 건수·중지 여부와
+  요약을 데이터 루트의 `sync-history.json` 배열에 실행 순서대로 추가한다. 검증 하네스에서는
+  `GPUI_CONVENIENCE_TOOLS_DATA_DIR` 아래에 저장되어 사용자 데이터와 분리된다.
+- 기존 이력은 읽어 배열 뒤에 새 항목을 붙이며, JSON이 손상된 경우 기존 파일을 덮어쓰지 않고
+  저장 오류를 로그로 남긴다. 보존 개수·기간 제한과 화면 목록은 D-019~D-020에서 다룬다.
+
+`sync_history::tests` 2개, `cargo check --locked`, 전체 143 passed·4 ignored, Clippy exit 0,
+`git diff --check`를 통과했으며 구현 커밋은 `97009c3`이다.
+
 - 실시간 감시(`notify` 크레이트, 이미 의존성 트리에 존재)
 - 제외 패턴(glob) 지원
 - 진행률 표시 및 취소
