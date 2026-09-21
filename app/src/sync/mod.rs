@@ -9,7 +9,7 @@
 
 use std::{
     cmp::Ordering as CmpOrdering,
-    collections::BTreeSet,
+    collections::{BTreeSet, HashMap},
     ffi::OsString,
     fs,
     path::{Path, PathBuf},
@@ -150,6 +150,105 @@ fn split_relative(path: &str) -> Vec<OsString> {
         .filter(|part| !part.is_empty() && *part != ".")
         .map(OsString::from)
         .collect()
+}
+
+/// 상대 경로 하나가 제외 glob 패턴과 일치하는지 확인한다.
+///
+/// `*`는 한 경로 조각 안의 0개 이상의 문자, `?`는 한 문자와 일치한다.
+/// 경로 조각 하나를 넘어가야 할 때는 `**`를 독립 조각으로 사용한다.
+/// 따라서 `**/*.tmp`는 루트와 모든 하위 폴더의 `.tmp` 파일을 모두 가리킨다.
+/// 패턴과 경로의 `/`·`\\`는 같은 구분자로 취급하며, 비교는 대소문자를 구분한다.
+///
+/// D-003에서 순회 엔진이 이 함수를 호출할 때까지는 설정 스키마만 존재하므로,
+/// 그 단계 전까지의 일반 빌드에서 발생하는 미사용 경고를 억제한다.
+#[allow(dead_code)]
+pub(crate) fn matches_exclude_pattern(pattern: &str, relative_path: &str) -> bool {
+    let pattern = pattern.trim();
+    if pattern.is_empty() {
+        return false;
+    }
+
+    let pattern_segments: Vec<_> = pattern
+        .split(['/', '\\'])
+        .filter(|segment| !segment.is_empty() && *segment != ".")
+        .collect();
+    let path_segments: Vec<_> = relative_path
+        .split(['/', '\\'])
+        .filter(|segment| !segment.is_empty() && *segment != ".")
+        .collect();
+
+    let mut memo = HashMap::new();
+    match_glob_segments(&pattern_segments, &path_segments, 0, 0, &mut memo)
+}
+
+#[allow(dead_code)]
+fn match_glob_segments(
+    pattern: &[&str],
+    path: &[&str],
+    pattern_index: usize,
+    path_index: usize,
+    memo: &mut HashMap<(usize, usize), bool>,
+) -> bool {
+    if let Some(result) = memo.get(&(pattern_index, path_index)) {
+        return *result;
+    }
+
+    let result = if pattern_index == pattern.len() {
+        path_index == path.len()
+    } else if is_globstar(pattern[pattern_index]) {
+        // `**`는 현재 경로 조각을 소비하지 않는 경우와 하나 소비하는 경우를
+        // 모두 시도해 `foo/**/bar`의 0개 하위 폴더도 올바르게 처리한다.
+        match_glob_segments(pattern, path, pattern_index + 1, path_index, memo)
+            || (path_index < path.len()
+                && match_glob_segments(pattern, path, pattern_index, path_index + 1, memo))
+    } else {
+        path_index < path.len()
+            && match_glob_segment(pattern[pattern_index], path[path_index])
+            && match_glob_segments(pattern, path, pattern_index + 1, path_index + 1, memo)
+    };
+
+    memo.insert((pattern_index, path_index), result);
+    result
+}
+
+#[allow(dead_code)]
+fn is_globstar(segment: &str) -> bool {
+    segment.len() >= 2 && segment.chars().all(|character| character == '*')
+}
+
+/// 경로 구분자를 제외한 한 조각을 `*`·`?`로 비교한다.
+#[allow(dead_code)]
+fn match_glob_segment(pattern: &str, text: &str) -> bool {
+    let pattern: Vec<_> = pattern.chars().collect();
+    let text: Vec<_> = text.chars().collect();
+    let mut pattern_index = 0;
+    let mut text_index = 0;
+    let mut last_star = None;
+    let mut star_text_index = 0;
+
+    while text_index < text.len() {
+        if pattern_index < pattern.len()
+            && (pattern[pattern_index] == '?' || pattern[pattern_index] == text[text_index])
+        {
+            pattern_index += 1;
+            text_index += 1;
+        } else if pattern_index < pattern.len() && pattern[pattern_index] == '*' {
+            last_star = Some(pattern_index);
+            star_text_index = text_index;
+            pattern_index += 1;
+        } else if let Some(star_index) = last_star {
+            pattern_index = star_index + 1;
+            star_text_index += 1;
+            text_index = star_text_index;
+        } else {
+            return false;
+        }
+    }
+
+    while pattern_index < pattern.len() && pattern[pattern_index] == '*' {
+        pattern_index += 1;
+    }
+    pattern_index == pattern.len()
 }
 
 /// 한 파일에 대한 동기화 실패 기록.

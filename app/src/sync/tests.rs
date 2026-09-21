@@ -32,6 +32,42 @@ fn job(source: &Path, target: &Path) -> SyncJob {
 }
 
 #[test]
+fn exclude_glob_matches_single_path_segments() {
+    assert!(matches_exclude_pattern("*.tmp", "cache.tmp"));
+    assert!(matches_exclude_pattern("cache-??.bin", "cache-ab.bin"));
+    assert!(!matches_exclude_pattern("cache-??.bin", "cache-a.bin"));
+    assert!(!matches_exclude_pattern("*.tmp", "nested/cache.tmp"));
+}
+
+#[test]
+fn exclude_globstar_matches_zero_or_more_directories() {
+    assert!(matches_exclude_pattern("**/*.tmp", "cache.tmp"));
+    assert!(matches_exclude_pattern("**/*.tmp", "nested/cache.tmp"));
+    assert!(matches_exclude_pattern(
+        "cache/**/index.dat",
+        "cache/index.dat"
+    ));
+    assert!(matches_exclude_pattern(
+        "cache/**/index.dat",
+        "cache/one/two/index.dat"
+    ));
+    assert!(!matches_exclude_pattern("**/*.tmp", "cache.txt"));
+}
+
+#[test]
+fn exclude_glob_normalizes_path_separators_and_ignores_blank_patterns() {
+    assert!(matches_exclude_pattern(
+        r"logs\**\*.log",
+        "logs/archive/app.log"
+    ));
+    assert!(matches_exclude_pattern(
+        " ./cache/** ",
+        "cache/nested/file.bin"
+    ));
+    assert!(!matches_exclude_pattern("   ", "cache/file.bin"));
+}
+
+#[test]
 fn copies_nested_files_and_skips_unchanged_on_second_run() {
     let root = temp_dir("basic");
     let src = root.join("src");
