@@ -939,6 +939,18 @@ virtual-disk 관련 테스트 72개·무시 2개, release build, VM `poweroff`, 
 각 화면의 전·후 리사이즈 캡처와 세션 종료 후 process/session 0을 기록했다. 이번 단계는
 같은 에이전트의 2차 자체 확인이므로 독립 Visual Reviewer 검토 완료로 표시하지 않는다.
 
+### Phase O-31 — VDE-014 폴더 더블클릭 GPUI 이벤트 검증 ✅
+
+폴더 진입 상태 메서드만 직접 호출하던 테스트 공백을 줄이기 위해, 실제 렌더된 폴더 행의
+`on_click`에 `MouseDown/MouseUp click_count=2`를 전달하는
+`virtual_disk_directory_row_double_click_enters_directory_and_refreshes_entries` 테스트를
+추가했다. 테스트는 폴더 진입 후 새 경로를 읽고, 열거 오류가 발생하면 이전 목록을 비우는
+경계까지 확인한다. 필수 GPUI 테스트 26개와 전체 테스트 161 passed·4 ignored, check·Clippy,
+문서·구조 게이트가 통과했다.
+
+이는 GPUI 이벤트 경로의 자동 검증을 보강한 것이며 실제 데스크톱 포그라운드 Click·Shift
+입력과 독립 Visual Reviewer 검토를 완료한 것은 아니다.
+
 ### Phase T-1 — T-001·T-002 회귀 테스트 보강 완료 ✅
 
 동기화 엔진이 읽기 전용 대상 파일을 실제로 덮어쓸 수 있는지 확인하는 테스트와,

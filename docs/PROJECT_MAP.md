@@ -31,7 +31,7 @@
 안전 경계: 원본 VDI는 read-only로만 열고, 실행 중 VM의 VDI 직접 읽기는 구현하지 않는다.
 실행 중 VM 지원은 후속 `GuestFileSource` 구현으로만 추가한다(VDE-021).
 
-**최종 측정**: 2026-09-22 · `app/src` 총 56개 파일 · 21,313줄
+**최종 측정**: 2026-09-22 · `app/src` 총 56개 파일 · 21,371줄
 
 ## 크기 기준 — 줄 수는 증상이다
 
@@ -372,6 +372,7 @@ G-001 판단: `muted`는 비활성 의미이므로 테두리와 hover를 추가�
 | 2026-09-22 | `app/src/virtual_disk/partition.rs`·`scripts/Invoke-ClaudeVisualCheck.ps1`·`docs/TODO.md`·`docs/VERIFICATION.md`·`docs/MASTER_PLAN.md` | VDE-019 보호 MBR 및 대용량 외부 VDI 검증 보강 | 실제 VirtualBox GPT 보호 MBR이 `0xffff_ffff` 섹터 수를 사용해 일반 MBR 범위 검사에서 거부되었고, 80GB급 VDI를 검증 세션으로 복사할 수 없음 | 보호 MBR은 시작 LBA만 검증하고 회귀 fixture를 실제 값으로 보정; `-ExternalVdiPath`로 원본을 복사하지 않는 read-only 연결을 추가해 종료된 TACS VDI에서 GPT·NTFS 3.1·게스트 루트 시스템 폴더를 확인; partition 7개·VDI 14개 테스트, locked check·Clippy·release build 통과; 최신 측정값 56개 파일·21,295줄 | 실제 대용량 파일 중지·외부 키보드·실제 릴리스 오류 억제 버튼·독립 Visual Reviewer는 후속 |
 | 2026-09-22 | `app/src/app/validation.rs`·`app/src/app/virtual_disk_copy.rs`·`scripts/Invoke-ClaudeVisualCheck.ps1`·`docs/TODO.md`·`docs/VERIFICATION.md` | VDE-015 실제 VDI 중지 경계 보조 검증 | 실제 TACS VDI는 기본 루트 복사가 19개·4.1MB로 빨리 끝나 대용량 청크 중지를 재현하지 못했고 외부 키 입력은 포그라운드 안전 차단 상태임 | 검증 전용 `-CancelAfterMs`가 release 복사 시작 후 앱 중지 메서드를 호출하도록 추가; 실제 종료 TACS VDI 200ms 실행에서 `중지됨 · 파일 0개`와 캡처 `vde015-external-tacs-cancel-1200x1000-054536.png`를 확인; virtual-disk 72 passed·2 ignored, release build·원본 불변·VM poweroff·process/session 0 확인 | 실제 대용량 파일 청크 중지·외부 키보드·독립 Visual Reviewer는 완료로 승격하지 않음 |
 | 2026-09-22 | `scripts/Invoke-ClaudeVisualCheck.ps1`·`docs/TODO.md`·`docs/VERIFICATION.md` | D-020·G-001 2차 자체 시각 교차 확인 | 구현 세션의 기존 캡처만으로는 최신 release의 리사이즈 후 카드 경계를 다시 확인할 수 없음 | 별도 격리 세션에서 D-020을 994×702·1280×900으로, G-001을 994×702·1280×900으로 재캡처; 이력 3행·자동 시작 카드·안내 문장 폭을 확인하고 세션 종료 후 process/session 0 기록 | 같은 에이전트의 자체 교차 확인이며 독립 Visual Reviewer 검토는 여전히 후속 |
+| 2026-09-22 | `app/src/app/tests/virtual_disk.rs`·`scripts/Verify-Workspace.ps1`·`docs/TODO.md`·`docs/VERIFICATION.md` | VDE-014 폴더 더블클릭 GPUI 이벤트 검증 | 기존 폴더 진입 테스트가 상태 메서드 직접 호출에 머물러 실제 행 `on_click`의 더블클릭 분기를 고정하지 못함 | `virtual_disk_directory_row_double_click_enters_directory_and_refreshes_entries`가 렌더된 폴더 행에 `MouseDown/MouseUp click_count=2`를 전달해 경로 이동·새로고침·오류 시 목록 제거를 확인; 필수 GPUI 테스트 26개·전체 161 passed·4 ignored·check·Clippy·구조/문서 게이트 통과; 최신 구조 56개 파일·21,371줄·최대 821줄 | 실제 데스크톱 Click·Shift 입력과 독립 Visual Reviewer는 포그라운드 안전 경계로 미검증 |
 | 2026-07-29 | 편의 기능 스플리터 3곳 | 공용 레이아웃 승격 | 패널별 고정 초기 폭 | `window::balanced_split` | 설정 pane 과도 축소 방지, 양쪽 가용폭 사용 |
 | 2026-07-29 | `app.rs` | 책임 단위 분할 + 재배치 | 1,798 | `app/` 7파일 (최대 564) | 대시보드·로그 렌더는 소유가 잘못돼 있어 `window/`로 이동 |
 | 2026-07-29 | `platform/windows.rs` | 책임 단위 분할 + 승격 | 1,361 | `platform/windows/` 6파일 (최대 344) | `wide_null`을 `windows/mod.rs`로 **공용 승격** |

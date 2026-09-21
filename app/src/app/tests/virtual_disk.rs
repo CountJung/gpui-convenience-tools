@@ -227,6 +227,64 @@ fn virtual_disk_panel_renders_loaded_hidden_entries_and_selects_all_with_ctrl_a(
 }
 
 #[gpui::test]
+fn virtual_disk_directory_row_double_click_enters_directory_and_refreshes_entries(
+    cx: &mut TestAppContext,
+) {
+    initialize_components(cx);
+    let (view, cx) = cx.add_window_view(|_, _| {
+        let mut root = test_app_root(ActivePanel::VirtualDisk);
+        root.virtual_disk.entries = vec![GuestFileEntry {
+            path: crate::virtual_disk::GuestPath::new("broken").unwrap(),
+            kind: GuestFileKind::Directory,
+            size_bytes: 0,
+            attributes: Default::default(),
+            times: Default::default(),
+        }];
+        root.virtual_disk.source = Some(Box::new(ErrorOnNestedDirectorySource));
+        root
+    });
+
+    cx.simulate_resize(size(px(1200.0), px(1000.0)));
+    refresh(cx);
+    let bounds = cx
+        .debug_bounds("virtual-disk-entry-0")
+        .expect("directory row should be rendered");
+    let position = point(
+        bounds.origin.x + bounds.size.width / 2.0,
+        bounds.origin.y + bounds.size.height / 2.0,
+    );
+
+    cx.simulate_event(gpui::MouseDownEvent {
+        position,
+        button: gpui::MouseButton::Left,
+        modifiers: gpui::Modifiers::none(),
+        click_count: 2,
+        first_mouse: false,
+    });
+    cx.simulate_event(gpui::MouseUpEvent {
+        position,
+        button: gpui::MouseButton::Left,
+        modifiers: gpui::Modifiers::none(),
+        click_count: 2,
+    });
+    refresh(cx);
+
+    let (entry_count, error, current_path) = cx.update(|_, app| {
+        let root = view.read(app);
+        (
+            root.virtual_disk.entries.len(),
+            root.virtual_disk.error.clone(),
+            root.virtual_disk.current_path.to_string(),
+        )
+    });
+    assert_eq!(current_path, "broken");
+    assert_eq!(entry_count, 0, "double-click entry should refresh the folder");
+    assert!(error
+        .as_deref()
+        .is_some_and(|message| message.contains("손상")));
+}
+
+#[gpui::test]
 fn virtual_disk_clears_stale_entries_when_directory_refresh_fails(cx: &mut TestAppContext) {
     initialize_components(cx);
     let (view, cx) = cx.add_window_view(|_, _| {
