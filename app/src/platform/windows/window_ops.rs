@@ -8,16 +8,21 @@
 use std::collections::BTreeSet;
 use std::path::Path;
 
+use anyhow::{anyhow, Result};
 use windows_sys::Win32::{
-    Foundation::{CloseHandle, BOOL, HANDLE, HWND, LPARAM},
+    Foundation::{CloseHandle, BOOL, HANDLE, HWND, LPARAM, RECT},
     System::Threading::{
         OpenProcess, QueryFullProcessImageNameW, PROCESS_QUERY_LIMITED_INFORMATION,
     },
     UI::WindowsAndMessaging::{
-        EnumWindows, GetClassNameW, GetWindow, GetWindowLongPtrW, GetWindowThreadProcessId,
-        IsWindowVisible, GWL_EXSTYLE, GW_OWNER, WS_EX_TOOLWINDOW,
+        EnumWindows, GetClassNameW, GetWindow, GetWindowLongPtrW, GetWindowRect,
+        GetWindowThreadProcessId, IsIconic, IsWindow, IsWindowVisible, IsZoomed, SetWindowPos,
+        ShowWindow, GWL_EXSTYLE, GW_OWNER, SW_HIDE, SW_SHOWMAXIMIZED, SW_SHOWMINNOACTIVE,
+        SW_SHOWNOACTIVATE, SWP_NOACTIVATE, SWP_NOZORDER, WS_EX_TOOLWINDOW,
     },
 };
+
+use crate::platform::{AdWindowShowState, AdWindowSnapshot};
 
 pub(super) struct TopLevelSearchContext {
     pub(super) process_name_lower: String,
@@ -67,6 +72,107 @@ pub(super) fn find_ad_window(process_name: &str, class_filter: &str) -> Option<H
     }
 
     context.found_window
+}
+
+/// 창을 숨기기 전 위치·크기·표시 상태를 읽기 전용으로 캡처한다.
+pub(super) fn capture_ad_window_state(hwnd: HWND) -> Result<AdWindowSnapshot> {
+    if unsafe { IsWindow(hwnd) } == 0 {
+        return Err(anyhow!("invalid HWND for capture_ad_window_state"));
+    }
+
+    let mut process_id = 0u32;
+    let mut rect = RECT {
+        left: 0,
+        top: 0,
+        right: 0,
+        bottom: 0,
+    };
+
+    // SAFETY: hwnd is validated above and the output pointers refer to local values.
+    unsafe {
+        GetWindowThreadProcessId(hwnd, &mut process_id as *mut u32);
+        if process_id == 0 || GetWindowRect(hwnd, &mut rect as *mut RECT) == 0 {
+            return Err(anyhow!("failed to read the target window state"));
+        }
+    }
+
+    let width = rect.right - rect.left;
+    let height = rect.bottom - rect.top;
+    if width <= 0 || height <= 0 {
+        return Err(anyhow!("target window has an invalid size: {width}x{height}"));
+    }
+
+    let show_state = if unsafe { IsWindowVisible(hwnd) } == 0 {
+        AdWindowShowState::Hidden
+    } else if unsafe { IsIconic(hwnd) } != 0 {
+        AdWindowShowState::Minimized
+    } else if unsafe { IsZoomed(hwnd) } != 0 {
+        AdWindowShowState::Maximized
+    } else {
+        AdWindowShowState::Normal
+    };
+
+    Ok(AdWindowSnapshot {
+        handle: hwnd,
+        process_id,
+        x: rect.left,
+        y: rect.top,
+        width,
+        height,
+        show_state,
+    })
+}
+
+/// 캡처한 창 상태를 같은 프로세스에 속한 동일 HWND에만 복원한다.
+pub(super) fn restore_ad_window_state(snapshot: &AdWindowSnapshot) -> Result<()> {
+    let hwnd = snapshot.handle;
+    if unsafe { IsWindow(hwnd) } == 0 {
+        return Err(anyhow!("saved HWND is no longer valid"));
+    }
+
+    let mut process_id = 0u32;
+    // SAFETY: hwnd was validated and process_id points to writable local storage.
+    unsafe {
+        GetWindowThreadProcessId(hwnd, &mut process_id as *mut u32);
+    }
+    if process_id != snapshot.process_id {
+        return Err(anyhow!(
+            "saved HWND belongs to a different process: expected {}, got {}",
+            snapshot.process_id,
+            process_id
+        ));
+    }
+
+    // SAFETY: HWND and dimensions were captured from Win32, and flags prevent focus/z-order
+    // changes while restoring the user's original geometry.
+    if unsafe {
+        SetWindowPos(
+            hwnd,
+            0,
+            snapshot.x,
+            snapshot.y,
+            snapshot.width,
+            snapshot.height,
+            SWP_NOACTIVATE | SWP_NOZORDER,
+        )
+    } == 0
+    {
+        return Err(anyhow!("SetWindowPos failed while restoring the saved window state"));
+    }
+
+    let show_command = match snapshot.show_state {
+        AdWindowShowState::Hidden => SW_HIDE,
+        AdWindowShowState::Normal => SW_SHOWNOACTIVATE,
+        AdWindowShowState::Minimized => SW_SHOWMINNOACTIVE,
+        AdWindowShowState::Maximized => SW_SHOWMAXIMIZED,
+    };
+
+    // SAFETY: HWND and command are validated Win32 values.
+    unsafe {
+        ShowWindow(hwnd, show_command);
+    }
+
+    Ok(())
 }
 
 fn is_ad_window_candidate(hwnd: HWND, class_filter: &str) -> bool {
@@ -170,6 +276,20 @@ pub(super) fn process_name_from_pid(process_id: u32) -> Option<String> {
     process_name
 }
 
+pub(super) fn is_process_id_running(process_id: u32) -> bool {
+    // SAFETY: OpenProcess is called with query-only rights and returns null on failure.
+    let process_handle = unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, process_id) };
+    if process_handle == 0 {
+        return false;
+    }
+
+    // SAFETY: handle was obtained from OpenProcess.
+    unsafe {
+        CloseHandle(process_handle);
+    }
+    true
+}
+
 fn query_process_image_name(process_handle: HANDLE) -> Option<String> {
     let mut buffer = vec![0u16; 512];
     let mut size = buffer.len() as u32;
@@ -199,7 +319,8 @@ fn query_process_image_name(process_handle: HANDLE) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::class_filter_matches;
+    use super::{capture_ad_window_state, class_filter_matches, restore_ad_window_state};
+    use crate::platform::{AdWindowShowState, AdWindowSnapshot};
 
     #[test]
     fn explicit_class_filter_is_case_insensitive() {
@@ -220,5 +341,25 @@ mod tests {
     #[test]
     fn empty_class_filter_does_not_match_every_window() {
         assert!(!class_filter_matches("Chrome_WidgetWin_1", ""));
+    }
+
+    #[test]
+    fn invalid_window_state_cannot_be_captured() {
+        assert!(capture_ad_window_state(0).is_err());
+    }
+
+    #[test]
+    fn invalid_window_state_cannot_be_restored() {
+        let snapshot = AdWindowSnapshot {
+            handle: 0,
+            process_id: 26440,
+            x: 10,
+            y: 20,
+            width: 300,
+            height: 200,
+            show_state: AdWindowShowState::Normal,
+        };
+
+        assert!(restore_ad_window_state(&snapshot).is_err());
     }
 }

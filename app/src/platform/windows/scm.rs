@@ -10,7 +10,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use super::WindowsPlatform;
-use crate::platform::NativeWindowHandle;
+use crate::platform::{AdWindowSnapshot, NativeWindowHandle, Platform};
 
 use windows_service::{
     define_windows_service,
@@ -24,6 +24,23 @@ use windows_service::{
 };
 
 pub const WIN_SERVICE_NAME: &str = "gpui-convenience-tools";
+
+fn restore_hidden_ad_window(
+    platform: &dyn Platform,
+    last_hidden: &mut Option<AdWindowSnapshot>,
+) -> bool {
+    let Some(snapshot) = last_hidden.take() else {
+        return true;
+    };
+
+    match platform.restore_ad_window_state(&snapshot) {
+        Ok(()) => true,
+        Err(err) => {
+            log::warn!("서비스 모드에서 광고 창 원래 상태 복원 실패: {err}");
+            false
+        }
+    }
+}
 
 /// SCM에서 조회한 서비스 상태
 #[allow(dead_code)]
@@ -271,7 +288,7 @@ fn run_service_loop(_arguments: Vec<OsString>) -> Result<()> {
         };
 
         rt.block_on(async move {
-            let mut last_hidden: Option<NativeWindowHandle> = None;
+            let mut last_hidden: Option<AdWindowSnapshot> = None;
 
             loop {
                 let snapshot = scanner_state_bg
@@ -285,16 +302,19 @@ fn run_service_loop(_arguments: Vec<OsString>) -> Result<()> {
                 };
 
                 if !service_enabled {
+                    restore_hidden_ad_window(platform_bg.as_ref(), &mut last_hidden);
                     tokio::time::sleep(Duration::from_secs(1)).await;
                     continue;
                 }
 
+                let mut any_running = false;
                 let mut detected_handle: Option<NativeWindowHandle> = None;
 
                 for target in targets.iter().filter(|t| t.enabled) {
                     if !platform_bg.is_target_running(&target.process_name) {
                         continue;
                     }
+                    any_running = true;
                     if let Ok(Some(hwnd)) = platform_bg
                         .find_ad_window(&target.process_name, &target.ad_window_class)
                     {
@@ -304,15 +324,38 @@ fn run_service_loop(_arguments: Vec<OsString>) -> Result<()> {
                 }
 
                 if let Some(hwnd) = detected_handle {
-                    if let Err(e) = platform_bg.hide_ad(hwnd) {
-                        log::warn!("hide_ad failed: {e}");
-                    } else if last_hidden != Some(hwnd) {
-                        log::info!("Ad window hidden (service mode)");
+                    let is_new_window = last_hidden
+                        .as_ref()
+                        .is_none_or(|snapshot| snapshot.handle != hwnd);
+
+                    if is_new_window
+                        && restore_hidden_ad_window(platform_bg.as_ref(), &mut last_hidden)
+                    {
+                        match platform_bg.capture_ad_window_state(hwnd) {
+                            Ok(snapshot) => match platform_bg.hide_ad(hwnd) {
+                                Ok(()) => {
+                                    log::info!("Ad window hidden (service mode)");
+                                    last_hidden = Some(snapshot);
+                                }
+                                Err(e) => {
+                                    log::warn!("hide_ad failed: {e}");
+                                }
+                            },
+                            Err(e) => {
+                                log::warn!("capture_ad_window_state failed: {e}");
+                            }
+                        }
+                    } else if !is_new_window {
+                        if let Err(e) = platform_bg.hide_ad(hwnd) {
+                            log::warn!("hide_ad retry failed: {e}");
+                        }
                     }
-                    last_hidden = Some(hwnd);
-                } else if let Some(hwnd) = last_hidden {
-                    let _ = platform_bg.show_ad(hwnd);
-                    last_hidden = None;
+                } else if !any_running
+                    || last_hidden.as_ref().is_some_and(|snapshot| {
+                        !platform_bg.is_process_id_running(snapshot.process_id)
+                    })
+                {
+                    restore_hidden_ad_window(platform_bg.as_ref(), &mut last_hidden);
                 }
 
                 tokio::time::sleep(Duration::from_secs(1)).await;

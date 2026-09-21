@@ -35,7 +35,7 @@ gpui-convenience-tools/          ← 저장소 루트
 │       ├── app/                 # AppRoot(Render) · 상태 · 이벤트 루프 · 사이드바
 │       │   ├── mod.rs           #   구조체 · 생성자 · 최상위 레이아웃 · 전역 스위치
 │       │   ├── state.rs         #   순수 데이터 타입
-│       │   ├── background.rs    #   스캔 · 동기화 백그라운드 스레드 (실행 위치 영속화)
+│       │   ├── background.rs    #   스캔 · 동기화 백그라운드 스레드 (광고 창 복원·실행 위치 영속화)
 │       │   ├── ops.rs           #   광고 차단 · 서비스 · 로그 설정 조작
 │       │   ├── sync_ops.rs      #   파일 동기화 작업 조작
 │       │   ├── interval.rs      #   주기 선택 상태 · 프리셋 조작
@@ -47,7 +47,7 @@ gpui-convenience-tools/          ← 저장소 루트
 │       │   ├── fallback.rs      # 비Windows 구현
 │       │   └── windows/         # Win32 구현
 │       │       ├── mod.rs       #   WindowsPlatform + Platform impl
-│       │       ├── window_ops.rs#   창 · 프로세스 열거
+│       │       ├── window_ops.rs#   창·프로세스 열거와 광고 창 상태 캡처·복원
 │       │       ├── tray.rs      #   시스템 트레이
 │       │       ├── scm.rs       #   Windows 서비스 등록 · 서비스 모드
 │       │       ├── services.rs  #   설치된 서비스 조회 · 제어
@@ -501,7 +501,22 @@ VDE-003은 플랫폼 비의존 공통 타입과 `UnsupportedFormatKind`·`IoOper
 
 이번 단계는 안전한 후보 선별만 구현한다. 자식 WebView 내부의 광고 영역은 일반적인 창
 클래스만으로 메인 콘텐츠와 구분할 수 없으므로 후속 타겟별 선택자 없이는 축소하지 않는다.
-원래 창 상태 저장·복원은 AD-002, 실제 0×0 축소는 AD-003에서 구현한다.
+
+### Phase A-2 — 광고 창 상태 저장·복원 완료 ✅
+
+AD-001에서 선별한 팝업을 숨기기 전에 다음 상태를 `AdWindowSnapshot`으로 저장한다.
+
+- HWND, 소유 프로세스 ID, 가상 화면 기준 좌표, 너비·높이, 숨김/일반/최소화/최대화 상태를 저장
+- 후보 창이 다음 스캔에서 보이지 않아도 대상 프로세스가 실행 중이면 스냅샷을 유지해 표시·숨김
+  깜빡임을 방지한다
+- 기능을 끄거나 대상 프로세스가 종료되면 HWND가 같은 프로세스 소유인지 확인한 뒤 원래 상태를
+  복원하고, 복원 실패 시 로그만 남기며 오래된 핸들을 반복 조작하지 않는다
+- Windows 서비스 모드에도 동일한 캡처·복원 경계를 적용한다
+- `scripts/Verify-AdWindowState.ps1`는 지정 PID와 앱 조상·자손의 프로세스·최상위 창 상태를
+  읽기 전용으로 확인한다. 26440 검증에서는 KakaoTalk(20292) → WebView2(9468) →
+  WebView2 renderer(26440) 관계를 확인했고, 사용자 창 조작은 수행하지 않았다
+
+실제 광고 창을 0×0으로 축소하는 동작은 AD-003에서 `SetWindowPos`와 함께 구현한다.
 
 ### Phase O — VirtualBox 오프라인 디스크 탐색·복사 🗓
 

@@ -16,7 +16,7 @@ use tokio::sync::mpsc::UnboundedSender;
 
 use super::state::{PlatformEvent, ScannerState, SyncSharedState};
 use super::AppRoot;
-use crate::platform::{NativeWindowHandle, Platform};
+use crate::platform::{AdWindowSnapshot, NativeWindowHandle, Platform};
 use crate::sync::{run_sync_job_with_control, SyncControl, SyncProgress};
 
 /// 진행 상황 이벤트 최소 간격.
@@ -67,6 +67,26 @@ fn instant_from_unix(unix_secs: u64) -> Option<Instant> {
     Instant::now().checked_sub(Duration::from_secs(elapsed))
 }
 
+/// 저장된 창 상태를 한 번만 복원하고 추적을 끝낸다.
+///
+/// 복원이 실패해도 같은 잘못된 HWND를 반복 조작하지 않도록 스냅샷을 먼저 제거한다.
+fn restore_hidden_ad_window(
+    platform: &dyn Platform,
+    last_hidden: &mut Option<AdWindowSnapshot>,
+) -> bool {
+    let Some(snapshot) = last_hidden.take() else {
+        return true;
+    };
+
+    match platform.restore_ad_window_state(&snapshot) {
+        Ok(()) => true,
+        Err(err) => {
+            log::warn!("광고 창 원래 상태 복원 실패: {err}");
+            false
+        }
+    }
+}
+
 impl AppRoot {
     // ─────────────────────────────────────────────
     // 백그라운드 루프
@@ -89,7 +109,7 @@ impl AppRoot {
             runtime.block_on(async move {
                 tokio::spawn(async move {
                     let mut last_running: Option<bool> = None;
-                    let mut last_hidden: Option<NativeWindowHandle> = None;
+                    let mut last_hidden: Option<AdWindowSnapshot> = None;
 
                     loop {
                         let snapshot = scanner_state
@@ -105,6 +125,7 @@ impl AppRoot {
                         let sleep_duration = Duration::from_secs(interval_secs.max(1) as u64);
 
                         if !service_enabled {
+                            restore_hidden_ad_window(platform.as_ref(), &mut last_hidden);
                             if last_running != Some(false) {
                                 let _ = event_tx.send(PlatformEvent::TargetStatusChanged(false));
                                 last_running = Some(false);
@@ -132,14 +153,40 @@ impl AppRoot {
                         }
 
                         if let Some(hwnd) = detected_handle {
-                            let _ = platform.hide_ad(hwnd);
-                            if last_hidden != Some(hwnd) {
-                                let _ = event_tx.send(PlatformEvent::AdBlocked);
+                            let is_new_window = last_hidden
+                                .as_ref()
+                                .is_none_or(|snapshot| snapshot.handle != hwnd);
+
+                            if is_new_window
+                                && restore_hidden_ad_window(platform.as_ref(), &mut last_hidden)
+                            {
+                                match platform.capture_ad_window_state(hwnd) {
+                                    Ok(snapshot) => match platform.hide_ad(hwnd) {
+                                        Ok(()) => {
+                                            last_hidden = Some(snapshot);
+                                            let _ = event_tx.send(PlatformEvent::AdBlocked);
+                                        }
+                                        Err(err) => {
+                                            log::warn!("광고 창 숨김 실패: {err}");
+                                        }
+                                    },
+                                    Err(err) => {
+                                        log::warn!("광고 창 원래 상태 캡처 실패: {err}");
+                                    }
+                                }
+                            } else if !is_new_window {
+                                // 사용자가 숨겨진 창을 다시 표시했을 수 있으므로 같은 HWND도
+                                // 다시 숨긴다. 원래 상태 스냅샷은 덮어쓰지 않는다.
+                                if let Err(err) = platform.hide_ad(hwnd) {
+                                    log::warn!("광고 창 재숨김 실패: {err}");
+                                }
                             }
-                            last_hidden = Some(hwnd);
-                        } else if let Some(hwnd) = last_hidden {
-                            let _ = platform.show_ad(hwnd);
-                            last_hidden = None;
+                        } else if !any_running
+                            || last_hidden.as_ref().is_some_and(|snapshot| {
+                                !platform.is_process_id_running(snapshot.process_id)
+                            })
+                        {
+                            restore_hidden_ad_window(platform.as_ref(), &mut last_hidden);
                         }
 
                         if last_running != Some(any_running) {
@@ -239,8 +286,8 @@ impl AppRoot {
                         let mut reporter = |progress: SyncProgress<'_>| {
                             *cursor.borrow_mut() = progress.current_path.to_string();
 
-                            if !last_persisted
-                                .is_some_and(|at| at.elapsed() < CURSOR_PERSIST_INTERVAL)
+                            if last_persisted
+                                .is_none_or(|at| at.elapsed() >= CURSOR_PERSIST_INTERVAL)
                             {
                                 last_persisted = Some(Instant::now());
                                 persist_job_progress(

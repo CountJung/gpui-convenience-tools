@@ -111,7 +111,6 @@ SHA-256을 기록한다. 다른 검증자의 독립 검토가 요구되는 UI �
 
 | ID | 프로필 | B | T | E | V | R | C | 증거 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| AD-002 | RUST | [ ] | [ ] | — | — | [ ] | [ ] | — |
 | AD-003 | RUST | [ ] | [ ] | — | — | [ ] | [ ] | — |
 | AD-004 | RUST | [ ] | [ ] | — | — | [ ] | [ ] | — |
 | VDE-004 | RUST | [ ] | [ ] | — | — | [ ] | [ ] | — |
@@ -173,6 +172,7 @@ SHA-256을 기록한다. 다른 검증자의 독립 검토가 요구되는 UI �
 | ID | 프로필 | B | T | E | V | R | C | 증거 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | AD-001 | RUST | [x] | [x] | — | — | [x] | [x] | `platform::windows::window_ops::tests` 3개 통과; `cargo check --locked` 통과; 최상위 소유/도구 팝업만 후보화, 0×0 동작은 후속 AD-003 |
+| AD-002 | RUST | [x] | [x] | — | — | [x] | [x] | `window_ops::tests` 5개 통과; `cargo check --locked`; `Verify-AdWindowState.ps1 -ProcessId 26440`로 KakaoTalk/WebView2 관련 PID·창 상태를 읽기 전용 확인; 실제 사용자 창 조작은 수행하지 않음 |
 | VDE-003 | RUST | [x] | [x] | — | — | [x] | [x] | `virtual_disk` 5개 테스트, 전체 대상 59개 통과; `cargo check --locked` 통과; VDI 파서·UI는 후속 ID 범위 |
 
 ### 증거 기록 형식

@@ -6,6 +6,29 @@ pub type NativeWindowHandle = windows_sys::Win32::Foundation::HWND;
 #[cfg(not(target_os = "windows"))]
 pub type NativeWindowHandle = isize;
 
+/// 광고 후보 창을 조작하기 전 저장하는 원래 표시 상태.
+///
+/// 핸들은 프로세스가 종료된 뒤 재사용될 수 있으므로 복원 시 `process_id`도 함께
+/// 확인한다. 위치와 크기는 가상 화면 기준 좌표로 저장한다.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct AdWindowSnapshot {
+    pub(crate) handle: NativeWindowHandle,
+    pub(crate) process_id: u32,
+    pub(crate) x: i32,
+    pub(crate) y: i32,
+    pub(crate) width: i32,
+    pub(crate) height: i32,
+    pub(crate) show_state: AdWindowShowState,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum AdWindowShowState {
+    Hidden,
+    Normal,
+    Minimized,
+    Maximized,
+}
+
 // ─────────────────────────────────────────────
 // B-1: 시스템 서비스 정보 구조체
 // ─────────────────────────────────────────────
@@ -77,6 +100,21 @@ pub trait Platform: Send + Sync {
     ) -> Result<Option<NativeWindowHandle>>;
     fn hide_ad(&self, handle: NativeWindowHandle) -> Result<()>;
     fn show_ad(&self, handle: NativeWindowHandle) -> Result<()>;
+
+    /// 저장된 창이 속한 프로세스가 아직 실행 중인지 확인한다.
+    fn is_process_id_running(&self, _process_id: u32) -> bool {
+        false
+    }
+
+    /// 광고 창을 숨기기 전 원래 상태를 캡처한다.
+    fn capture_ad_window_state(&self, _handle: NativeWindowHandle) -> Result<AdWindowSnapshot> {
+        Err(anyhow::anyhow!("광고 창 상태 캡처는 지원되지 않습니다."))
+    }
+
+    /// 이전에 캡처한 광고 창 상태를 복원한다.
+    fn restore_ad_window_state(&self, _snapshot: &AdWindowSnapshot) -> Result<()> {
+        Err(anyhow::anyhow!("광고 창 상태 복원은 지원되지 않습니다."))
+    }
 
     // ─── B-1: 시스템 서비스 관리 ───
 

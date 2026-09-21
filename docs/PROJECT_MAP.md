@@ -25,7 +25,7 @@
 안전 경계: 원본 VDI는 read-only로만 열고, 실행 중 VM의 VDI 직접 읽기는 구현하지 않는다.
 실행 중 VM 지원은 후속 `GuestFileSource` 구현으로만 추가한다(VDE-021).
 
-**최종 측정**: 2026-09-21 · `app/src` 총 39개 파일 · 11,989줄
+**최종 측정**: 2026-09-21 · `app/src` 총 39개 파일 · 12,270줄
 
 ## 크기 기준 — 줄 수는 증상이다
 
@@ -83,7 +83,7 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `mod.rs` | 545 | 폴더 동기화 엔진 (UI 비의존 순수 로직) — 진행 보고·중지·이어서 시작 제어 포함 |
 | `tests.rs` | 514 | 복사·건너뜀·미러 삭제·실패 사유·진행 보고·중지·이어서 시작 단위 테스트 |
 
-### 앱 루트 (`app/src/app/`) — 2,617줄 / 8파일
+### 앱 루트 (`app/src/app/`) — 2,666줄 / 8파일
 
 `app.rs`(1,798줄)를 책임별로 분할한 결과다.
 
@@ -93,7 +93,7 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `sync_ops.rs` | 436 | 파일 동기화 작업 조작 (추가·삭제·선택·입력 저장·수동 실행 큐·중지·전역 스위치·커서 무효화) |
 | `interval.rs` | 313 | 주기 선택 상태(`IntervalPicker`)와 조작 — 프리셋 추가·삭제·드롭다운 동기화 |
 | `events.rs` | 271 | `PlatformEvent` 채널 소비, 진행 상태 반영, 로그·토스트 유틸 |
-| `background.rs` | 320 | 스캔 스레드와 동기화 스레드 (진행 이벤트 빈도 제한·중지·실행 위치 영속화) |
+| `background.rs` | 369 | 스캔 스레드와 동기화 스레드 (광고 창 상태 복원·진행 이벤트 빈도 제한·중지·실행 위치 영속화) |
 | `state.rs` | 230 | 순수 데이터 타입 (`AppState`, `PlatformEvent`, `SyncRunning`, `ActivePanel`, 타깃별 `NAV_*`) |
 | `ops.rs` | 195 | 광고 차단·서비스 관리·로그 설정 조작 |
 | `inputs.rs` | 129 | 입력 위젯(`InputState`) 지연 생성과 값 동기화 |
@@ -126,19 +126,19 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `log_view.rs` | 110 | 시스템 — 화면 로그 가상 리스트와 로그 파일 현황 |
 | `mod.rs` | 96 | 패널 모듈 선언 + `balanced_split`·`scroll_pane` 레이아웃 헬퍼 |
 
-### 플랫폼 (`app/src/platform/`) — 1,680줄 / 8파일
+### 플랫폼 (`app/src/platform/`) — 1,920줄 / 8파일
 
 `windows.rs`(1,361줄)를 책임별로 분할한 결과다.
 
 | 파일 | 줄 | 책임 |
 | --- | ---: | --- |
-| `mod.rs` | 149 | `Platform` trait 정의 + 서비스 타입, `NativePlatform` 타깃별 별칭 |
-| `fallback.rs` | 55 | 비Windows `Platform` 구현 — 광고 차단 계열 미지원을 명시적으로 반환 |
-| `windows/scm.rs` | 344 | Windows 서비스(SCM) 등록과 서비스 모드 실행 |
+| `mod.rs` | 187 | `Platform` trait 정의 + 광고 창 상태 스냅샷·서비스 타입, `NativePlatform` 타깃별 별칭 |
+| `fallback.rs` | 59 | 비Windows `Platform` 구현 — 광고 차단 계열 미지원을 명시적으로 반환 |
+| `windows/scm.rs` | 389 | Windows 서비스(SCM) 등록과 서비스 모드 실행 |
 | `windows/services.rs` | 340 | 설치된 Win32 서비스 조회·시작·중지·삭제, 권한 확인 |
 | `windows/tray.rs` | 274 | 시스템 트레이 아이콘과 메시지 루프 |
-| `windows/window_ops.rs` | 224 | 프로세스별 최상위 창 열거, 클래스 필터, 메인 WebView 제외, 광고 팝업 후보 탐색 |
-| `windows/mod.rs` | 146 | `WindowsPlatform` + `Platform` 구현, 하위 모듈 re-export |
+| `windows/window_ops.rs` | 365 | 프로세스별 최상위 창 열거, 클래스 필터, 메인 WebView 제외, 광고 팝업 후보 탐색, 창 상태 캡처·복원 |
+| `windows/mod.rs` | 158 | `WindowsPlatform` + `Platform` 구현, 하위 모듈 re-export |
 | `windows/task_scheduler.rs` | 148 | 로그온 시 자동 시작(`schtasks`) |
 
 ### 빌드
@@ -153,6 +153,7 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | --- | ---: | --- |
 | `scripts/Verify-Workspace.ps1` | 166 | VS Code용 Rust/GPUI 자동 검증과 ChatGPT 데스크톱 handoff manifest·해시 고정 빌드 생성 |
 | `scripts/Invoke-ClaudeVisualCheck.ps1` | 450 | `CLAUDE_LOCAL` 시각 검증 하네스 — 격리 실행(`-SeedConfig`로 상태 재현)·창 캡처(`PrintWindow`)·입력(`SendInput`)·정리 |
+| `scripts/Verify-AdWindowState.ps1` | 214 | 지정 PID와 앱 조상·자손의 최상위 창 상태를 읽기 전용 점검(AD-002) |
 | `scripts/Start-DesktopVisualValidation.ps1` | 126 | manifest 해시 검증 후 단일 임시 데이터 루트 격리 프로세스·세션 파일 생성과 실패 롤백 |
 | `scripts/Stop-DesktopVisualValidation.ps1` | 75 | 기록된 검증 PID·시작 시각과 작업 전용 임시 루트만 검증 후 정리 |
 | `.vscode/tasks.json` | 111 | IDE 전용 검증, Claude 로컬 시각 세션, ChatGPT 데스크톱 인계 준비 작업 |

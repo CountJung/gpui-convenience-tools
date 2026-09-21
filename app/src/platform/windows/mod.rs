@@ -39,9 +39,9 @@ use services::{
     delete_sys_service_impl, list_sys_services_impl, query_sys_service_impl, start_sys_service_impl,
     stop_sys_service_impl,
 };
-use window_ops::list_running_window_process_names;
+use window_ops::{is_process_id_running, list_running_window_process_names};
 
-use crate::platform::Platform;
+use crate::platform::{AdWindowSnapshot, Platform};
 
 /// Rust 문자열을 null-terminated UTF-16 버퍼로 변환한다. Win32 W계열 API 인자용.
 pub(super) fn wide_null(value: &str) -> Vec<u16> {
@@ -98,6 +98,18 @@ impl Platform for WindowsPlatform {
         }
 
         Ok(())
+    }
+
+    fn is_process_id_running(&self, process_id: u32) -> bool {
+        is_process_id_running(process_id)
+    }
+
+    fn capture_ad_window_state(&self, handle: HWND) -> Result<AdWindowSnapshot> {
+        window_ops::capture_ad_window_state(handle)
+    }
+
+    fn restore_ad_window_state(&self, snapshot: &AdWindowSnapshot) -> Result<()> {
+        window_ops::restore_ad_window_state(snapshot)
     }
 
     fn list_sys_services(&self) -> Result<Vec<crate::platform::SysServiceInfo>> {
