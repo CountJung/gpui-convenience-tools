@@ -134,7 +134,10 @@
   `ResizableState`의 `sizes()`를 `on_resize`에서 읽어 config에 저장하고 복원한다.
   기본 폭·범위 보정, 설정 저장·복원, GPUI 드래그 회귀 테스트와 격리 release 복원 캡처 완료;
   실제 divider 드래그 mouse-up 저장을 위해 검증 하네스에 안전한 `Drag` 입력을 추가했으며,
-  독립 Visual Reviewer 확인은 후속 환경 의존 항목이다.
+  최신 release 1000×700의 시작 화면 캡처 `next-g003-before-065645.png`에서 divider 위치를
+  확인한 뒤 드래그를 시도했지만 포그라운드 안전 검사(`현재 포그라운드=66246`)가 입력을
+  차단했다. 따라서 실제 mouse-up 저장 성공으로 기록하지 않으며, 독립 Visual Reviewer
+  확인도 후속 환경 의존 항목이다.
 
 - [ ] G-004 | 0% | **UAC 매니페스트 결정**
   `app/resources.rc`와 `app/*.exe.manifest`는 현재 빌드에 반영되지 않는 죽은 파일이다.
