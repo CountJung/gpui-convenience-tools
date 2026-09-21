@@ -25,7 +25,7 @@
 안전 경계: 원본 VDI는 read-only로만 열고, 실행 중 VM의 VDI 직접 읽기는 구현하지 않는다.
 실행 중 VM 지원은 후속 `GuestFileSource` 구현으로만 추가한다(VDE-021).
 
-**최종 측정**: 2026-09-21 · `app/src` 총 39개 파일 · 13,035줄
+**최종 측정**: 2026-09-21 · `app/src` 총 39개 파일 · 13,028줄
 
 ## 크기 기준 — 줄 수는 증상이다
 
@@ -111,7 +111,7 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `mod.rs` | 172 | 공용 픽스처 (`test_app_root`·`TestPlatform`·`refresh`·`click_debug_element` 등) |
 | `theme.rs` | 85 | 테마 전환과 스위치 가시성 |
 
-### 패널 (`app/src/window/`) — 3,429줄 / 10파일
+### 패널 (`app/src/window/`) — 3,422줄 / 10파일
 
 | 파일 | 줄 | 책임 |
 | --- | ---: | --- |
