@@ -251,6 +251,17 @@ release 앱 요약 `중지됨 · 파일 0개 · 0 B · 건너뜀 0 · 실패 0`�
 청크 중간 중지는 재현되지 않았다. 따라서 이 시드는 중지 상태·정리 경계의 보조 증거일 뿐,
 VDE-015의 실제 대용량 파일 중지 완료 증거로 승격하지 않는다.
 
+다중 파티션 VDI를 검증할 때는 `-VdiPartitionNumber <번호>`를 지정한다. 지정하지 않으면
+기존 호환 동작대로 첫 번째 파티션을 선택한다. 실제 종료된 TACS VM에서 파티션 5번을
+선택한 캡처 `target/visual-validation/captures/vde015-tacs-partition5-root-060904.png`를
+확인했고, 파티션 1번 `$Extend` 경로의 `-CancelAfterMs 250`은
+`중지됨 · 파일 0개 · 0 B`로 끝났으며 캡처는
+`target/visual-validation/captures/vde015-tacs-extend-cancel-061128.png`이다. 같은 경로의
+`600`ms 실행은 `완료 · 파일 8개 · 4.1 MB`였고 캡처는
+`target/visual-validation/captures/vde015-tacs-extend-cancel-600-061151.png`이다. 두 실행은
+원본 VDI를 변경하지 않았지만 실제 대용량 파일의 청크 중간 중지를 증명하지 않으므로 VDE-015
+완료 조건으로 승격하지 않는다.
+
 2026-09-22 2차 자체 시각 교차 확인으로 D-020·G-001의 최신 release 화면을 별도 격리
 세션에서 다시 열었다. D-020은 994×702에서 최근 실행 이력 카드가 세로 스크롤 안에
 배치되고, 1280×900에서 중지·실패 포함·성공 3행이 모두 카드 경계 안에 표시되었다.

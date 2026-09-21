@@ -63,6 +63,10 @@ param(
     # Start 전용. 시드 VDI를 열고 지정한 게스트 상대 경로를 초기 목록으로 표시한다.
     [string]$InitialGuestPath,
 
+    # Start 전용. 시드 VDI에서 선택할 실제 파티션 번호(예: GPT 5번).
+    [ValidateRange(1, 999)]
+    [int]$VdiPartitionNumber,
+
     # Start 전용. 검증 전용 환경 변수로 패널 전환 입력 없이 특정 화면을 연다.
     [ValidateSet("Dashboard", "FileSync", "VirtualDisk", "AutoStart")]
     [string]$InitialPanel = "Dashboard",
@@ -391,6 +395,7 @@ switch ($Action) {
         $previousValidationVdiSelectAll = $env:GPUI_CONVENIENCE_TOOLS_VALIDATION_VDI_SELECT_ALL
         $previousValidationVdiAutoCopy = $env:GPUI_CONVENIENCE_TOOLS_VALIDATION_VDI_AUTO_COPY
         $previousValidationVdiGuestPath = $env:GPUI_CONVENIENCE_TOOLS_VALIDATION_VDI_GUEST_PATH
+        $previousValidationVdiPartitionNumber = $env:GPUI_CONVENIENCE_TOOLS_VALIDATION_VDI_PARTITION_NUMBER
         $previousValidationVdiCancelAfterMs = $env:GPUI_CONVENIENCE_TOOLS_VALIDATION_VDI_CANCEL_AFTER_MS
         $previousVboxManage = $env:GPUI_CONVENIENCE_TOOLS_VBOXMANAGE
         try {
@@ -419,6 +424,10 @@ switch ($Action) {
                 }
                 if (-not [string]::IsNullOrWhiteSpace($InitialGuestPath)) {
                     $env:GPUI_CONVENIENCE_TOOLS_VALIDATION_VDI_GUEST_PATH = $InitialGuestPath
+                }
+                if ($VdiPartitionNumber -gt 0) {
+                    $env:GPUI_CONVENIENCE_TOOLS_VALIDATION_VDI_PARTITION_NUMBER =
+                        $VdiPartitionNumber.ToString()
                 }
             }
             if ($null -eq $previousVboxManage) {
@@ -460,6 +469,10 @@ switch ($Action) {
                 Remove-Item Env:\GPUI_CONVENIENCE_TOOLS_VALIDATION_VDI_GUEST_PATH -ErrorAction SilentlyContinue
             }
             else { $env:GPUI_CONVENIENCE_TOOLS_VALIDATION_VDI_GUEST_PATH = $previousValidationVdiGuestPath }
+            if ($null -eq $previousValidationVdiPartitionNumber) {
+                Remove-Item Env:\GPUI_CONVENIENCE_TOOLS_VALIDATION_VDI_PARTITION_NUMBER -ErrorAction SilentlyContinue
+            }
+            else { $env:GPUI_CONVENIENCE_TOOLS_VALIDATION_VDI_PARTITION_NUMBER = $previousValidationVdiPartitionNumber }
             if ($null -eq $previousValidationVdiCancelAfterMs) {
                 Remove-Item Env:\GPUI_CONVENIENCE_TOOLS_VALIDATION_VDI_CANCEL_AFTER_MS -ErrorAction SilentlyContinue
             }

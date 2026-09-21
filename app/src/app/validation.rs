@@ -35,7 +35,39 @@ pub(super) fn seed_validation_virtual_disk(root: &mut AppRoot, cx: &mut Context<
     root.virtual_disk.path_text = path;
     root.open_virtual_disk(cx);
     if !root.virtual_disk.partitions.is_empty() {
-        root.select_virtual_disk_partition(0, cx);
+        let requested_partition_number = std::env::var(
+            "GPUI_CONVENIENCE_TOOLS_VALIDATION_VDI_PARTITION_NUMBER",
+        )
+        .ok()
+        .and_then(|value| value.parse::<u32>().ok())
+        .filter(|number| *number > 0);
+        let partition_index = requested_partition_number
+            .and_then(|number| {
+                root.virtual_disk
+                    .partitions
+                    .iter()
+                    .position(|partition| partition.number == number)
+            })
+            .or_else(|| {
+                if requested_partition_number.is_some() {
+                    root.push_log(
+                        "ERROR",
+                        "검증용 VDI 파티션 번호를 찾지 못했습니다. 선택을 생략합니다."
+                            .to_string(),
+                    );
+                    root.virtual_disk.entries.clear();
+                    root.virtual_disk.error = Some(
+                        "검증용 VDI 파티션 번호를 찾지 못했습니다. 파티션 번호를 확인하세요."
+                            .to_string(),
+                    );
+                    None
+                } else {
+                    Some(0)
+                }
+            });
+        if let Some(partition_index) = partition_index {
+            root.select_virtual_disk_partition(partition_index, cx);
+        }
     }
 
     if let Ok(target) = std::env::var("GPUI_CONVENIENCE_TOOLS_VALIDATION_VDI_TARGET") {
