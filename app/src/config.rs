@@ -429,6 +429,36 @@ pub fn save_theme_selection(mode: ThemeMode, theme_name: &str) -> Result<()> {
 mod tests {
     use super::*;
 
+    struct IsolatedDataDir {
+        previous: Option<std::ffi::OsString>,
+        path: PathBuf,
+    }
+
+    impl IsolatedDataDir {
+        fn new(name: &str) -> Self {
+            let path = std::env::temp_dir().join(format!(
+                "gct-config-test-{name}-{}",
+                std::process::id()
+            ));
+            let _ = fs::remove_dir_all(&path);
+            fs::create_dir_all(&path).expect("create isolated config directory");
+            let previous = std::env::var_os(DATA_DIR_ENV);
+            std::env::set_var(DATA_DIR_ENV, &path);
+            Self { previous, path }
+        }
+    }
+
+    impl Drop for IsolatedDataDir {
+        fn drop(&mut self) {
+            if let Some(previous) = self.previous.take() {
+                std::env::set_var(DATA_DIR_ENV, previous);
+            } else {
+                std::env::remove_var(DATA_DIR_ENV);
+            }
+            let _ = fs::remove_dir_all(&self.path);
+        }
+    }
+
     /// 구버전 config.json(신규 필드 없음)이 그대로 로드되어야 한다.
     #[test]
     fn legacy_config_without_new_fields_still_parses() {
@@ -525,6 +555,47 @@ mod tests {
         carry_over_engine_progress(&stored, &mut fresh);
         assert!(fresh[0].resume_cursor.is_none());
         assert!(fresh[0].last_run_unix.is_none());
+    }
+
+    #[test]
+    fn update_config_preserves_unedited_fields() {
+        let _data_dir = IsolatedDataDir::new("preserves-fields");
+        let mut initial = AppConfig {
+            service_enabled: false,
+            ..AppConfig::default()
+        };
+        initial.targets[0].display_name = "Test target".to_string();
+        initial.favorite_services = vec!["TestService".to_string()];
+        initial.sync_jobs = vec![SyncJob {
+            source: r"D:\source".to_string(),
+            target: r"D:\target".to_string(),
+            last_run_unix: Some(1_700_000_000),
+            resume_cursor: Some("nested/file.txt".to_string()),
+            ..SyncJob::default()
+        }];
+        initial.log.max_files = 17;
+        save_config(&initial).expect("save initial config");
+
+        let updated = update_config(|config| config.scan_interval_secs = 45)
+            .expect("update config");
+
+        assert_eq!(updated.scan_interval_secs, 45);
+        assert!(!updated.service_enabled);
+        assert_eq!(updated.targets[0].display_name, "Test target");
+        assert_eq!(updated.favorite_services, vec!["TestService"]);
+        assert_eq!(updated.sync_jobs[0].last_run_unix, Some(1_700_000_000));
+        assert_eq!(
+            updated.sync_jobs[0].resume_cursor.as_deref(),
+            Some("nested/file.txt")
+        );
+        assert_eq!(updated.log.max_files, 17);
+
+        let persisted = load_config()
+            .expect("load updated config")
+            .expect("updated config exists");
+        assert_eq!(persisted.scan_interval_secs, 45);
+        assert_eq!(persisted.sync_jobs[0].source, r"D:\source");
+        assert_eq!(persisted.sync_jobs[0].target, r"D:\target");
     }
 
     /// `label()`은 이름이 비었을 때 원본 폴더명으로 대체된다.

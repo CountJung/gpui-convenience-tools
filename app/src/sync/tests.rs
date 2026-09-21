@@ -138,6 +138,33 @@ fn copies_nested_files_and_skips_unchanged_on_second_run() {
 }
 
 #[test]
+fn overwrites_an_existing_readonly_target_file() {
+    let root = temp_dir("readonly-target");
+    let src = root.join("src");
+    let dst = root.join("dst");
+    fs::create_dir_all(&src).unwrap();
+    fs::create_dir_all(&dst).unwrap();
+
+    let source_file = src.join("config.json");
+    let target_file = dst.join("config.json");
+    fs::write(&source_file, b"new configuration").unwrap();
+    fs::write(&target_file, b"old").unwrap();
+
+    let mut target_permissions = fs::metadata(&target_file).unwrap().permissions();
+    target_permissions.set_readonly(true);
+    fs::set_permissions(&target_file, target_permissions).unwrap();
+    assert!(fs::metadata(&target_file).unwrap().permissions().readonly());
+
+    let outcome = run_sync_job(&job(&src, &dst));
+
+    assert_eq!(outcome.copied, 1, "failures: {:?}", outcome.failures);
+    assert!(outcome.failures.is_empty(), "failures: {:?}", outcome.failures);
+    assert_eq!(fs::read(&target_file).unwrap(), b"new configuration");
+
+    let _ = fs::remove_dir_all(&root);
+}
+
+#[test]
 fn recopies_when_size_differs() {
     let root = temp_dir("resize");
     let src = root.join("src");
