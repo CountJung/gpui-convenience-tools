@@ -474,6 +474,23 @@ VDE-003은 플랫폼 비의존 공통 타입과 `UnsupportedFormatKind`·`IoOper
 - `virtual_disk::vdi` 4개 테스트가 합성 VDI에서 정상 읽기와 손상 경계를 고정하며, 파티션·
   NTFS·VM 잠금 확인은 각각 VDE-006 이후 범위로 남긴다.
 
+### Phase O-4 — VDE-005 VDI 안전 가드 완료 ✅
+
+`VdiReader`에 원본을 열기 전과 읽기 전후에 적용하는 안전 가드를 연결했다.
+
+- VDI가 있는 디렉터리의 `.lck` 잠금 표식을 발견하면 `ReadOnlyViolation`으로 열기를 거부한다.
+- `GPUI_CONVENIENCE_TOOLS_VBOXMANAGE`가 지정되면 `VBoxManage list runningvms`와
+  `showvminfo --machinereadable` 결과에서 대상 VDI 경로를 대조해 실행 중인 VM이 사용하는
+  원본을 거부한다. 경로가 지정되지 않은 경우에도 잠금 표식·파일 안정성 검사는 유지하며,
+  실행 중 VM 경로 조회는 향후 설정 화면에서 이 환경변수를 공급해야 한다.
+- 열기 시 파일 크기와 수정 시각을 스냅샷하고, 헤더 검증 직후와 각 `read_at` 전후에 다시
+  비교한다. 변경이 감지되면 `SourceChanged`를 반환한다.
+- 핸들은 계속 `File::open`으로만 생성하며, read-only 핸들·잠금 표식·크기 변경·mtime 변경·
+  실행 중 VM 경로 대조를 9개 VDI 테스트로 고정했다.
+
+이 단계는 UI·파티션·NTFS를 구현하지 않고 VDI 컨테이너 진입 안전성만 제공한다. 외부
+`VBoxManage` 조회는 환경변수로 주입해 테스트와 운영 경로의 실행 파일 위치를 하드코딩하지 않는다.
+
 ## 진행 예정 단계
 
 세부 체크리스트는 `TODO.md`를 정본으로 한다.

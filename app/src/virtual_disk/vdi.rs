@@ -7,9 +7,12 @@
 
 use std::{
     collections::HashSet,
-    fs::File,
+    env,
+    fs::{self, File},
     io::{Read, Seek, SeekFrom},
     path::{Path, PathBuf},
+    process::Command,
+    time::SystemTime,
 };
 
 use super::{UnsupportedFormatKind, VdiImage, VdiImageType, VdiVersion, VirtualDiskError};
@@ -42,6 +45,31 @@ pub struct VdiHeader {
     pub blocks_allocated: u32,
 }
 
+/// VDI를 열기 전에 적용할 안전 검사 설정.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct VdiSafetyOptions {
+    /// 실행 중 VM의 연결 디스크를 조회할 `VBoxManage` 경로.
+    ///
+    /// `GPUI_CONVENIENCE_TOOLS_VBOXMANAGE`에서 읽을 수 있으며, 설정하지 않으면
+    /// 파일시스템 잠금 표식 검사만 수행한다. 명시된 경로의 조회가 실패하면
+    /// 안전하게 열기를 거부한다.
+    pub vboxmanage_path: Option<PathBuf>,
+}
+
+impl VdiSafetyOptions {
+    pub fn from_environment() -> Self {
+        Self {
+            vboxmanage_path: env::var_os("GPUI_CONVENIENCE_TOOLS_VBOXMANAGE").map(PathBuf::from),
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct SourceSnapshot {
+    file_len: u64,
+    modified: SystemTime,
+}
+
 /// 검증된 VDI 컨테이너의 read-only 블록 리더.
 pub struct VdiReader {
     file: File,
@@ -50,12 +78,24 @@ pub struct VdiReader {
     header: VdiHeader,
     image: VdiImage,
     block_map: Vec<u32>,
+    source_snapshot: SourceSnapshot,
 }
 
 impl VdiReader {
     /// VDI를 쓰기 권한 없이 열고 헤더·블록 맵·물리 범위를 검증한다.
     pub fn open(path: impl AsRef<Path>) -> Result<Self, VirtualDiskError> {
+        Self::open_with_options(path, &VdiSafetyOptions::from_environment())
+    }
+
+    /// 안전 검사 설정을 적용해 VDI를 읽기 전용으로 연다.
+    pub fn open_with_options(
+        path: impl AsRef<Path>,
+        options: &VdiSafetyOptions,
+    ) -> Result<Self, VirtualDiskError> {
         let path = path.as_ref().to_path_buf();
+        reject_lock_artifacts(&path)?;
+        probe_running_vm(&path, options.vboxmanage_path.as_deref())?;
+        let source_snapshot = source_snapshot(&path)?;
         let mut file = File::open(&path).map_err(|source| VirtualDiskError::Io {
             operation: super::IoOperation::Open,
             source,
@@ -96,14 +136,17 @@ impl VdiReader {
             sector_size: header.sector_size,
         };
 
-        Ok(Self {
+        let reader = Self {
             file,
             file_len,
-            path,
+            path: path.clone(),
             header,
             image,
             block_map,
-        })
+            source_snapshot,
+        };
+        reader.ensure_source_stable_at(&path)?;
+        Ok(reader)
     }
 
     pub fn path(&self) -> &Path {
@@ -130,6 +173,7 @@ impl VdiReader {
     ///
     /// 미할당·discarded 블록은 파일에 존재하지 않아도 0으로 채운다.
     pub fn read_at(&mut self, offset: u64, buffer: &mut [u8]) -> Result<usize, VirtualDiskError> {
+        self.ensure_source_stable()?;
         let length = buffer.len() as u64;
         if offset > self.header.disk_size || length > self.header.disk_size.saturating_sub(offset) {
             return Err(VirtualDiskError::BoundsViolation {
@@ -161,8 +205,141 @@ impl VdiReader {
             done += chunk;
         }
 
+        self.ensure_source_stable()?;
         Ok(done)
     }
+
+    fn ensure_source_stable(&self) -> Result<(), VirtualDiskError> {
+        let current = source_snapshot(&self.path)?;
+        if current != self.source_snapshot {
+            return Err(VirtualDiskError::SourceChanged(format!(
+                "파일 크기 또는 수정 시각이 열기 이후 변경되었습니다: {}",
+                self.path.display()
+            )));
+        }
+        Ok(())
+    }
+}
+
+impl VdiReader {
+    fn ensure_source_stable_at(&self, path: &Path) -> Result<(), VirtualDiskError> {
+        let current = source_snapshot(path)?;
+        if current != self.source_snapshot {
+            return Err(VirtualDiskError::SourceChanged(format!(
+                "파일 크기 또는 수정 시각이 열기 중 변경되었습니다: {}",
+                path.display()
+            )));
+        }
+        Ok(())
+    }
+}
+
+fn source_snapshot(path: &Path) -> Result<SourceSnapshot, VirtualDiskError> {
+    let metadata = fs::metadata(path).map_err(|source| VirtualDiskError::Io {
+        operation: super::IoOperation::Open,
+        source,
+    })?;
+    let modified = metadata.modified().map_err(|source| VirtualDiskError::Io {
+        operation: super::IoOperation::Open,
+        source,
+    })?;
+    Ok(SourceSnapshot {
+        file_len: metadata.len(),
+        modified,
+    })
+}
+
+fn reject_lock_artifacts(path: &Path) -> Result<(), VirtualDiskError> {
+    let parent = path.parent().unwrap_or_else(|| Path::new("."));
+    let entries = fs::read_dir(parent).map_err(|source| VirtualDiskError::Io {
+        operation: super::IoOperation::ListDirectory,
+        source,
+    })?;
+
+    for entry in entries {
+        let entry = entry.map_err(|source| VirtualDiskError::Io {
+            operation: super::IoOperation::ListDirectory,
+            source,
+        })?;
+        let name = entry.file_name().to_string_lossy().to_ascii_lowercase();
+        if name.ends_with(".lck") {
+            return Err(VirtualDiskError::ReadOnlyViolation(format!(
+                "VirtualBox 잠금 표식이 있어 열지 않았습니다: {}",
+                entry.path().display()
+            )));
+        }
+    }
+    Ok(())
+}
+
+fn probe_running_vm(path: &Path, vboxmanage_path: Option<&Path>) -> Result<(), VirtualDiskError> {
+    let Some(vboxmanage_path) = vboxmanage_path else {
+        return Ok(());
+    };
+
+    let output = Command::new(vboxmanage_path)
+        .args(["list", "runningvms"])
+        .output()
+        .map_err(|source| {
+            VirtualDiskError::ReadOnlyViolation(format!(
+                "VBoxManage 실행 중 VM 조회에 실패했습니다: {source}"
+            ))
+        })?;
+    if !output.status.success() {
+        return Err(VirtualDiskError::ReadOnlyViolation(format!(
+            "VBoxManage 실행 중 VM 조회가 실패했습니다: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        )));
+    }
+
+    for line in String::from_utf8_lossy(&output.stdout).lines() {
+        let Some(uuid) = line
+            .split('{')
+            .nth(1)
+            .and_then(|part| part.split('}').next())
+        else {
+            continue;
+        };
+        let info = Command::new(vboxmanage_path)
+            .args(["showvminfo", uuid, "--machinereadable"])
+            .output()
+            .map_err(|source| {
+                VirtualDiskError::ReadOnlyViolation(format!(
+                    "실행 중 VM 디스크 조회에 실패했습니다: {source}"
+                ))
+            })?;
+        if !info.status.success() {
+            return Err(VirtualDiskError::ReadOnlyViolation(format!(
+                "실행 중 VM 디스크 조회가 실패했습니다: {}",
+                String::from_utf8_lossy(&info.stderr).trim()
+            )));
+        }
+        if vm_info_contains_path(&String::from_utf8_lossy(&info.stdout), path) {
+            return Err(VirtualDiskError::ReadOnlyViolation(format!(
+                "실행 중인 VM이 VDI를 사용 중이어서 열지 않았습니다: {}",
+                path.display()
+            )));
+        }
+    }
+    Ok(())
+}
+
+fn vm_info_contains_path(info: &str, target: &Path) -> bool {
+    let target = normalized_path(target);
+    info.lines()
+        .filter_map(|line| line.split_once('='))
+        .any(|(_, value)| {
+            let value = value.trim().trim_matches('"');
+            value.to_ascii_lowercase().contains(".vdi")
+                && normalized_path(Path::new(value)) == target
+        })
+}
+
+fn normalized_path(path: &Path) -> String {
+    let path = fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
+    path.to_string_lossy()
+        .replace('/', "\\")
+        .to_ascii_lowercase()
 }
 
 fn parse_header(raw: &[u8]) -> Result<VdiHeader, VirtualDiskError> {
@@ -469,6 +646,81 @@ mod tests {
         remove_fixture(&path);
     }
 
+    #[test]
+    fn rejects_virtualbox_lock_artifacts_before_opening() {
+        let path = write_fixture(IMAGE_TYPE_DYNAMIC, &[0], 1);
+        let lock_path = path.with_file_name(format!(
+            "{}.lck",
+            path.file_name().unwrap().to_string_lossy()
+        ));
+        fs::create_dir(&lock_path).unwrap();
+
+        assert!(matches!(
+            VdiReader::open(&path),
+            Err(VirtualDiskError::ReadOnlyViolation(message)) if message.contains("잠금")
+        ));
+
+        let _ = fs::remove_dir(&lock_path);
+        remove_fixture(&path);
+    }
+
+    #[test]
+    fn rejects_source_changes_after_open() {
+        let path = write_fixture(IMAGE_TYPE_DYNAMIC, &[0], 1);
+        let mut reader = VdiReader::open(&path).unwrap();
+        fs::OpenOptions::new()
+            .write(true)
+            .open(&path)
+            .unwrap()
+            .set_len(2048)
+            .unwrap();
+
+        let mut buffer = [0u8; 1];
+        assert!(matches!(
+            reader.read_at(0, &mut buffer),
+            Err(VirtualDiskError::SourceChanged(_))
+        ));
+        remove_fixture(&path);
+    }
+
+    #[test]
+    fn rejects_source_mtime_changes_even_when_size_is_unchanged() {
+        let path = write_fixture(IMAGE_TYPE_DYNAMIC, &[0], 1);
+        let mut reader = VdiReader::open(&path).unwrap();
+        fs::OpenOptions::new()
+            .write(true)
+            .open(&path)
+            .unwrap()
+            .write_all(&[b'Z'])
+            .unwrap();
+
+        let mut buffer = [0u8; 1];
+        assert!(matches!(
+            reader.read_at(0, &mut buffer),
+            Err(VirtualDiskError::SourceChanged(_))
+        ));
+        remove_fixture(&path);
+    }
+
+    #[test]
+    fn opens_a_read_only_handle() {
+        let path = write_fixture(IMAGE_TYPE_DYNAMIC, &[0], 1);
+        let reader = VdiReader::open(&path).unwrap();
+        let mut clone = reader.file.try_clone().unwrap();
+
+        assert!(clone.write_all(&[0]).is_err());
+        remove_fixture(&path);
+    }
+
+    #[test]
+    fn detects_a_running_vm_disk_from_machine_readable_info() {
+        let path = write_fixture(IMAGE_TYPE_DYNAMIC, &[0], 1);
+        let info = format!("SATA-0-0=\"{}\"\n", path.display());
+
+        assert!(vm_info_contains_path(&info, &path));
+        remove_fixture(&path);
+    }
+
     fn write_fixture(image_type: u32, map: &[u32], allocated: u32) -> PathBuf {
         let path = fixture_path();
         let mut header = base_header(image_type, map.len() as u32, allocated);
@@ -513,13 +765,18 @@ mod tests {
     fn fixture_path() -> PathBuf {
         static NEXT: AtomicU64 = AtomicU64::new(0);
         let id = NEXT.fetch_add(1, Ordering::Relaxed);
-        std::env::temp_dir().join(format!(
-            "gpui-convenience-vde004-{}-{id}.vdi",
+        let directory = std::env::temp_dir().join(format!(
+            "gpui-convenience-vde005-{}-{id}",
             std::process::id()
-        ))
+        ));
+        fs::create_dir_all(&directory).unwrap();
+        directory.join("disk.vdi")
     }
 
     fn remove_fixture(path: &Path) {
         let _ = fs::remove_file(path);
+        if let Some(parent) = path.parent() {
+            let _ = fs::remove_dir(parent);
+        }
     }
 }

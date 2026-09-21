@@ -15,7 +15,7 @@
 | 경로 | 책임 | 관련 작업 ID |
 | --- | --- | --- |
 | `app/src/virtual_disk/mod.rs` | **구현됨** — `GuestFileSource`·파일 항목·오류 타입·백엔드 경계 | VDE-003 |
-| `app/src/virtual_disk/vdi.rs` | **구현됨** — VDI 1.1 헤더·블록 맵·동적/고정 이미지 read-only 읽기 | VDE-004; 안전 가드는 VDE-005 |
+| `app/src/virtual_disk/vdi.rs` | **구현됨** — VDI 1.1 read-only 블록 리더와 잠금·VM 사용·원본 안정성 가드 | VDE-004~005 |
 | `app/src/virtual_disk/partition.rs` | MBR/GPT 파티션 범위 검증 | VDE-006 |
 | `app/src/virtual_disk/ntfs.rs` | NTFS 디렉터리 열거·스트림 읽기·속성 보존 | VDE-007~008 |
 | `app/src/virtual_disk/copy.rs` | 안전한 호스트 경로 매핑·청크 복사·충돌 정책 | VDE-009~012 |
@@ -25,7 +25,7 @@
 안전 경계: 원본 VDI는 read-only로만 열고, 실행 중 VM의 VDI 직접 읽기는 구현하지 않는다.
 실행 중 VM 지원은 후속 `GuestFileSource` 구현으로만 추가한다(VDE-021).
 
-**최종 측정**: 2026-09-21 · `app/src` 총 40개 파일 · 13,845줄
+**최종 측정**: 2026-09-21 · `app/src` 총 40개 파일 · 14,115줄
 
 ## 크기 기준 — 줄 수는 증상이다
 
@@ -68,12 +68,12 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `logging.rs` | 560 | 롤링 파일 로거 (`log::Log` 구현, 테스트용 출력 경로 주입) |
 | `util.rs` | 139 | 도메인 주인이 없는 순수 헬퍼 — `format_interval`·`interval_to_secs`·`TimeUnit` |
 
-### VirtualBox 도메인 (`app/src/virtual_disk/`) — 918줄 / 2파일
+### VirtualBox 도메인 (`app/src/virtual_disk/`) — 1,188줄 / 2파일
 
 | 파일 | 줄 | 책임 |
 | --- | ---: | --- |
 | `mod.rs` | 406 | VDI·파티션·게스트 파일 항목 모델, 정규화된 게스트 경로, `GuestFileSource`, 플랫폼 비의존 오류 계약 |
-| `vdi.rs` | 512 | VDI 1.1 read-only 헤더·블록 맵 검증, 동적/고정 블록 읽기, 범위·오버플로·손상 메타데이터 경계 |
+| `vdi.rs` | 782 | VDI 1.1 read-only 헤더·블록 맵·동적/고정 블록 읽기, 잠금·VM 사용·크기/mtime 안정성 가드 |
 
 ### 동기화 엔진 (`app/src/sync/`) — 1,246줄 / 2파일
 
@@ -281,6 +281,7 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | 2026-09-17 | 프로젝트 문서 | 정본 디렉터리 통합 | 루트 문서 5개 + 에이전트 규칙 중복 | `docs/` 5개 정본 + 루트 에이전트 어댑터 | 공통 내용은 `DEVELOPMENT_GUIDE.md`로 통합하고 어댑터에는 표면별 주의사항만 유지 |
 | 2026-09-17 | `virtual_disk/mod.rs` | VDE-003 도메인 경계 추가 | VirtualBox 탐색 모델 없음 | 403줄의 플랫폼 비의존 모델·읽기 계약·오류 분류 | VDI 실제 파서와 GPUI 화면은 VDE-004 이후 연결 |
 | 2026-09-21 | `virtual_disk/vdi.rs` | VDE-004 VDI 블록 리더 추가 | VDI 헤더·블록 맵 구현 없음 | 512줄의 read-only 헤더·맵 검증·동적/고정 블록 읽기 | 파티션·NTFS·잠금 안정성은 VDE-005~008에서 연결 |
+| 2026-09-21 | `virtual_disk/vdi.rs` | VDE-005 안전 가드 추가 | 파일 잠금·원본 변경·실행 중 VM 대조 없음 | 782줄의 잠금 표식·환경변수 기반 VBoxManage 조회·크기/mtime 스냅샷·read-only 핸들 검증 | 800줄 주의 구간에 접근했으므로 VDE-006 전에 책임 단위 분할 후보를 검토 |
 | 2026-07-29 | 편의 기능 스플리터 3곳 | 공용 레이아웃 승격 | 패널별 고정 초기 폭 | `window::balanced_split` | 설정 pane 과도 축소 방지, 양쪽 가용폭 사용 |
 | 2026-07-29 | `app.rs` | 책임 단위 분할 + 재배치 | 1,798 | `app/` 7파일 (최대 564) | 대시보드·로그 렌더는 소유가 잘못돼 있어 `window/`로 이동 |
 | 2026-07-29 | `platform/windows.rs` | 책임 단위 분할 + 승격 | 1,361 | `platform/windows/` 6파일 (최대 344) | `wide_null`을 `windows/mod.rs`로 **공용 승격** |
