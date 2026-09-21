@@ -73,14 +73,20 @@ pub fn discover_partitions<S: PartitionSource>(
         if entry.is_empty() {
             continue;
         }
-        validate_mbr_range(
-            entry.start_lba as u64,
-            entry.sector_count as u64,
-            total_sectors,
-        )?;
         if entry.partition_type == TYPE_PROTECTIVE_MBR {
+            // GPT 보호 MBR은 32비트 MBR 범위를 넘어서는 디스크를 보호하기 위해
+            // 섹터 수를 `0xffff_ffff`로 기록할 수 있다. 실제 파티션 범위는 GPT
+            // 헤더가 소유하므로, 여기서는 시작 LBA만 현재 디스크 안인지 확인한다.
+            if entry.start_lba == 0 || entry.start_lba as u64 >= total_sectors {
+                return Err(corrupt("보호 MBR 시작 LBA가 디스크 범위를 벗어납니다"));
+            }
             protective = true;
         } else {
+            validate_mbr_range(
+                entry.start_lba as u64,
+                entry.sector_count as u64,
+                total_sectors,
+            )?;
             non_protective = true;
         }
         entries.push((index as u32 + 1, entry));
@@ -714,7 +720,7 @@ mod tests {
     fn discovers_gpt_and_ignores_protective_mbr() {
         let mut disk = MemoryDisk::new(4096);
         disk.set_mbr_signature();
-        disk.mbr_entry(0, TYPE_PROTECTIVE_MBR, 1, 4095);
+        disk.mbr_entry(0, TYPE_PROTECTIVE_MBR, 1, u32::MAX);
         disk.bytes[SECTOR_SIZE..SECTOR_SIZE + 8].copy_from_slice(GPT_SIGNATURE);
         disk.bytes[SECTOR_SIZE + 12..SECTOR_SIZE + 16].copy_from_slice(&92u32.to_le_bytes());
         disk.bytes[SECTOR_SIZE + 24..SECTOR_SIZE + 32].copy_from_slice(&1u64.to_le_bytes());

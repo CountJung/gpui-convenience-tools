@@ -59,7 +59,7 @@
 
 ### O-5. 검증·후속 백엔드
 
-- [ ] VDE-019 | 95% | GPUI 자체 테스트와 격리 릴리스 실행으로 실제 파일 목록·숨김/시스템 항목·복사 진행/실패 요약·대상 폴더 복사를 확인 — VirtualBox 7.2.14가 `convertfromraw`로 생성한 표준 VDI와 export 테스트로 재생성한 합성 VDI를 최신 release 앱에서 재검증하고 캡처를 남김; 최신 release 1200×1000 캡처 `continuation-vde019-current-release-040648.png`와 이번 검증의 `continuation-current-vde019-1200x1000-052717.png`, `continuation-current-vde019-920x700-052734.png`에서 안전 경계·NTFS 3.1·숨김/시스템 항목·16개 선택 상태와 compact 폭의 행 경계를 확인; 구현 세션의 캡처이며 외부 키보드·실제 릴리스 오류 억제 버튼 클릭·독립 Visual Reviewer 확인은 후속
+- [ ] VDE-019 | 95% | GPUI 자체 테스트와 격리 릴리스 실행으로 실제 파일 목록·숨김/시스템 항목·복사 진행/실패 요약·대상 폴더 복사를 확인 — VirtualBox 7.2.14가 `convertfromraw`로 생성한 표준 VDI와 export 테스트로 재생성한 합성 VDI를 최신 release 앱에서 재검증하고 캡처를 남김; 최신 release 1200×1000 캡처 `continuation-vde019-current-release-040648.png`와 이번 검증의 `continuation-current-vde019-1200x1000-052717.png`, `continuation-current-vde019-920x700-052734.png`에서 안전 경계·NTFS 3.1·숨김/시스템 항목·16개 선택 상태와 compact 폭의 행 경계를 확인; 추가로 원본을 복사하지 않는 `-ExternalVdiPath` 경로로 종료된 실제 TACS VDI의 GPT·NTFS 3.1·게스트 루트 시스템 폴더를 확인하고 `vde019-external-tacs-root-fixed-920x700-053642.png`, `vde019-external-tacs-root-fixed-1200x1000-053659.png`를 남김; 구현 세션의 캡처이며 대용량 파일 중지·외부 키보드·실제 릴리스 오류 억제 버튼 클릭·독립 Visual Reviewer 확인은 후속
 - [ ] VDE-021 | 70% | 공식 `VBoxManage guestcontrol` 명령 계약·read-only 안전 경계·`GuestFileSource` 분리 설계를 `VIRTUAL_DISK_BACKENDS.md`에 기록 완료; VDE-019 실제 패널/복사 E2E, 격리 VM·Guest Additions 준비 전에는 구현·완료 처리하지 않음
 
 > VDE-021은 필수 오프라인 경로의 선행 작업이다. Guest Control이 추가되더라도 실행 중 VDI

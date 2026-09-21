@@ -894,6 +894,25 @@ best-effort로 제거하되, 정리 실패가 원래 읽기·쓰기 오류 사�
 분리한 `copy/tests.rs`를 포함해 최신 측정값은 56개 파일·21,289줄·최대 821줄이다. 실제
 대용량 VDI 중지 E2E와 독립 릴리스 UI 검토는 기존 VDE-015·VDE-012 잔여 조건으로 유지한다.
 
+### Phase O-28 — GPT 보호 MBR 및 대용량 외부 VDI 검증 보강 완료 ✅
+
+실제 종료 상태의 VirtualBox `TACS` VM을 확인하는 과정에서 GPT 보호 MBR의 파티션 크기
+`0xffff_ffff`를 일반 MBR 범위 검증에 적용해 실제 80GB VDI를 거부하던 결함을 발견했다.
+보호 MBR은 시작 LBA만 디스크 범위 안인지 확인하고, 실제 GPT 범위는 GPT 헤더 검증에
+위임하도록 파서를 수정했다. 기존 회귀 테스트도 실제 보호 MBR 값으로 보정했다.
+
+대용량 VDI를 세션 폴더로 복사하지 않도록 `Invoke-ClaudeVisualCheck.ps1`에
+`-ExternalVdiPath`를 추가했다. 대상 폴더·설정·로그는 계속 격리하고, 설치된 `VBoxManage.exe`
+경로를 검증 세션에 주입한다. 이 경로로 종료된 `TACS.vdi`를 최신 release 앱에서 열어 GPT
+파티션 1·5의 NTFS 3.1과 게스트 루트의 `$Extend`, `System Volume Information`을 확인했다.
+920×700 및 1200×1000 캡처를 남겼고, 원본 VDI 길이 불변과 세션 종료 후 프로세스·세션 0을
+확인했다.
+
+파티션 테스트 7개·VDI 테스트 14개·`cargo check --locked`·Clippy `-D warnings`·release
+build를 통과했다. 최신 구조 측정값은 56개 파일·21,295줄·최대 821줄이다. 실제 대용량
+파일 중지, 외부 키보드 입력, 실제 release 오류 억제 버튼 클릭, 독립 Visual Reviewer는
+완료로 승격하지 않고 VDE-012·014~016·019의 잔여 조건으로 유지한다.
+
 ### Phase T-1 — T-001·T-002 회귀 테스트 보강 완료 ✅
 
 동기화 엔진이 읽기 전용 대상 파일을 실제로 덮어쓸 수 있는지 확인하는 테스트와,

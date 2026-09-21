@@ -228,6 +228,19 @@ scripts\Invoke-ClaudeVisualCheck.ps1 -Action Stop
 실제 release 앱의 통합 증거이며, VirtualBox가 직접 생성한 사용자 VDI와 독립 Visual Reviewer
 검토를 대신하지 않는다.
 
+대용량 종료 VM 디스크를 검증할 때는 원본을 세션 폴더로 복사하지 않도록
+`-ExternalVdiPath <absolute-vdi-path>`를 사용한다. 앱은 이 경로를 `VdiReader`의 read-only
+입력으로만 열고, 대상 폴더·설정·로그는 세션 임시 루트에 격리한다. 하네스는 설치된
+`VBoxManage.exe`를 환경 변수로 주입해 실행 중 VM 가드를 활성화한다. 이 옵션은 원본 파일을
+복사하지 않으므로 실제 사용자 VDI에 사용할 때도 VM이 종료된 상태인지 먼저 확인해야 한다.
+
+2026-09-22 현재 종료된 `TACS` VM의 실제 VDI를 이 경로로 열어 `TACS.vdi`에서 GPT 파티션
+1·5의 NTFS 3.1과 게스트 루트의 시스템 폴더를 확인했다. 920×700 캡처
+`target/visual-validation/captures/vde019-external-tacs-root-fixed-920x700-053642.png`와
+1200×1000 캡처 `target/visual-validation/captures/vde019-external-tacs-root-fixed-1200x1000-053659.png`를
+남겼으며, 원본 길이는 변하지 않았고 세션 종료 후 `PROCESS_COUNT=0`·`SESSION_COUNT=0`이었다.
+대용량 파일 중지·외부 키보드·독립 Visual Reviewer는 이 검증으로 완료 처리하지 않는다.
+
 폴더 진입 화면을 입력 없이 재현할 때는 `-InitialGuestPath many_subdirs`를 함께 사용한다.
 이 값은 검증 프로세스에만 전달되며 제품 설정에는 저장되지 않는다.
 

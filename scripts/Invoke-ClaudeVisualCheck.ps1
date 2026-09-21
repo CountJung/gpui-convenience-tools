@@ -46,6 +46,10 @@ param(
     # Start 전용. 검증 전용 격리 VDI 복사본을 만들 원본 경로.
     [string]$SeedVdi,
 
+    # Start 전용. 원본을 복사하지 않고 읽기 전용 검증 경로로 직접 연결한다.
+    # 앱은 VDI를 읽기 전용으로 열며, 대상 폴더는 여전히 세션 임시 경로로 격리된다.
+    [string]$ExternalVdiPath,
+
     # Start 전용. 시드 VDI의 선택 항목을 격리 대상 폴더로 자동 복사한다.
     [switch]$AutoCopyVdi,
 
@@ -324,6 +328,18 @@ switch ($Action) {
         }
         $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $BinaryPath).Hash.ToLowerInvariant()
 
+        if (-not [string]::IsNullOrWhiteSpace($SeedVdi) -and
+            -not [string]::IsNullOrWhiteSpace($ExternalVdiPath)) {
+            throw "-SeedVdi와 -ExternalVdiPath는 동시에 사용할 수 없다."
+        }
+        $externalVdiSource = $null
+        if (-not [string]::IsNullOrWhiteSpace($ExternalVdiPath)) {
+            $externalVdiSource = [System.IO.Path]::GetFullPath($ExternalVdiPath)
+            if (-not (Test-Path -LiteralPath $externalVdiSource -PathType Leaf)) {
+                throw "외부 검증 VDI를 찾을 수 없다: $externalVdiSource"
+            }
+        }
+
         $sessionId = [Guid]::NewGuid().ToString("N")
         $sessionRoot = Join-Path ([System.IO.Path]::GetTempPath()) ($tempPrefix + $sessionId)
         $appData = Join-Path $sessionRoot "appdata"
@@ -332,7 +348,10 @@ switch ($Action) {
         New-Item -ItemType Directory -Force -Path (Join-Path $sessionRoot "target") | Out-Null
 
         $validationVdiPath = $null
-        if (-not [string]::IsNullOrWhiteSpace($SeedVdi)) {
+        if ($null -ne $externalVdiSource) {
+            $validationVdiPath = $externalVdiSource
+        }
+        elseif (-not [string]::IsNullOrWhiteSpace($SeedVdi)) {
             $seedVdiSource = [System.IO.Path]::GetFullPath($SeedVdi)
             if (-not (Test-Path -LiteralPath $seedVdiSource -PathType Leaf)) {
                 throw "시드 VDI를 찾을 수 없다: $seedVdiSource"
@@ -368,6 +387,7 @@ switch ($Action) {
         $previousValidationVdiSelectAll = $env:GPUI_CONVENIENCE_TOOLS_VALIDATION_VDI_SELECT_ALL
         $previousValidationVdiAutoCopy = $env:GPUI_CONVENIENCE_TOOLS_VALIDATION_VDI_AUTO_COPY
         $previousValidationVdiGuestPath = $env:GPUI_CONVENIENCE_TOOLS_VALIDATION_VDI_GUEST_PATH
+        $previousVboxManage = $env:GPUI_CONVENIENCE_TOOLS_VBOXMANAGE
         try {
             $env:APPDATA = $appData
             $env:GPUI_CONVENIENCE_TOOLS_DATA_DIR = $appData
@@ -391,6 +411,12 @@ switch ($Action) {
                 }
                 if (-not [string]::IsNullOrWhiteSpace($InitialGuestPath)) {
                     $env:GPUI_CONVENIENCE_TOOLS_VALIDATION_VDI_GUEST_PATH = $InitialGuestPath
+                }
+            }
+            if ($null -eq $previousVboxManage) {
+                $defaultVboxManage = Join-Path ${env:ProgramFiles} "Oracle\VirtualBox\VBoxManage.exe"
+                if (Test-Path -LiteralPath $defaultVboxManage -PathType Leaf) {
+                    $env:GPUI_CONVENIENCE_TOOLS_VBOXMANAGE = $defaultVboxManage
                 }
             }
             $process = Start-Process -FilePath $BinaryPath -PassThru
@@ -426,6 +452,10 @@ switch ($Action) {
                 Remove-Item Env:\GPUI_CONVENIENCE_TOOLS_VALIDATION_VDI_GUEST_PATH -ErrorAction SilentlyContinue
             }
             else { $env:GPUI_CONVENIENCE_TOOLS_VALIDATION_VDI_GUEST_PATH = $previousValidationVdiGuestPath }
+            if ($null -eq $previousVboxManage) {
+                Remove-Item Env:\GPUI_CONVENIENCE_TOOLS_VBOXMANAGE -ErrorAction SilentlyContinue
+            }
+            else { $env:GPUI_CONVENIENCE_TOOLS_VBOXMANAGE = $previousVboxManage }
         }
 
         $hwnd = [IntPtr]::Zero
