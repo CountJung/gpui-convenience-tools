@@ -142,6 +142,14 @@ SHA-256을 기록한다. 다른 검증자의 독립 검토가 요구되는 UI �
 | G-003 | E2E | [x] | [x] | [x] | [ ] | [x] | [x] | `sidebar_width` 설정 필드와 200~360px 보정·기본 240px 복원; `sidebar_width_is_normalized_to_supported_range`, `update_config_preserves_unedited_fields`, GPUI `sidebar_divider_drag_resizes_navigation_and_content`; 전체 140 passed·4 ignored; Clippy 기존 경고 7건; 격리 release 기본 캡처 `target/visual-validation/captures/g003-default-003709.png`, `sidebar_width=320` 시드 복원 캡처 `target/visual-validation/captures/g003-restored-width-003742.png`; 하네스가 divider 드래그를 지원하지 않아 실제 mouse-up 저장 콜백·독립 Visual Reviewer는 후속; commit `0a793b8` push 완료 |
 | G-004 | RUST | [ ] | [ ] | — | — | [ ] | [ ] | — |
 
+최신 VDE-019 릴리스 보강 검증은 `exports_ntfs_vdi_fixture_when_requested`로 격리 합성 VDI를
+재생성한 뒤 수행했다. 최신 release 앱에서 표준 VBox VDI와 재생성 합성 VDI 모두 파일 행,
+숨김·시스템 속성, 복사 결과 17개·915.3KB, `many_subdirs` 실패 사유를 확인했고 캡처는
+`continuation-vde019-standard-release-031918.png`,
+`continuation-vde019-synthetic-refreshed-032017.png`이다. 오류 억제 버튼 `Click`은
+포그라운드 안전 검사에서 차단되어 실제 릴리스 클릭 성공으로 기록하지 않았으며, 세션 종료 후
+`PROCESS_COUNT=0`·`SESSION_COUNT=0`을 확인했다.
+
 ## 완료 검증 기록
 
 완료 작업은 `TODO.md`에서 제거하고 이곳에 게이트 결과를 보존한다. 상세 설계와 완료 단계는

@@ -778,6 +778,13 @@ foreground 안전 차단으로 입력을 보내지 않았다. 캡처는
 외부 키보드 입력과 독립 Visual Reviewer 확인은 잔여다.
 표준 VDI 파서·raw fixture export와 검증 커밋은 `bed5914`이다.
 
+후속 릴리스 재검증에서 오래된 합성 fixture를 `exports_ntfs_vdi_fixture_when_requested`로
+격리 경로에 재생성하고, 표준 VBox VDI와 합성 VDI 모두 정상 탐색·복사 결과를 확인했다.
+캡처는 `continuation-vde019-standard-release-031918.png`와
+`continuation-vde019-synthetic-refreshed-032017.png`이다. 오류 억제 버튼은 포그라운드 안전
+검사에 의해 입력이 차단되어 실제 릴리스 클릭 성공으로 기록하지 않았으며, 세션 정리 후
+프로세스·임시 세션 루트가 0개임을 확인했다.
+
 ### Phase T-1 — T-001·T-002 회귀 테스트 보강 완료 ✅
 
 동기화 엔진이 읽기 전용 대상 파일을 실제로 덮어쓸 수 있는지 확인하는 테스트와,
