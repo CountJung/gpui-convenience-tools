@@ -20,7 +20,7 @@ const TYPE_PROTECTIVE_MBR: u8 = 0xee;
 const TYPE_EXTENDED_MBR: [u8; 3] = [0x05, 0x0f, 0x85];
 
 /// 파티션 검색에 필요한 읽기 전용 디스크 경계.
-pub trait PartitionSource {
+pub trait PartitionSource: Send {
     fn disk_size_bytes(&self) -> u64;
     fn sector_size(&self) -> u32;
     fn read_at(&mut self, offset: u64, buffer: &mut [u8]) -> Result<usize, VirtualDiskError>;

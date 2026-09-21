@@ -27,6 +27,7 @@ windows-sys = { version = "0.52", features = [
   "Win32_Security",
 ] }
 windows-service = "0.7"
+ntfs = "0.4.0"
 
 
 

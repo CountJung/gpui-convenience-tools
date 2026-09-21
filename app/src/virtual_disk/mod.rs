@@ -8,6 +8,7 @@
 
 pub mod vdi;
 pub mod partition;
+pub mod ntfs;
 
 use std::{fmt, io, path::PathBuf};
 
@@ -133,6 +134,7 @@ impl GuestFileAttributes {
     pub const REPARSE_POINT: Self = Self(0x0400);
     pub const COMPRESSED: Self = Self(0x0800);
     pub const OFFLINE: Self = Self(0x1000);
+    pub const NOT_CONTENT_INDEXED: Self = Self(0x2000);
     pub const ENCRYPTED: Self = Self(0x4000);
 
     pub const fn from_bits(bits: u32) -> Self {

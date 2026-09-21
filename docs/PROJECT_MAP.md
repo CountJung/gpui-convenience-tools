@@ -17,7 +17,7 @@
 | `app/src/virtual_disk/mod.rs` | **구현됨** — `GuestFileSource`·파일 항목·오류 타입·백엔드 경계 | VDE-003 |
 | `app/src/virtual_disk/vdi.rs` | **구현됨** — VDI 1.1 read-only 블록 리더와 잠금·VM 사용·원본 안정성 가드 | VDE-004~005 |
 | `app/src/virtual_disk/partition.rs` | **구현됨** — MBR·EBR·protective MBR·GPT 검색과 CRC·범위 검증 | VDE-006 |
-| `app/src/virtual_disk/ntfs.rs` | NTFS 디렉터리 열거·스트림 읽기·속성 보존 | VDE-007~008 |
+| `app/src/virtual_disk/ntfs.rs` | **구현됨** — NTFS 디렉터리 열거·기본 데이터 스트림 읽기·속성 보존 | VDE-007; VDE-008 예정 |
 | `app/src/virtual_disk/copy.rs` | 안전한 호스트 경로 매핑·청크 복사·충돌 정책 | VDE-009~012 |
 | `app/src/window/virtual_disk.rs` | VDI 선택·파티션·탐색·선택·단축키·진행 UI | VDE-013~017 |
 | `app/src/app/virtual_disk_ops.rs` | 탐색기 상태·이벤트·복사 작업 조작 | VDE-013~016 |
@@ -25,7 +25,7 @@
 안전 경계: 원본 VDI는 read-only로만 열고, 실행 중 VM의 VDI 직접 읽기는 구현하지 않는다.
 실행 중 VM 지원은 후속 `GuestFileSource` 구현으로만 추가한다(VDE-021).
 
-**최종 측정**: 2026-09-21 · `app/src` 총 40개 파일 · 14,845줄
+**최종 측정**: 2026-09-21 · `app/src` 총 42개 파일 · 15,354줄
 
 ## 크기 기준 — 줄 수는 증상이다
 
@@ -39,7 +39,7 @@
 | 800~1,000 | 🟡 경고 | 다음 작업 전에 구조 리팩터링 |
 | 1,000 초과 | 🔴 위반 | **즉시 리팩터링.** 다른 작업보다 우선 |
 
-현재 🔴 위반 **없음**, 🟡 경고 **없음**. 최대 파일은 729줄(`app/mod.rs`).
+현재 🔴 위반 **없음**, 🟡 경고 **없음**. 최대 파일은 782줄(`virtual_disk/vdi.rs`).
 줄 수와 무관하게 처리하는 중복 헬퍼는 아래 「중복 헬퍼 추적」에서 관리한다.
 
 ### 줄 수 측정 명령
@@ -68,13 +68,14 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `logging.rs` | 560 | 롤링 파일 로거 (`log::Log` 구현, 테스트용 출력 경로 주입) |
 | `util.rs` | 139 | 도메인 주인이 없는 순수 헬퍼 — `format_interval`·`interval_to_secs`·`TimeUnit` |
 
-### VirtualBox 도메인 (`app/src/virtual_disk/`) — 1,789줄 / 3파일
+### VirtualBox 도메인 (`app/src/virtual_disk/`) — 2,424줄 / 4파일
 
 | 파일 | 줄 | 책임 |
 | --- | ---: | --- |
 | `mod.rs` | 406 | VDI·파티션·게스트 파일 항목 모델, 정규화된 게스트 경로, `GuestFileSource`, 플랫폼 비의존 오류 계약 |
 | `vdi.rs` | 782 | VDI 1.1 read-only 헤더·블록 맵·동적/고정 블록 읽기, 잠금·VM 사용·크기/mtime 안정성 가드 |
 | `partition.rs` | 729 | read-only `PartitionSource` 경계, MBR·EBR·protective MBR·GPT 검색, 양쪽 CRC·LBA 범위 검증 |
+| `ntfs.rs` | 507 | 파티션 범위 `Read + Seek` 어댑터, NTFS 3.1 디렉터리·기본 데이터 스트림 읽기, DOS 별칭 제외와 속성 보존 |
 
 ### 동기화 엔진 (`app/src/sync/`) — 1,246줄 / 2파일
 
@@ -284,6 +285,7 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | 2026-09-21 | `virtual_disk/vdi.rs` | VDE-004 VDI 블록 리더 추가 | VDI 헤더·블록 맵 구현 없음 | 512줄의 read-only 헤더·맵 검증·동적/고정 블록 읽기 | 파티션·NTFS·잠금 안정성은 VDE-005~008에서 연결 |
 | 2026-09-21 | `virtual_disk/vdi.rs` | VDE-005 안전 가드 추가 | 파일 잠금·원본 변경·실행 중 VM 대조 없음 | 782줄의 잠금 표식·환경변수 기반 VBoxManage 조회·크기/mtime 스냅샷·read-only 핸들 검증 | 800줄 주의 구간에 접근했으므로 VDE-006 전에 책임 단위 분할 후보를 검토 |
 | 2026-09-21 | `virtual_disk/partition.rs` | VDE-006 MBR/GPT 파서 추가 | 파티션 검색 구현 없음 | 729줄의 MBR·EBR·GPT 양쪽 CRC·범위 검증과 `PartitionSource` 어댑터 | NTFS 파일시스템 판정은 VDE-007~008에서 연결 |
+| 2026-09-21 | `virtual_disk/ntfs.rs` | VDE-007 NTFS 읽기 전용 어댑터 추가 | NTFS 디렉터리·스트림 접근 구현 없음 | 507줄의 파티션 범위 `Read + Seek`, NTFS 3.1 열거·기본 스트림 읽기·속성 보존과 env 주입 이미지 테스트 | 압축·암호화·항목별 오류 억제는 VDE-008에서 연결 |
 | 2026-07-29 | 편의 기능 스플리터 3곳 | 공용 레이아웃 승격 | 패널별 고정 초기 폭 | `window::balanced_split` | 설정 pane 과도 축소 방지, 양쪽 가용폭 사용 |
 | 2026-07-29 | `app.rs` | 책임 단위 분할 + 재배치 | 1,798 | `app/` 7파일 (최대 564) | 대시보드·로그 렌더는 소유가 잘못돼 있어 `window/`로 이동 |
 | 2026-07-29 | `platform/windows.rs` | 책임 단위 분할 + 승격 | 1,361 | `platform/windows/` 6파일 (최대 344) | `wide_null`을 `windows/mod.rs`로 **공용 승격** |

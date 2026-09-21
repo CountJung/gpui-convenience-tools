@@ -509,6 +509,26 @@ VDE-003은 플랫폼 비의존 공통 타입과 `UnsupportedFormatKind`·`IoOper
 GPT 서명·헤더·CRC·배열 범위 기준은 [UEFI GPT 디스크 레이아웃](https://uefi.org/specs/UEFI/2.10/05_GUID_Partition_Table_Format.html)을
 참조했다.
 
+### Phase O-6 — VDE-007 NTFS 읽기 전용 탐색 완료 ✅
+
+`app/src/virtual_disk/ntfs.rs`에 `ntfs` 0.4.0을 사용하는 읽기 전용 `GuestFileSource` 어댑터를
+추가했다.
+
+- 파티션의 시작 오프셋과 정확한 길이만 `Read + Seek`로 노출하여 NTFS가 파티션 밖을 읽지 않게
+  하고, VDI의 `PartitionSource` 오류를 원래 오류 계약으로 되돌린다.
+- NTFS 3.1만 열고 `$UpCase` 테이블을 먼저 읽어 대소문자 비구분 경로 탐색을 활성화한다.
+  루트·하위 디렉터리 열거는 DOS 8.3 별칭과 `.`/`..` 항목을 중복 표시하지 않는다.
+- 숨김·시스템·읽기 전용을 포함한 Windows 파일 속성을 목록 모델에 보존하며, 기본 이름 없는
+  `$DATA` 스트림을 offset 기반으로 읽고 파일 크기 밖의 요청은 `BoundsViolation`으로 거부한다.
+- `PartitionIo`의 범위·seek·속성 비트 단위 테스트와 함께
+  `GPUI_CONVENIENCE_TOOLS_NTFS_TEST_IMAGE`로 실제 NTFS 이미지를 주입하는 읽기 전용 검증을
+  추가했다. 고정 합성 이미지·손상 이미지 회귀는 VDE-018에서 별도로 확정한다.
+
+검증은 `cargo check -p gpui-convenience-tools`, `cargo test -p gpui-convenience-tools`의
+95개 통과·3개 무시와 환경변수 주입 실제 NTFS 이미지 테스트 1개 통과로 완료했다. `ntfs`
+API 선택 근거는 [`ntfs` 0.4.0 문서](https://docs.rs/ntfs/0.4.0/ntfs/)와
+[공식 저장소](https://github.com/ColinFinck/ntfs)를 참조했다.
+
 ## 진행 예정 단계
 
 세부 체크리스트는 `TODO.md`를 정본으로 한다.
