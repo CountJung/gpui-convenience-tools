@@ -96,7 +96,7 @@
 
 ### D-5. 동기화 이력
 
-- [ ] D-020 | 90% | 패널에 최근 실행 이력 목록(성공/실패 건수, 소요 시간) — `sync-history.json` 로드·완료 후 새로고침·결과 건수/소요 시간 카드와 GPUI 수용 테스트 구현, `-SeedHistory`·`-InitialPanel FileSync`로 시드된 실제 패널 캡처 완료; 994×702·1280×900 2차 자체 세션에서 이력 카드 경계와 3행 표시를 재확인하고 `d020-second-pass-before-055457.png`, `d020-second-pass-resized-055501.png`를 남김; 독립 Visual Reviewer 확인은 후속
+- [ ] D-020 | 95% | 패널에 최근 실행 이력 목록(성공/실패 건수, 소요 시간) — `sync-history.json` 로드·완료 후 새로고침·결과 건수/소요 시간 카드와 GPUI 수용 테스트 구현, `-SeedHistory`·`-InitialPanel FileSync`로 시드된 실제 패널 캡처 완료; 994×702·1280×900 2차 자체 세션에서 이력 카드 경계와 3행 표시를 재확인하고 `d020-second-pass-before-055457.png`, `d020-second-pass-resized-055501.png`를 남겼으며, 최신 release에서도 `next-d020-history-065416.png`·`next-d020-history-1280-065430.png`로 재확인함; 1280×900에서 중지·실패 포함·성공 3행과 결과 건수가 카드 내부에 표시되고 세션 종료 후 프로세스·임시 루트가 0개였음; 독립 Visual Reviewer 확인은 후속
 
 ---
 
