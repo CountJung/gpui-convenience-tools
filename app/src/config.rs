@@ -5,6 +5,11 @@ use std::{fs, path::PathBuf};
 
 use crate::app::TargetApp;
 
+/// 앱 셸 사이드바의 기본 폭과 허용 범위.
+pub const DEFAULT_SIDEBAR_WIDTH: f32 = 240.0;
+const MIN_SIDEBAR_WIDTH: f32 = 200.0;
+const MAX_SIDEBAR_WIDTH: f32 = 360.0;
+
 /// 앱 전체 설정.
 ///
 /// 저장은 항상 전체 구조체 단위로 이루어진다. 부분 갱신이 필요하면
@@ -38,6 +43,9 @@ pub struct AppConfig {
     /// 파일 동기화 작업 목록.
     #[serde(default)]
     pub sync_jobs: Vec<SyncJob>,
+    /// 앱 셸 사이드바 폭(px).
+    #[serde(default = "default_sidebar_width")]
+    pub sidebar_width: f32,
     /// 로그 롤링 파일 설정.
     #[serde(default)]
     pub log: LogConfig,
@@ -45,6 +53,19 @@ pub struct AppConfig {
 
 fn default_scan_interval_secs() -> u32 {
     10
+}
+
+fn default_sidebar_width() -> f32 {
+    DEFAULT_SIDEBAR_WIDTH
+}
+
+/// 저장된 사이드바 폭을 현재 UI가 지원하는 범위로 보정한다.
+pub fn normalize_sidebar_width(width: f32) -> f32 {
+    if width.is_finite() {
+        width.clamp(MIN_SIDEBAR_WIDTH, MAX_SIDEBAR_WIDTH)
+    } else {
+        DEFAULT_SIDEBAR_WIDTH
+    }
 }
 
 /// 기본 주기 프리셋: 10초 · 30초 · 1분.
@@ -261,6 +282,7 @@ impl Default for AppConfig {
             interval_presets: default_interval_presets(),
             sync_enabled: true,
             sync_jobs: Vec::new(),
+            sidebar_width: DEFAULT_SIDEBAR_WIDTH,
             log: LogConfig::default(),
         }
     }
@@ -476,6 +498,15 @@ mod tests {
         // 신규 필드는 기본값으로 채워진다.
         assert!(config.log.file_enabled);
         assert_eq!(config.log.max_files, default_max_files());
+        assert_eq!(config.sidebar_width, DEFAULT_SIDEBAR_WIDTH);
+    }
+
+    #[test]
+    fn sidebar_width_is_normalized_to_supported_range() {
+        assert_eq!(normalize_sidebar_width(100.0), MIN_SIDEBAR_WIDTH);
+        assert_eq!(normalize_sidebar_width(480.0), MAX_SIDEBAR_WIDTH);
+        assert_eq!(normalize_sidebar_width(f32::NAN), DEFAULT_SIDEBAR_WIDTH);
+        assert_eq!(normalize_sidebar_width(320.0), 320.0);
     }
 
     /// 구버전 SyncJob에는 id가 없으므로 ensure_id로 채워야 한다.
@@ -573,6 +604,7 @@ mod tests {
             resume_cursor: Some("nested/file.txt".to_string()),
             ..SyncJob::default()
         }];
+        initial.sidebar_width = 320.0;
         initial.log.max_files = 17;
         save_config(&initial).expect("save initial config");
 
@@ -584,6 +616,7 @@ mod tests {
         assert_eq!(updated.targets[0].display_name, "Test target");
         assert_eq!(updated.favorite_services, vec!["TestService"]);
         assert_eq!(updated.sync_jobs[0].last_run_unix, Some(1_700_000_000));
+        assert_eq!(updated.sidebar_width, 320.0);
         assert_eq!(
             updated.sync_jobs[0].resume_cursor.as_deref(),
             Some("nested/file.txt")
@@ -596,6 +629,7 @@ mod tests {
         assert_eq!(persisted.scan_interval_secs, 45);
         assert_eq!(persisted.sync_jobs[0].source, r"D:\source");
         assert_eq!(persisted.sync_jobs[0].target, r"D:\target");
+        assert_eq!(persisted.sidebar_width, 320.0);
     }
 
     /// `label()`은 이름이 비었을 때 원본 폴더명으로 대체된다.

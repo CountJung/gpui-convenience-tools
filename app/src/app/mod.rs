@@ -49,7 +49,7 @@ use gpui_component::{
     resizable::{h_resizable, resizable_panel},
     scroll::{Scrollbar, ScrollbarShow},
     theme::ActiveTheme,
-    v_flex, VirtualListScrollHandle, TITLE_BAR_HEIGHT,
+    v_flex, PixelsExt, VirtualListScrollHandle, TITLE_BAR_HEIGHT,
 };
 use std::{
     sync::{Arc, Mutex},
@@ -58,7 +58,8 @@ use std::{
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 
 use crate::config::{
-    default_interval_presets, load_config, normalize_interval_presets, update_config, LogConfig,
+    default_interval_presets, load_config, normalize_interval_presets, normalize_sidebar_width,
+    update_config, LogConfig, DEFAULT_SIDEBAR_WIDTH,
 };
 use crate::platform::{NativePlatform, Platform};
 use crate::window::{
@@ -83,6 +84,7 @@ pub struct AppRoot {
     scanner_state: Arc<Mutex<ScannerState>>,
     subscriptions: Vec<Subscription>,
     pub(crate) scan_interval_secs: u32,
+    pub(crate) sidebar_width: f32,
     /// 스캔 주기·감시 주기가 공유하는 주기 선택 상태.
     pub(crate) interval_picker: IntervalPicker,
 
@@ -112,9 +114,11 @@ impl AppRoot {
         let mut log_config = LogConfig::default();
         let mut initial_interval_presets = default_interval_presets();
         let mut sync_enabled = true;
+        let mut sidebar_width = DEFAULT_SIDEBAR_WIDTH;
 
         if let Ok(Some(cfg)) = load_config() {
             sync_enabled = cfg.sync_enabled;
+            sidebar_width = normalize_sidebar_width(cfg.sidebar_width);
             app_state.is_active = cfg.service_enabled;
             if !cfg.targets.is_empty() {
                 app_state.targets = cfg.targets;
@@ -211,6 +215,7 @@ impl AppRoot {
             scanner_state,
             subscriptions: Vec::new(),
             scan_interval_secs: initial_scan_interval_secs,
+            sidebar_width,
             interval_picker: IntervalPicker {
                 presets: initial_interval_presets,
                 ..IntervalPicker::default()
@@ -574,6 +579,8 @@ impl Render for AppRoot {
         );
         let sidebar_scroll = self.sidebar_scroll_handle.clone();
         let content_scroll = self.content_scroll_handle.clone();
+        let initial_sidebar_width = px(normalize_sidebar_width(self.sidebar_width));
+        let persist_sidebar_width = !cfg!(test);
 
         v_flex()
             .size_full()
@@ -605,11 +612,31 @@ impl Render for AppRoot {
                     .flex_1()
                     .min_h_0()
                     .child(
-                        h_resizable("app-shell-split").child(
-                        resizable_panel()
-                            .size(px(240.0))
-                            .size_range(px(200.0)..px(360.0))
+                        h_resizable("app-shell-split")
+                            .on_resize(move |state, _window, cx| {
+                                if !persist_sidebar_width {
+                                    return;
+                                }
+                                let Some(width) = state
+                                    .read(cx)
+                                    .sizes()
+                                    .first()
+                                    .map(|size| size.as_f32())
+                                else {
+                                    return;
+                                };
+                                let width = normalize_sidebar_width(width);
+                                if let Err(err) =
+                                    update_config(|config| config.sidebar_width = width)
+                                {
+                                    log::warn!("사이드바 폭 저장 실패: {err}");
+                                }
+                            })
                             .child(
+                                resizable_panel()
+                                    .size(initial_sidebar_width)
+                                    .size_range(px(200.0)..px(360.0))
+                                    .child(
                                 div()
                                     .debug_selector(|| "sidebar-pane".to_string())
                                     .size_full()
