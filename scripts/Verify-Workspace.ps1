@@ -59,6 +59,10 @@ try {
     Write-Host "Surface policy: IDE-safe verification only."
     Write-Host "Computer Use is not initialized or retried by this script."
 
+    Invoke-CheckedCommand -Executable "pwsh" -Arguments @(
+        "-NoProfile", "-File", (Join-Path $repoRoot "scripts\Assert-ProjectDocs.ps1")
+    )
+
     Invoke-CheckedCommand -Executable "cargo" -Arguments @(
         "check", "-p", $packageName
     )

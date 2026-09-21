@@ -27,6 +27,8 @@
 테스트를 재실행해 `IDE_VERIFIED`를 출력했다. 실제 데스크톱 표면은 별도 포그라운드 조건이
 필요하므로 같은 실행에서 `DESKTOP_PENDING`으로 분리했다. 전체 `cargo fmt --check`는 기존
 baseline 포맷 차이가 남아 있어 별도 구조 정리 범위로 유지한다.
+이번 실행에서는 `DOCS_VERIFIED active=23 matrix=23`도 먼저 통과해 활성 TODO와 검증
+매트릭스의 일대일 대응을 확인했다.
 
 ## 작업마다 적용하는 순서
 
@@ -60,6 +62,8 @@ pwsh -NoProfile -File .\scripts\Verify-Workspace.ps1
 
 `Verify-Workspace.ps1`가 실패하면 작업을 완료로 체크하지 않는다. 실패가 기존 baseline인지
 확인한 경우에도 원문 오류, 실행 명령, 영향 범위를 작업 기록에 남긴다.
+이 스크립트는 코드 테스트 전에 `scripts/Assert-ProjectDocs.ps1`를 실행해 활성 TODO ID와
+검증 매트릭스의 일대일 대응도 확인한다.
 
 ### 3. GPUI E2E 수용 테스트 작성·실행
 
