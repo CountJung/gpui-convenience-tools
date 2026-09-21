@@ -40,6 +40,7 @@ pub fn balanced_split(
                         .size_full()
                         .min_w_0()
                         .min_h_0()
+                        .overflow_x_hidden()
                         .child(left),
                 ),
         )
@@ -52,6 +53,7 @@ pub fn balanced_split(
                         .size_full()
                         .min_w_0()
                         .min_h_0()
+                        .overflow_x_hidden()
                         .child(right),
                 ),
         )
@@ -77,11 +79,19 @@ pub fn scroll_pane(id: &'static str, handle: &ScrollHandle, content: AnyElement)
                 .id(id)
                 .debug_selector(move || id.to_string())
                 .size_full()
+                .w_full()
+                .min_w_0()
                 .min_h_0()
                 .overflow_x_hidden()
                 .overflow_y_scroll()
                 .track_scroll(handle)
-                .child(content),
+                .child(
+                    div()
+                        .w_full()
+                        .min_w_0()
+                        .overflow_x_hidden()
+                        .child(content),
+                ),
         )
         .child(
             div()

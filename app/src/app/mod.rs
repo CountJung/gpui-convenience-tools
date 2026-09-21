@@ -684,7 +684,9 @@ impl Render for AppRoot {
                                                 .id("content-area")
                                                 .debug_selector(|| "content-area".to_string())
                                                 .size_full()
+                                                .min_w_0()
                                                 .p_4()
+                                                .overflow_x_hidden()
                                                 .child(panel),
                                         )
                                     } else {
@@ -694,7 +696,9 @@ impl Render for AppRoot {
                                                     .id("content-area")
                                                     .debug_selector(|| "content-area".to_string())
                                                     .size_full()
+                                                    .min_w_0()
                                                     .p_4()
+                                                    .overflow_x_hidden()
                                                     .overflow_y_scroll()
                                                     .track_scroll(&content_scroll)
                                                     .child(panel),

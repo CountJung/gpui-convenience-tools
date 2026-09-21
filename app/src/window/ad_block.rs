@@ -84,52 +84,104 @@ fn render_status_and_targets(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> A
             let class = target.ad_window_class.clone();
 
             target_rows = target_rows.child(
-                h_flex()
-                    .h(px(48.0))
+                v_flex()
+                    .debug_selector(move || format!("ad-block-target-row-{ix}"))
+                    .w_full()
+                    .min_w_0()
                     .px_3()
-                    .gap_2()
-                    .items_center()
+                    .py_2()
+                    .gap_1()
+                    .overflow_x_hidden()
                     .border_b_1()
                     .border_color(border)
                     .hover(|s| s.bg(theme.secondary_hover))
                     .child(
-                        v_flex()
-                            .flex_1()
+                        h_flex()
+                            .w_full()
                             .min_w_0()
-                            .child(div().text_color(fg).child(display))
-                            .child(div().text_color(muted_fg).child(process)),
-                    )
-                    .child(div().w(px(150.0)).text_color(muted_fg).child(class))
-                    .child(
-                        div()
-                            .w(px(56.0))
-                            .flex()
+                            .gap_2()
                             .items_center()
-                            .justify_center()
+                            .overflow_hidden()
                             .child(
-                                ui::toggle_switch(("target-switch", ix), enabled, cx).on_click(
-                                    cx.listener(move |this, checked: &bool, window, cx| {
-                                        this.set_target_enabled(ix, *checked, window, cx);
-                                    }),
-                                ),
+                                v_flex()
+                                    .flex_1()
+                                    .min_w_0()
+                                    .overflow_hidden()
+                                    .child(
+                                        div()
+                                            .text_color(fg)
+                                            .whitespace_nowrap()
+                                            .overflow_hidden()
+                                            .child(display),
+                                    )
+                                    .child(
+                                        div()
+                                            .text_color(muted_fg)
+                                            .whitespace_nowrap()
+                                            .overflow_hidden()
+                                            .child(process),
+                                    ),
+                            )
+                            .child(
+                                div()
+                                    .w(px(56.0))
+                                    .flex_shrink_0()
+                                    .flex()
+                                    .items_center()
+                                    .justify_center()
+                                    .child(
+                                        ui::toggle_switch(("target-switch", ix), enabled, cx)
+                                            .on_click(cx.listener(
+                                                move |this, checked: &bool, window, cx| {
+                                                    this.set_target_enabled(
+                                                        ix, *checked, window, cx,
+                                                    );
+                                                },
+                                            )),
+                                    ),
+                            )
+                            .child(
+                                div()
+                                    .id(("target-remove", ix))
+                                    .w(px(36.0))
+                                    .flex_shrink_0()
+                                    .flex()
+                                    .items_center()
+                                    .justify_center()
+                                    .rounded_md()
+                                    .py_1()
+                                    .cursor_pointer()
+                                    .text_color(theme.danger)
+                                    .hover(|s| {
+                                        s.bg(theme.danger).text_color(theme.danger_foreground)
+                                    })
+                                    .on_click(cx.listener(move |this, _ev, window, cx| {
+                                        this.remove_target(ix, window, cx);
+                                    }))
+                                    .child("×"),
                             ),
                     )
                     .child(
-                        div()
-                            .id(("target-remove", ix))
-                            .w(px(36.0))
-                            .flex()
-                            .items_center()
-                            .justify_center()
-                            .rounded_md()
-                            .py_1()
-                            .cursor_pointer()
-                            .text_color(theme.danger)
-                            .hover(|s| s.bg(theme.danger).text_color(theme.danger_foreground))
-                            .on_click(cx.listener(move |this, _ev, window, cx| {
-                                this.remove_target(ix, window, cx);
-                            }))
-                            .child("×"),
+                        h_flex()
+                            .w_full()
+                            .min_w_0()
+                            .gap_2()
+                            .child(
+                                div()
+                                    .flex_shrink_0()
+                                    .text_color(muted_fg)
+                                    .child("창 클래스"),
+                            )
+                            .child(
+                                div()
+                                    .flex_1()
+                                    .min_w_0()
+                                    .debug_selector(move || format!("ad-block-target-class-{ix}"))
+                                    .whitespace_nowrap()
+                                    .overflow_hidden()
+                                    .text_color(muted_fg)
+                                    .child(class),
+                            ),
                     ),
             );
         }
@@ -143,6 +195,9 @@ fn render_status_and_targets(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> A
         // ── 상태 카드 ──
         .child(
             div()
+                .debug_selector(|| "ad-block-status-card".to_string())
+                .w_full()
+                .min_w_0()
                 .rounded_lg()
                 .p_4()
                 .bg(card)
@@ -150,6 +205,9 @@ fn render_status_and_targets(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> A
                 .border_color(border)
                 .child(
                     v_flex()
+                        .w_full()
+                        .min_w_0()
+                        .overflow_x_hidden()
                         .gap_3()
                         .child(
                             h_flex()
@@ -159,12 +217,11 @@ fn render_status_and_targets(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> A
                         )
                         .child(
                             h_flex()
+                                .w_full()
+                                .min_w_0()
                                 .gap_3()
-                                .child(ui::stat_tile(
-                                    "누적 차단",
-                                    blocked_count.to_string(),
-                                    cx,
-                                ))
+                                .overflow_x_hidden()
+                                .child(ui::stat_tile("누적 차단", blocked_count.to_string(), cx))
                                 .child(ui::stat_tile(
                                     "활성 타겟",
                                     format!("{active_targets} / {total_targets}"),
@@ -181,34 +238,50 @@ fn render_status_and_targets(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> A
         // ── 타겟 목록 카드 ──
         .child(
             div()
+                .debug_selector(|| "ad-block-target-card".to_string())
+                .w_full()
+                .min_w_0()
                 .rounded_lg()
                 .bg(card)
                 .border_1()
                 .border_color(border)
                 .child(
                     v_flex()
+                        .w_full()
+                        .min_w_0()
+                        .overflow_x_hidden()
                         .child(
-                            h_flex()
+                            v_flex()
+                                .w_full()
+                                .min_w_0()
                                 .px_3()
                                 .py_2()
+                                .gap_1()
                                 .border_b_1()
                                 .border_color(border)
-                                .gap_2()
+                                .overflow_x_hidden()
                                 .child(
-                                    div()
-                                        .flex_1()
+                                    h_flex()
+                                        .w_full()
                                         .min_w_0()
-                                        .text_color(muted_fg)
-                                        .child("표시 이름 / 프로세스"),
+                                        .gap_2()
+                                        .child(
+                                            div()
+                                                .flex_1()
+                                                .min_w_0()
+                                                .text_color(muted_fg)
+                                                .child("표시 이름 / 프로세스"),
+                                        )
+                                        .child(
+                                            div()
+                                                .w(px(56.0))
+                                                .flex_shrink_0()
+                                                .text_color(muted_fg)
+                                                .child("활성"),
+                                        )
+                                        .child(div().w(px(36.0))),
                                 )
-                                .child(
-                                    div()
-                                        .w(px(150.0))
-                                        .text_color(muted_fg)
-                                        .child("광고 창 클래스"),
-                                )
-                                .child(div().w(px(56.0)).text_color(muted_fg).child("활성"))
-                                .child(div().w(px(36.0))),
+                                .child(div().text_color(muted_fg).child("창 클래스")),
                         )
                         .child(target_rows),
                 ),
@@ -293,10 +366,13 @@ fn render_settings(
 
         proc_rows = proc_rows.child(
             h_flex()
+                .w_full()
+                .min_w_0()
                 .h(px(34.0))
                 .px_3()
                 .gap_2()
                 .items_center()
+                .overflow_x_hidden()
                 .border_b_1()
                 .border_color(border)
                 .hover(|s| s.bg(theme.secondary_hover))
@@ -304,6 +380,8 @@ fn render_settings(
                     div()
                         .flex_1()
                         .min_w_0()
+                        .overflow_hidden()
+                        .whitespace_nowrap()
                         .text_color(if exists { muted_fg } else { fg })
                         .child(process_name.clone()),
                 )
@@ -319,6 +397,9 @@ fn render_settings(
         // ── 전역 활성 + 스캔 주기 ──
         .child(
             div()
+                .debug_selector(|| "ad-block-settings-card".to_string())
+                .w_full()
+                .min_w_0()
                 .rounded_lg()
                 .bg(card)
                 .border_1()
@@ -326,6 +407,9 @@ fn render_settings(
                 .p_4()
                 .child(
                     v_flex()
+                        .w_full()
+                        .min_w_0()
+                        .overflow_x_hidden()
                         .gap_3()
                         .child(ui::option_row(
                             "ad-block-enable",
@@ -348,24 +432,42 @@ fn render_settings(
         // ── 실행 중인 프로세스 ──
         .child(
             div()
+                .debug_selector(|| "ad-block-process-card".to_string())
+                .w_full()
+                .min_w_0()
                 .rounded_lg()
                 .bg(card)
                 .border_1()
                 .border_color(border)
                 .child(
                     v_flex()
+                        .w_full()
+                        .min_w_0()
+                        .overflow_x_hidden()
                         .child(
                             h_flex()
+                                .w_full()
+                                .min_w_0()
                                 .px_3()
                                 .py_2()
                                 .border_b_1()
                                 .border_color(border)
                                 .justify_between()
+                                .overflow_x_hidden()
                                 .items_center()
-                                .child(div().text_color(fg).child("실행 중인 프로세스"))
+                                .child(
+                                    div()
+                                        .flex_1()
+                                        .min_w_0()
+                                        .overflow_hidden()
+                                        .text_color(fg)
+                                        .child("실행 중인 프로세스"),
+                                )
                                 .child(
                                     div()
                                         .id("refresh-running-processes")
+                                        .flex_shrink_0()
+                                        .whitespace_nowrap()
                                         .rounded_md()
                                         .px_3()
                                         .py_1()
@@ -398,4 +500,3 @@ fn render_settings(
 // ─────────────────────────────────────────────
 // 공통 조각
 // ─────────────────────────────────────────────
-

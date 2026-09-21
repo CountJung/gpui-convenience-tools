@@ -225,6 +225,8 @@ pub fn stat_tile(label: impl Into<SharedString>, value: impl Into<SharedString>,
 
     div()
         .flex_1()
+        .min_w_0()
+        .overflow_hidden()
         .rounded_md()
         .px_3()
         .py_3()
@@ -234,8 +236,21 @@ pub fn stat_tile(label: impl Into<SharedString>, value: impl Into<SharedString>,
         .child(
             v_flex()
                 .gap_1()
-                .child(div().text_color(t.muted_foreground).child(label.into()))
-                .child(div().text_color(t.foreground).child(value.into())),
+                .min_w_0()
+                .child(
+                    div()
+                        .min_w_0()
+                        .overflow_hidden()
+                        .text_color(t.muted_foreground)
+                        .child(label.into()),
+                )
+                .child(
+                    div()
+                        .min_w_0()
+                        .overflow_hidden()
+                        .text_color(t.foreground)
+                        .child(value.into()),
+                ),
         )
 }
 
@@ -254,6 +269,9 @@ pub fn option_row(
     let t = cx.theme();
 
     h_flex()
+        .w_full()
+        .min_w_0()
+        .overflow_x_hidden()
         .debug_selector(move || format!("{id}-row"))
         .gap_3()
         .items_center()
@@ -270,6 +288,7 @@ pub fn option_row(
         )
         .child(
             div()
+                .flex_shrink_0()
                 .debug_selector(move || id.to_string())
                 .child(toggle_switch(id, checked, cx).on_click(on_click)),
         )

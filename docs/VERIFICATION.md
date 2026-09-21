@@ -111,7 +111,6 @@ SHA-256을 기록한다. 다른 검증자의 독립 검토가 요구되는 UI �
 
 | ID | 프로필 | B | T | E | V | R | C | 증거 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| AD-005 | E2E | [x] | [x] | [ ] | [ ] | [x] | [ ] | ToolHelp 프로세스 트리·자식 창 후보 탐색 구현; `window_ops::tests` 10개 통과; 읽기 전용 `Verify-AdWindowState.ps1 -ProcessId 26440 -IncludeChildWindows -ClassFilter Chrome_WidgetWin_1`에서 WebView2 호스트 PID 9468의 `Chrome_WidgetWin_1` 자식 창(380×91)을 확인했지만 현재 숨김 상태라 실제 0×0 E2E와 커밋 게이트는 미완료 |
 | VDE-004 | RUST | [ ] | [ ] | — | — | [ ] | [ ] | — |
 | VDE-005 | RUST | [ ] | [ ] | — | — | [ ] | [ ] | — |
 | VDE-006 | RUST | [ ] | [ ] | — | — | [ ] | [ ] | — |
@@ -174,6 +173,8 @@ SHA-256을 기록한다. 다른 검증자의 독립 검토가 요구되는 UI �
 | AD-002 | RUST | [x] | [x] | — | — | [x] | [x] | `window_ops::tests` 5개 통과; `cargo check --locked`; `Verify-AdWindowState.ps1 -ProcessId 26440`로 KakaoTalk/WebView2 관련 PID·창 상태를 읽기 전용 확인; 실제 사용자 창 조작은 수행하지 않음 |
 | AD-003 | RUST | [x] | [x] | — | — | [x] | [x] | `window_ops::tests` 7개 통과(전용 0×0 fixture 포함); `cargo check --locked`; `SetWindowPos` 0×0·`EnableWindow(FALSE)`·원상 복원 검증; 사용자 PID 26440은 읽기 전용 상태 확인만 수행 |
 | AD-004 | RUST | [x] | [x] | — | — | [x] | [x] | `window_ops::tests` 9개 통과(다중 tool-window fixture·무효 HWND 경계 포함); 다중 HWND 추적·닫힌/재생성 창 정리·프로세스 ID 재사용 방어·수동 상태 변경 재축소·창별 복원 실패 로그 구현; 전체 테스트 및 `Verify-Workspace.ps1` 통과 |
+| AD-005 | E2E | [x] | [x] | [x] | [x] | [x] | [ ] | ToolHelp 프로세스 트리·`Chrome_WidgetWin_1` 자식 후보 탐색 구현; 사용자 제공 실제 KakaoTalk 광고영역 0×0 확인으로 닫음; 구현 세션의 격리 릴리즈 캡처는 `target/visual-validation/captures/ad-panel-contained-rows-final-2-154739.png` |
+| UI-001 | GPUI | [x] | [x] | [x] | [x] | [x] | [ ] | `ad_block_cards_contain_long_content_at_supported_widths`가 920/994/1000/1280px에서 카드·행·클래스 열 경계 통과; 릴리즈 `CLAUDE_LOCAL` 1085×804 캡처 `target/visual-validation/captures/ad-panel-contained-rows-final-2-154739.png`에서 `KakaoTalk.exe`·`Chrome_WidgetWin_1` 표시와 카드 경계 확인 |
 | VDE-003 | RUST | [x] | [x] | — | — | [x] | [x] | `virtual_disk` 5개 테스트, 전체 대상 59개 통과; `cargo check --locked` 통과; VDI 파서·UI는 후속 ID 범위 |
 
 ### 증거 기록 형식

@@ -25,7 +25,7 @@
 안전 경계: 원본 VDI는 read-only로만 열고, 실행 중 VM의 VDI 직접 읽기는 구현하지 않는다.
 실행 중 VM 지원은 후속 `GuestFileSource` 구현으로만 추가한다(VDE-021).
 
-**최종 측정**: 2026-09-21 · `app/src` 총 39개 파일 · 12,661줄
+**최종 측정**: 2026-09-21 · `app/src` 총 39개 파일 · 13,035줄
 
 ## 크기 기준 — 줄 수는 증상이다
 
@@ -83,13 +83,13 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `mod.rs` | 545 | 폴더 동기화 엔진 (UI 비의존 순수 로직) — 진행 보고·중지·이어서 시작 제어 포함 |
 | `tests.rs` | 514 | 복사·건너뜀·미러 삭제·실패 사유·진행 보고·중지·이어서 시작 단위 테스트 |
 
-### 앱 루트 (`app/src/app/`) — 2,736줄 / 8파일
+### 앱 루트 (`app/src/app/`) — 2,740줄 / 8파일
 
 `app.rs`(1,798줄)를 책임별로 분할한 결과다.
 
 | 파일 | 줄 | 책임 |
 | --- | ---: | --- |
-| `mod.rs` | 723 | `AppRoot` 정의·생성자·백그라운드 UI wake·사이드바(전역 스위치 2개 포함)·최상위 레이아웃 |
+| `mod.rs` | 727 | `AppRoot` 정의·생성자·백그라운드 UI wake·사이드바(전역 스위치 2개 포함)·최상위 레이아웃 |
 | `sync_ops.rs` | 436 | 파일 동기화 작업 조작 (추가·삭제·선택·입력 저장·수동 실행 큐·중지·전역 스위치·커서 무효화) |
 | `interval.rs` | 313 | 주기 선택 상태(`IntervalPicker`)와 조작 — 프리셋 추가·삭제·드롭다운 동기화 |
 | `events.rs` | 271 | `PlatformEvent` 채널 소비, 진행 상태 반영, 로그·토스트 유틸 |
@@ -98,7 +98,7 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `ops.rs` | 195 | 광고 차단·서비스 관리·로그 설정 조작 |
 | `inputs.rs` | 129 | 입력 위젯(`InputState`) 지연 생성과 값 동기화 |
 
-### GPUI 회귀 테스트 (`app/src/app/tests/`) — 1,446줄 / 5파일
+### GPUI 회귀 테스트 (`app/src/app/tests/`) — 1,519줄 / 5파일
 
 `app/tests.rs`(929줄, 🟡)를 시나리오별로 나눈 결과다. 픽스처는 `mod.rs`가 단독 소유하고
 하위 모듈은 `use super::*`로 가져다 쓴다.
@@ -106,27 +106,27 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | 파일 | 줄 | 책임 |
 | --- | ---: | --- |
 | `file_sync.rs` | 639 | 동기화 조작·진행 표시줄·중지·로그 요약·섹션 너비·전역 스위치·커서 무효화 |
-| `layout.rs` | 324 | 사이드바·스플리터·divider drag·스크롤 |
+| `layout.rs` | 397 | 사이드바·스플리터·카드 경계·divider drag·스크롤 |
 | `interval.rs` | 226 | 주기 드롭다운·프리셋 추가/삭제·패널 간 공유 |
 | `mod.rs` | 172 | 공용 픽스처 (`test_app_root`·`TestPlatform`·`refresh`·`click_debug_element` 등) |
 | `theme.rs` | 85 | 테마 전환과 스위치 가시성 |
 
-### 패널 (`app/src/window/`) — 3,281줄 / 10파일
+### 패널 (`app/src/window/`) — 3,429줄 / 10파일
 
 | 파일 | 줄 | 책임 |
 | --- | ---: | --- |
 | `service_mgr.rs` | 672 | 편의 기능 — Windows 서비스 (목록/제어 ↔ 검색·필터·권한) |
 | `file_sync.rs` | 612 | 편의 기능 — 파일 동기화 (작업 목록 → 설정 → 실패 기록 + 하단 고정 진행 표시줄) |
 | `settings.rs` | 444 | 전역 설정 — 테마 선택·로그 보관 정책 |
-| `ad_block.rs` | 400 | 편의 기능 — 웹뷰 광고 차단 (상태·타겟 ↔ 스캔 주기·프로세스 추가) |
+| `ad_block.rs` | 502 | 편의 기능 — 웹뷰 광고 차단 (상태·타겟 ↔ 스캔 주기·프로세스 추가·카드 경계) |
 | `service_view.rs` | 318 | 시스템 — 자동 시작(작업 스케줄러) 등록·삭제·즉시 실행 |
-| `ui.rs` | 322 | **공용 UI 프리미티브** — 배지·액션 버튼·토글 스위치·통계 타일·설정 행·선택 칩·로그 레벨 칸 |
+| `ui.rs` | 341 | **공용 UI 프리미티브** — 배지·액션 버튼·토글 스위치·통계 타일·설정 행·선택 칩·로그 레벨 칸·폭 경계 |
 | `dashboard.rs` | 161 | 개요 — 전체 상태 요약과 최근 활동 (플랫폼별 요약 카드 + 동기화 상태 배지) |
-| `interval.rs` | 146 | 주기 선택 렌더 — 드롭다운 + (값·단위·추가) 행 + 등록된 프리셋 목록 |
+| `interval.rs` | 156 | 주기 선택 렌더 — 드롭다운 + (값·단위·추가) 행 + 등록된 프리셋 목록 |
 | `log_view.rs` | 110 | 시스템 — 화면 로그 가상 리스트와 로그 파일 현황 |
-| `mod.rs` | 96 | 패널 모듈 선언 + `balanced_split`·`scroll_pane` 레이아웃 헬퍼 |
+| `mod.rs` | 106 | 패널 모듈 선언 + `balanced_split`·`scroll_pane` 레이아웃 헬퍼 |
 
-### 플랫폼 (`app/src/platform/`) — 2,191줄 / 8파일
+### 플랫폼 (`app/src/platform/`) — 2,390줄 / 8파일
 
 `windows.rs`(1,361줄)를 책임별로 분할한 결과다.
 
@@ -157,7 +157,7 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `.claude/agents/docs-sync.md` | 11 | Claude용 Documentation Sync 얇은 어댑터 |
 | `.codex/agents/code-reviewer.toml` | 9 | Codex용 Code Reviewer 얇은 어댑터 |
 | `.codex/agents/docs-sync.toml` | 9 | Codex용 Documentation Sync 얇은 어댑터 |
-| `scripts/Verify-Workspace.ps1` | 166 | VS Code용 Rust/GPUI 자동 검증과 ChatGPT 데스크톱 handoff manifest·해시 고정 빌드 생성 |
+| `scripts/Verify-Workspace.ps1` | 167 | VS Code용 Rust/GPUI 자동 검증과 ChatGPT 데스크톱 handoff manifest·해시 고정 빌드 생성 |
 | `scripts/Invoke-ClaudeVisualCheck.ps1` | 450 | `CLAUDE_LOCAL` 시각 검증 하네스 — 격리 실행(`-SeedConfig`로 상태 재현)·창 캡처(`PrintWindow`)·입력(`SendInput`)·정리 |
 | `scripts/Verify-AdWindowState.ps1` | 282 | 지정 PID와 앱 조상·자손의 최상위·선택적 자식 창 상태와 클래스 후보를 읽기 전용 점검(AD-002·AD-005 진단) |
 | `scripts/Start-DesktopVisualValidation.ps1` | 126 | manifest 해시 검증 후 단일 임시 데이터 루트 격리 프로세스·세션 파일 생성과 실패 롤백 |

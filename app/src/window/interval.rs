@@ -55,9 +55,17 @@ pub fn render(
         .child(
             h_flex()
                 .w_full()
+                .min_w_0()
                 .gap_2()
                 .items_center()
-                .child(div().text_color(muted_fg).child("직접 추가"))
+                .overflow_x_hidden()
+                .child(
+                    div()
+                        .flex_shrink_0()
+                        .whitespace_nowrap()
+                        .text_color(muted_fg)
+                        .child("직접 추가"),
+                )
                 .child(
                     div()
                         .flex_1()
@@ -68,11 +76,13 @@ pub fn render(
                     div()
                         .debug_selector(|| "interval-unit-select".to_string())
                         .w(px(96.0))
+                        .flex_shrink_0()
                         .children(unit_select.as_ref().map(Select::new)),
                 )
                 .child(
                     div()
                         .debug_selector(|| "interval-add".to_string())
+                        .flex_shrink_0()
                         .child(ui::action_button(
                             "interval-add",
                             "추가",

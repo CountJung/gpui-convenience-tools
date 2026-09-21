@@ -10,6 +10,7 @@ $repoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 $packageName = "gpui-convenience-tools"
 $visualTests = @(
     "ad_block_split_fills_default_and_minimum_supported_width",
+    "ad_block_cards_contain_long_content_at_supported_widths",
     "split_panels_keep_settings_pane_usable_at_default_width",
     "service_rows_keep_names_readable_at_supported_window_widths",
     "sidebar_divider_drag_resizes_navigation_and_content",

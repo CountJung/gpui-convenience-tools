@@ -87,6 +87,51 @@ fn assert_feature_split_is_usable(
     );
 }
 
+fn assert_ad_cards_contain_long_target_content(cx: &mut gpui::VisualTestContext) {
+    let content = cx
+        .debug_bounds("content-area")
+        .expect("content area should be rendered");
+    let target_card = cx
+        .debug_bounds("ad-block-target-card")
+        .expect("ad target card should be rendered");
+    let target_row = cx
+        .debug_bounds("ad-block-target-row-0")
+        .expect("ad target row should be rendered");
+    let target_class = cx
+        .debug_bounds("ad-block-target-class-0")
+        .expect("ad target class should be rendered");
+    let process_card = cx
+        .debug_bounds("ad-block-process-card")
+        .expect("ad process card should be rendered");
+
+    let content_right = content.origin.x + content.size.width;
+    let target_card_right = target_card.origin.x + target_card.size.width;
+    let target_row_right = target_row.origin.x + target_row.size.width;
+    let target_class_right = target_class.origin.x + target_class.size.width;
+    let process_card_right = process_card.origin.x + process_card.size.width;
+
+    assert!(
+        target_card.origin.x >= content.origin.x
+            && target_card_right <= content_right,
+        "target card should stay inside the content container: content={content:?}, card={target_card:?}"
+    );
+    assert!(
+        target_row.origin.x >= target_card.origin.x
+            && target_row_right <= target_card_right,
+        "long target content should not push its row outside the card: card={target_card:?}, row={target_row:?}"
+    );
+    assert!(
+        target_class.origin.x >= target_row.origin.x
+            && target_class_right <= target_row_right,
+        "target class column should stay inside the target row: row={target_row:?}, class={target_class:?}"
+    );
+    assert!(
+        process_card.origin.x >= content.origin.x
+            && process_card_right <= content_right,
+        "process card should stay inside the content container: content={content:?}, card={process_card:?}"
+    );
+}
+
 fn assert_service_row_preserves_identity_width(cx: &mut gpui::VisualTestContext) {
     let row = cx
         .debug_bounds("service-row-0")
@@ -150,6 +195,34 @@ fn ad_block_split_fills_default_and_minimum_supported_width(cx: &mut TestAppCont
     ));
     refresh(cx);
     assert_ad_split_uses_available_width(cx);
+}
+
+#[gpui::test]
+fn ad_block_cards_contain_long_content_at_supported_widths(cx: &mut TestAppContext) {
+    initialize_components(cx);
+    let (view, cx) = cx.add_window_view(|_, _| test_app_root(ActivePanel::AdBlock));
+
+    cx.update(|_, app| {
+        view.update(app, |root, cx| {
+            root.app_state.targets = vec![TargetApp {
+                process_name: "KakaoTalk.exe.with-a-very-long-process-name".to_string(),
+                display_name: "카카오톡 광고 대상 표시 이름이 아주 긴 경우".to_string(),
+                enabled: true,
+                ad_window_class: "Chrome_WidgetWin_1_With_Long_Class_Name".to_string(),
+            }];
+            root.running_processes = vec![
+                "KakaoTalk.exe.with-a-very-long-process-name".to_string(),
+                "another-process-with-a-long-name.exe".to_string(),
+            ];
+            cx.notify();
+        });
+    });
+
+    for width in [MIN_SUPPORTED_WINDOW_WIDTH, 994.0, DEFAULT_WINDOW_WIDTH, 1280.0] {
+        cx.simulate_resize(size(px(width), px(DEFAULT_WINDOW_HEIGHT)));
+        refresh(cx);
+        assert_ad_cards_contain_long_target_content(cx);
+    }
 }
 
 #[gpui::test]
