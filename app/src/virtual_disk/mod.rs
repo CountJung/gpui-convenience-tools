@@ -6,6 +6,7 @@
 // 아직 UI·파티션 계층이 연결되지 않은 도메인 모델도 단계별로 먼저 고정한다.
 #![allow(dead_code)]
 
+pub mod copy;
 pub mod ntfs;
 pub mod partition;
 pub mod vdi;
@@ -296,6 +297,16 @@ pub enum VirtualDiskError {
 
     #[error("원본 변경이 감지되었습니다: {0}")]
     SourceChanged(String),
+
+    #[error("안전하지 않은 경로({path}): {detail}")]
+    UnsafePath { path: String, detail: String },
+
+    #[error("호스트 경로가 너무 깁니다: length={length}, max={max}, path={path}")]
+    PathTooLong {
+        path: String,
+        length: usize,
+        max: usize,
+    },
 
     #[error("게스트 항목({path}) 처리 실패: {source}")]
     GuestEntry {
