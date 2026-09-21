@@ -691,7 +691,7 @@ mod tests {
             .write(true)
             .open(&path)
             .unwrap()
-            .write_all(&[b'Z'])
+            .write_all(b"Z")
             .unwrap();
 
         let mut buffer = [0u8; 1];

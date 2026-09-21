@@ -7,6 +7,7 @@
 #![allow(dead_code)]
 
 pub mod vdi;
+pub mod partition;
 
 use std::{fmt, io, path::PathBuf};
 

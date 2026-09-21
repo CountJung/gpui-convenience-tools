@@ -491,6 +491,24 @@ VDE-003은 플랫폼 비의존 공통 타입과 `UnsupportedFormatKind`·`IoOper
 이 단계는 UI·파티션·NTFS를 구현하지 않고 VDI 컨테이너 진입 안전성만 제공한다. 외부
 `VBoxManage` 조회는 환경변수로 주입해 테스트와 운영 경로의 실행 파일 위치를 하드코딩하지 않는다.
 
+### Phase O-5 — VDE-006 MBR/GPT 파티션 검색 완료 ✅
+
+`app/src/virtual_disk/partition.rs`에 VDI 블록 리더와 결합할 읽기 전용 파티션 검색 계층을
+추가했다.
+
+- MBR 서명·기본 파티션 범위·확장 MBR의 EBR 연결과 논리 파티션 범위를 검증한다.
+- protective MBR은 GPT로 재판정하고, GPT 주 헤더의 위치·사용 가능 LBA·파티션 배열 범위를
+  checked arithmetic으로 검증한다.
+- GPT 헤더 CRC와 파티션 배열 CRC를 직접 계산해 확인하며, 손상·hybrid MBR·순환 EBR·범위
+  초과는 `CorruptImage`로 게스트 파일시스템 계층에 전달하지 않는다.
+- `PartitionSource`로 읽기 계약을 분리해 현재 `VdiReader`뿐 아니라 후속 read-only 디스크
+  백엔드도 같은 파서를 사용할 수 있게 했다. 파티션 항목은 `VdiPartition`으로 반환하며
+  파일시스템 판정은 VDE-007 이후에 수행한다.
+
+검증은 합성 메모리 디스크를 사용하는 5개 파티션 테스트와 전체 Rust 테스트로 수행했다.
+GPT 서명·헤더·CRC·배열 범위 기준은 [UEFI GPT 디스크 레이아웃](https://uefi.org/specs/UEFI/2.10/05_GUID_Partition_Table_Format.html)을
+참조했다.
+
 ## 진행 예정 단계
 
 세부 체크리스트는 `TODO.md`를 정본으로 한다.
