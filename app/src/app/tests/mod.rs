@@ -139,6 +139,20 @@ fn click_debug_element(cx: &mut gpui::VisualTestContext, selector: &'static str)
     refresh(cx);
 }
 
+fn click_option_switch(cx: &mut gpui::VisualTestContext, row_selector: &'static str) {
+    let bounds = cx
+        .debug_bounds(row_selector)
+        .unwrap_or_else(|| panic!("{row_selector} should be rendered"));
+    cx.simulate_click(
+        point(
+            bounds.origin.x + bounds.size.width - px(24.0),
+            bounds.origin.y + bounds.size.height / 2.0,
+        ),
+        Modifiers::none(),
+    );
+    refresh(cx);
+}
+
 fn wheel_to_end(cx: &mut gpui::VisualTestContext, viewport_selector: &'static str, delta_y: f32) {
     let viewport = cx
         .debug_bounds(viewport_selector)

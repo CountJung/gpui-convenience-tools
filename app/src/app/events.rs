@@ -130,6 +130,29 @@ impl AppRoot {
                         cx,
                     );
                 }
+                PlatformEvent::SyncWatchFallback { id, reason } => {
+                    let Some(job) = self.sync.jobs.iter_mut().find(|job| job.id == id) else {
+                        continue;
+                    };
+                    if job.watch_mode != crate::config::WatchMode::Realtime {
+                        continue;
+                    }
+                    let label = job.label();
+                    job.watch_mode = crate::config::WatchMode::Interval;
+                    self.persist_sync_jobs();
+                    self.push_log(
+                        "WARN",
+                        format!(
+                            "[{label}] 실시간 감시를 시작하지 못해 주기 모드로 전환했습니다: {reason}"
+                        ),
+                    );
+                    self.notify_toast(
+                        "실시간 감시를 시작하지 못해 주기 모드로 전환했습니다",
+                        NotificationType::Warning,
+                        window,
+                        cx,
+                    );
+                }
                 PlatformEvent::TargetToggled { index, enabled } => {
                     let message = if let Some(target) = self.app_state.targets.get_mut(index) {
                         target.enabled = enabled;

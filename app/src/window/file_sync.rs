@@ -13,6 +13,7 @@ use gpui::{
 use gpui_component::{h_flex, input::Input, theme::ActiveTheme, v_flex};
 
 use crate::app::{AppRoot, IntervalTarget};
+use crate::config::WatchMode;
 use crate::util::format_interval;
 use crate::window::scroll_pane;
 use crate::window::ui::{self, ButtonStyle};
@@ -233,7 +234,11 @@ fn render_job_list(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElement 
             let source = job.source.clone();
             let target = job.target.clone();
             let enabled = job.enabled;
-            let interval = job.interval_secs;
+            let watch_label = if job.watch_mode == WatchMode::Realtime {
+                "실시간".to_string()
+            } else {
+                format_interval(job.interval_secs)
+            };
             let status = this.sync.status.get(&job.id).cloned().unwrap_or_default();
 
             rows = rows.child(
@@ -270,9 +275,7 @@ fn render_job_list(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElement 
                                             })
                                             .child(if enabled { "자동" } else { "수동" }),
                                     )
-                                    .child(
-                                        div().text_color(muted_fg).child(format_interval(interval)),
-                                    ),
+                                    .child(div().text_color(muted_fg).child(watch_label)),
                             )
                             .child(
                                 div()
@@ -398,7 +401,8 @@ fn render_job_settings(
     let target_input = this.sync.target_input.clone();
     let exclude_input = this.sync.exclude_input.clone();
 
-    let interval_row = crate::window::interval::render(this, IntervalTarget::Sync, window, cx);
+    let interval_row = (job.watch_mode == WatchMode::Interval)
+        .then(|| crate::window::interval::render(this, IntervalTarget::Sync, window, cx));
 
     v_flex()
         .w_full()
@@ -522,9 +526,27 @@ fn render_job_settings(
                         .child(div().text_color(muted_fg).child(
                             "파일·폴더의 상대 경로 기준이며, 빈 줄은 저장할 때 무시합니다.",
                         ))
+                        // ── 감시 방식 ──
+                        .child(div().text_color(fg).child("감시 방식"))
+                        .child(ui::option_row(
+                            "sync-opt-realtime",
+                            "실시간 감시",
+                            "변경이 멈춘 뒤 2초 동안 추가 변경을 모아 동기화합니다.",
+                            job.watch_mode == WatchMode::Realtime,
+                            cx.listener(|this, checked: &bool, window, cx| {
+                                let mode = if *checked {
+                                    WatchMode::Realtime
+                                } else {
+                                    WatchMode::Interval
+                                };
+                                this.update_selected_sync_job(window, cx, move |job| {
+                                    job.watch_mode = mode;
+                                });
+                            }),
+                            cx,
+                        ))
                         // ── 감시 주기 ──
-                        .child(div().text_color(fg).child("감시 주기"))
-                        .child(interval_row)
+                        .children(interval_row)
                         // ── 옵션 ──
                         .child(div().text_color(fg).child("옵션"))
                         .child(ui::option_row(

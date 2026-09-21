@@ -63,6 +63,8 @@ pub(crate) enum PlatformEvent {
     ServiceToggled(bool),
     /// 파일 동기화 자동 실행 전역 스위치 변경.
     SyncAutoToggled(bool),
+    /// 실시간 감시를 시작하지 못해 해당 작업을 주기 모드로 강등한다.
+    SyncWatchFallback { id: String, reason: String },
     TargetToggled { index: usize, enabled: bool },
     TargetRemoved { index: usize },
     SyncStarted {

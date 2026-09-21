@@ -24,6 +24,7 @@ mod sync_ops;
 mod ui_state;
 mod virtual_disk_copy;
 mod virtual_disk_ops;
+mod watch;
 
 pub(crate) use interval::{IntervalPicker, IntervalTarget};
 pub(crate) use virtual_disk_copy::{

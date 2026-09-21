@@ -102,6 +102,87 @@ fn file_sync_renders_recent_history_with_result_counts_and_duration(
 }
 
 #[gpui::test]
+fn file_sync_watch_mode_toggle_updates_selected_job(cx: &mut TestAppContext) {
+    initialize_components(cx);
+    let (view, cx) = cx.add_window_view(|_, _| {
+        let mut root = test_app_root(ActivePanel::FileSync);
+        root.sync.jobs = vec![SyncJob::default()];
+        root.sync.selected_job = Some(0);
+        root
+    });
+
+    cx.simulate_resize(size(px(DEFAULT_WINDOW_WIDTH), px(1200.0)));
+    refresh(cx);
+
+    cx.update(|_, app| {
+        assert_eq!(
+            view.read(app).sync.jobs[0].watch_mode,
+            crate::config::WatchMode::Interval
+        );
+    });
+
+    click_option_switch(cx, "sync-opt-realtime-row");
+    cx.update(|_, app| {
+        assert_eq!(
+            view.read(app).sync.jobs[0].watch_mode,
+            crate::config::WatchMode::Realtime
+        );
+    });
+
+    click_option_switch(cx, "sync-opt-realtime-row");
+    cx.update(|_, app| {
+        assert_eq!(
+            view.read(app).sync.jobs[0].watch_mode,
+            crate::config::WatchMode::Interval
+        );
+    });
+}
+
+#[gpui::test]
+fn file_sync_watch_fallback_downgrades_and_logs(cx: &mut TestAppContext) {
+    initialize_components(cx);
+    let (view, cx) = cx.add_window_view(|_, _| {
+        let mut root = test_app_root(ActivePanel::FileSync);
+        root.sync.jobs = vec![SyncJob {
+            watch_mode: crate::config::WatchMode::Realtime,
+            ..SyncJob::default()
+        }];
+        root.sync.selected_job = Some(0);
+        root
+    });
+
+    cx.simulate_resize(size(px(DEFAULT_WINDOW_WIDTH), px(1200.0)));
+    refresh(cx);
+    let (id, tx) = cx.update(|_, app| {
+        let root = view.read(app);
+        (root.sync.jobs[0].id.clone(), root.event_tx.clone())
+    });
+    tx.send(PlatformEvent::SyncWatchFallback {
+        id,
+        reason: "검증용 감시 오류".to_string(),
+    })
+    .expect("watch fallback should enter the event channel");
+
+    cx.update(|window, app| {
+        view.update(app, |root, cx| root.process_pending_events(window, cx));
+    });
+    refresh(cx);
+
+    cx.update(|_, app| {
+        let root = view.read(app);
+        assert_eq!(
+            root.sync.jobs[0].watch_mode,
+            crate::config::WatchMode::Interval
+        );
+        assert!(root
+            .app_state
+            .log_entries
+            .iter()
+            .any(|entry| entry.message.contains("주기 모드로 전환했습니다")));
+    });
+}
+
+#[gpui::test]
 fn file_sync_exclude_patterns_editor_is_multiline_and_contained(cx: &mut TestAppContext) {
     initialize_components(cx);
     let (_view, cx) = cx.add_window_view(|_, _| {

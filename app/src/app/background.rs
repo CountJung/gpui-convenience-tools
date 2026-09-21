@@ -16,6 +16,7 @@ use tokio::sync::mpsc::UnboundedSender;
 
 use super::state::{PlatformEvent, ScannerState, SyncSharedState};
 use super::AppRoot;
+use super::watch::WatchManager;
 use crate::platform::{AdWindowSnapshot, NativeWindowHandle, Platform};
 use crate::sync::{run_sync_job_with_control, SyncControl, SyncProgress};
 
@@ -272,6 +273,7 @@ impl AppRoot {
         std::thread::spawn(move || {
             // 작업 인덱스는 추가·삭제로 밀리므로 실행 주기는 반드시 ID로 추적한다.
             let mut last_run: HashMap<String, Instant> = HashMap::new();
+            let mut watch_manager = WatchManager::new();
 
             // 앱을 껐다 켰다고 해서 주기를 처음부터 세면, 시작할 때마다 원본 전체를 다시
             // 훑어 "건너뜀"만 쌓인다. 저장해 둔 마지막 실행 시각으로 주기를 이어받는다.
@@ -304,14 +306,31 @@ impl AppRoot {
                 // 삭제된 작업의 기록은 정리한다.
                 last_run.retain(|id, _| jobs.iter().any(|job| &job.id == id));
 
+                for failure in watch_manager.poll(&jobs) {
+                    log::warn!(
+                        "실시간 감시를 시작하지 못해 주기 모드로 전환합니다 ({}) : {}",
+                        failure.id,
+                        failure.reason
+                    );
+                    let _ = event_tx.send(PlatformEvent::SyncWatchFallback {
+                        id: failure.id,
+                        reason: failure.reason,
+                    });
+                }
+
                 for job in jobs.iter() {
                     let manual_requested = manual.contains(&job.id);
 
-                    let due = match last_run.get(&job.id) {
-                        Some(prev) => {
-                            prev.elapsed() >= Duration::from_secs(job.interval_secs.max(1) as u64)
+                    let due = if job.watch_mode == crate::config::WatchMode::Realtime {
+                        watch_manager.take_ready(&job.id, Instant::now())
+                    } else {
+                        match last_run.get(&job.id) {
+                            Some(prev) => {
+                                prev.elapsed()
+                                    >= Duration::from_secs(job.interval_secs.max(1) as u64)
+                            }
+                            None => true,
                         }
-                        None => true,
                     };
 
                     // 전역 스위치는 자동 실행만 막는다. 사용자가 직접 누른 요청까지 막으면
