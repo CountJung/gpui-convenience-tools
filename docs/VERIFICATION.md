@@ -241,6 +241,16 @@ scripts\Invoke-ClaudeVisualCheck.ps1 -Action Stop
 남겼으며, 원본 길이는 변하지 않았고 세션 종료 후 `PROCESS_COUNT=0`·`SESSION_COUNT=0`이었다.
 대용량 파일 중지·외부 키보드·독립 Visual Reviewer는 이 검증으로 완료 처리하지 않는다.
 
+복사 중지 경계는 검증 전용 `-CancelAfterMs <milliseconds>`로도 재현할 수 있다. 이 옵션은
+`-AutoCopyVdi`와 함께 사용할 때 복사 시작 후 앱의 중지 메서드를 호출하며, 설정 파일이나
+일반 사용자 실행 경로에는 저장하지 않는다. 종료된 실제 `TACS.vdi`의 200ms 시나리오에서
+release 앱 요약 `중지됨 · 파일 0개 · 0 B · 건너뜀 0 · 실패 0`을 확인했고 캡처
+`target/visual-validation/captures/vde015-external-tacs-cancel-1200x1000-054536.png`를
+남겼다. 같은 VDI의 1,500ms 실행은 실제 루트 데이터가 먼저 끝나 `완료 · 파일 19개 · 4.1 MB`가
+되었고, `$Extend`의 1,000ms 실행도 `완료 · 파일 8개 · 4.1 MB`가 되어 실제 대용량 파일의
+청크 중간 중지는 재현되지 않았다. 따라서 이 시드는 중지 상태·정리 경계의 보조 증거일 뿐,
+VDE-015의 실제 대용량 파일 중지 완료 증거로 승격하지 않는다.
+
 폴더 진입 화면을 입력 없이 재현할 때는 `-InitialGuestPath many_subdirs`를 함께 사용한다.
 이 값은 검증 프로세스에만 전달되며 제품 설정에는 저장되지 않는다.
 

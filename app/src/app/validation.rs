@@ -66,4 +66,9 @@ pub(super) fn seed_validation_virtual_disk(root: &mut AppRoot, cx: &mut Context<
 
     root.virtual_disk.validation_auto_copy_requested =
         std::env::var("GPUI_CONVENIENCE_TOOLS_VALIDATION_VDI_AUTO_COPY").as_deref() == Ok("1");
+    root.virtual_disk.copy.validation_cancel_after_ms =
+        std::env::var("GPUI_CONVENIENCE_TOOLS_VALIDATION_VDI_CANCEL_AFTER_MS")
+            .ok()
+            .and_then(|value| value.parse::<u64>().ok())
+            .filter(|delay_ms| *delay_ms > 0);
 }

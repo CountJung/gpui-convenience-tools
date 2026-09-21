@@ -53,6 +53,10 @@ param(
     # Start 전용. 시드 VDI의 선택 항목을 격리 대상 폴더로 자동 복사한다.
     [switch]$AutoCopyVdi,
 
+    # Start 전용. 검증용 자동 복사 시작 후 지정한 시간 뒤 중지 요청을 보낸다.
+    [ValidateRange(1, 600000)]
+    [int]$CancelAfterMs,
+
     # Start 전용. VDI 시드 직후 전체 항목을 선택한다. 자동 복사 시에는 자동으로 켜진다.
     [switch]$SelectAllVdi,
 
@@ -387,6 +391,7 @@ switch ($Action) {
         $previousValidationVdiSelectAll = $env:GPUI_CONVENIENCE_TOOLS_VALIDATION_VDI_SELECT_ALL
         $previousValidationVdiAutoCopy = $env:GPUI_CONVENIENCE_TOOLS_VALIDATION_VDI_AUTO_COPY
         $previousValidationVdiGuestPath = $env:GPUI_CONVENIENCE_TOOLS_VALIDATION_VDI_GUEST_PATH
+        $previousValidationVdiCancelAfterMs = $env:GPUI_CONVENIENCE_TOOLS_VALIDATION_VDI_CANCEL_AFTER_MS
         $previousVboxManage = $env:GPUI_CONVENIENCE_TOOLS_VBOXMANAGE
         try {
             $env:APPDATA = $appData
@@ -408,6 +413,9 @@ switch ($Action) {
                 }
                 if ($AutoCopyVdi) {
                     $env:GPUI_CONVENIENCE_TOOLS_VALIDATION_VDI_AUTO_COPY = "1"
+                }
+                if ($CancelAfterMs -gt 0) {
+                    $env:GPUI_CONVENIENCE_TOOLS_VALIDATION_VDI_CANCEL_AFTER_MS = $CancelAfterMs.ToString()
                 }
                 if (-not [string]::IsNullOrWhiteSpace($InitialGuestPath)) {
                     $env:GPUI_CONVENIENCE_TOOLS_VALIDATION_VDI_GUEST_PATH = $InitialGuestPath
@@ -452,6 +460,10 @@ switch ($Action) {
                 Remove-Item Env:\GPUI_CONVENIENCE_TOOLS_VALIDATION_VDI_GUEST_PATH -ErrorAction SilentlyContinue
             }
             else { $env:GPUI_CONVENIENCE_TOOLS_VALIDATION_VDI_GUEST_PATH = $previousValidationVdiGuestPath }
+            if ($null -eq $previousValidationVdiCancelAfterMs) {
+                Remove-Item Env:\GPUI_CONVENIENCE_TOOLS_VALIDATION_VDI_CANCEL_AFTER_MS -ErrorAction SilentlyContinue
+            }
+            else { $env:GPUI_CONVENIENCE_TOOLS_VALIDATION_VDI_CANCEL_AFTER_MS = $previousValidationVdiCancelAfterMs }
             if ($null -eq $previousVboxManage) {
                 Remove-Item Env:\GPUI_CONVENIENCE_TOOLS_VBOXMANAGE -ErrorAction SilentlyContinue
             }

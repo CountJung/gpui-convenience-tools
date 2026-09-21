@@ -31,7 +31,7 @@
 안전 경계: 원본 VDI는 read-only로만 열고, 실행 중 VM의 VDI 직접 읽기는 구현하지 않는다.
 실행 중 VM 지원은 후속 `GuestFileSource` 구현으로만 추가한다(VDE-021).
 
-**최종 측정**: 2026-09-22 · `app/src` 총 56개 파일 · 21,295줄
+**최종 측정**: 2026-09-22 · `app/src` 총 56개 파일 · 21,313줄
 
 ## 크기 기준 — 줄 수는 증상이다
 
@@ -118,9 +118,9 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `inputs.rs` | 136 | 입력 위젯(`InputState`) 지연 생성과 값 동기화 — 파일 동기화 제외 패턴 멀티라인 편집기 포함 |
 | `ui_state.rs` | 79 | `ServiceState`·`SyncState`·`AdBlockState`와 최근 동기화 이력 — 단일 `AppRoot` 엔티티가 소유하는 기능별 UI 상태 묶음 |
 | `virtual_disk_ops.rs` | 629 | VDI 경로 입력·read-only 열기·파티션 검색/선택·게스트 목록 새로고침·폴더 이동·Ctrl 토글/Shift 범위 다중 선택·포커스·stale 목록 제거를 포함한 안전 오류 안내·항목별 반복 알림 억제 저장 |
-| `virtual_disk_copy.rs` | 506 | VDI 대상 폴더 입력·선택, 백그라운드 read-only 복사, 청크 단위 중지 요청, 진행·중지·완료 요약·항목별 오류 로그·미억제 토스트 게이트·탐색기 keymap·검증 자동 복사 |
+| `virtual_disk_copy.rs` | 519 | VDI 대상 폴더 입력·선택, 백그라운드 read-only 복사, 청크 단위 중지 요청, 진행·중지·완료 요약·항목별 오류 로그·미억제 토스트 게이트·탐색기 keymap·검증 자동 복사·검증 자동 중지 |
 | `watch.rs` | 303 | `notify` 재귀 watcher 소유·작업별 변경 이벤트 전달·2초 quiet debounce·감시 실패 중복 억제·작업 변경 시 정리 |
-| `validation.rs` | 68 | 릴리스 화면 검증 전용 초기 패널·VDI·게스트 경로 시드; 사용자 설정에는 저장하지 않는 격리 입력 |
+| `validation.rs` | 74 | 릴리스 화면 검증 전용 초기 패널·VDI·게스트 경로·자동 중지 시드; 사용자 설정에는 저장하지 않는 격리 입력 |
 
 ### GPUI 회귀 테스트 (`app/src/app/tests/`) — 2,057줄 / 6파일
 
@@ -191,7 +191,7 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `.codex/agents/code-reviewer.toml` | 9 | Codex용 Code Reviewer 얇은 어댑터 |
 | `.codex/agents/docs-sync.toml` | 9 | Codex용 Documentation Sync 얇은 어댑터 |
 | `scripts/Verify-Workspace.ps1` | 167 | VS Code용 Rust/GPUI 자동 검증과 ChatGPT 데스크톱 handoff manifest·해시 고정 빌드 생성 |
-| `scripts/Invoke-ClaudeVisualCheck.ps1` | 627 | `CLAUDE_LOCAL` 시각 검증 하네스 — 격리 실행(`-SeedConfig`·`-SeedHistory`·`-InitialPanel`로 상태 재현), 원본 복사 없는 대용량 VDI 연결(`-ExternalVdiPath`), 창 캡처(`PrintWindow`)·입력(`SendInput`)·정리 |
+| `scripts/Invoke-ClaudeVisualCheck.ps1` | 639 | `CLAUDE_LOCAL` 시각 검증 하네스 — 격리 실행(`-SeedConfig`·`-SeedHistory`·`-InitialPanel`로 상태 재현), 원본 복사 없는 대용량 VDI 연결(`-ExternalVdiPath`), 자동 중지(`-CancelAfterMs`), 창 캡처(`PrintWindow`)·입력(`SendInput`)·정리 |
 | `scripts/Verify-AdWindowState.ps1` | 282 | 지정 PID와 앱 조상·자손의 최상위·선택적 자식 창 상태와 클래스 후보를 읽기 전용 점검(AD-002·AD-005 진단) |
 | `scripts/Start-DesktopVisualValidation.ps1` | 126 | manifest 해시 검증 후 단일 임시 데이터 루트 격리 프로세스·세션 파일 생성과 실패 롤백 |
 | `scripts/Stop-DesktopVisualValidation.ps1` | 75 | 기록된 검증 PID·시작 시각과 작업 전용 임시 루트만 검증 후 정리 |
@@ -200,7 +200,7 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `.github/workflows/release.yml` | 140 | `v*` 태그 → Windows·macOS 병렬 빌드 후 단일 Release 생성 |
 | `.github/workflows/macos-build.yml` | 47 | push/PR마다 macOS check·test·패키징 — 비Windows cfg 경로의 **유일한** 검증 지점 |
 
-> `Invoke-ClaudeVisualCheck.ps1`은 627줄이지만 분할하지 않는다. 하나의 Win32 시퀀스
+> `Invoke-ClaudeVisualCheck.ps1`은 639줄이지만 분할하지 않는다. 하나의 Win32 시퀀스
 > (P/Invoke 선언 → 세션 → 캡처 → 입력 → 정리)를 공유하고, 쪼개면 각 파일이 같은 `Add-Type`
 > 블록과 세션 스키마를 중복 소유하게 되어 응집도가 깨진다.
 > 정본의 「구조 리팩터링 기준 > 예외」 조항을 적용한다.
@@ -370,6 +370,7 @@ G-001 판단: `muted`는 비활성 의미이므로 테두리와 hover를 추가�
 | 2026-09-22 | `app/src/virtual_disk/copy.rs`·`app/src/virtual_disk/copy/tests.rs`·`docs/PROJECT_MAP.md` | 1,000줄 트리거 복사 테스트 책임 분리 | 복사 중지 보강으로 테스트가 운영 복사 엔진 본문에 누적되어 `copy.rs`가 1,002줄에 도달함 | 테스트 326줄을 `copy/tests.rs`로 이동하고 운영 본문을 673줄로 축소; 전체 56개 파일·21,258줄, 최대 821줄·경고 2개로 갱신; 복사 엔진 테스트 10개 통과 | 동작 변경 없는 구조 분리이며 부분 파일 정리 기능은 별도 후속 커밋에서 검증한다 |
 | 2026-09-22 | `app/src/virtual_disk/copy.rs`·`app/src/virtual_disk/copy/tests.rs`·`docs/TODO.md`·`docs/VERIFICATION.md`·`docs/MASTER_PLAN.md` | VDE-012·VDE-015 복사 실패 부분 결과 정리 | 원본 읽기·대상 쓰기·flush 실패가 새로 생성한 부분 대상 파일을 남길 수 있었음 | 실패 직전 출력 핸들을 닫고 부분 파일을 정리하되 원본 오류 사유를 보존; `collecting_copy_errors_removes_partial_output_and_keeps_issue`와 형제 파일 계속 처리 테스트, 최신 56개 파일·21,289줄 측정 반영 | 실제 대용량 VDI 중지 E2E와 독립 릴리스 UI 검토는 기존 잔여 조건 |
 | 2026-09-22 | `app/src/virtual_disk/partition.rs`·`scripts/Invoke-ClaudeVisualCheck.ps1`·`docs/TODO.md`·`docs/VERIFICATION.md`·`docs/MASTER_PLAN.md` | VDE-019 보호 MBR 및 대용량 외부 VDI 검증 보강 | 실제 VirtualBox GPT 보호 MBR이 `0xffff_ffff` 섹터 수를 사용해 일반 MBR 범위 검사에서 거부되었고, 80GB급 VDI를 검증 세션으로 복사할 수 없음 | 보호 MBR은 시작 LBA만 검증하고 회귀 fixture를 실제 값으로 보정; `-ExternalVdiPath`로 원본을 복사하지 않는 read-only 연결을 추가해 종료된 TACS VDI에서 GPT·NTFS 3.1·게스트 루트 시스템 폴더를 확인; partition 7개·VDI 14개 테스트, locked check·Clippy·release build 통과; 최신 측정값 56개 파일·21,295줄 | 실제 대용량 파일 중지·외부 키보드·실제 릴리스 오류 억제 버튼·독립 Visual Reviewer는 후속 |
+| 2026-09-22 | `app/src/app/validation.rs`·`app/src/app/virtual_disk_copy.rs`·`scripts/Invoke-ClaudeVisualCheck.ps1`·`docs/TODO.md`·`docs/VERIFICATION.md` | VDE-015 실제 VDI 중지 경계 보조 검증 | 실제 TACS VDI는 기본 루트 복사가 19개·4.1MB로 빨리 끝나 대용량 청크 중지를 재현하지 못했고 외부 키 입력은 포그라운드 안전 차단 상태임 | 검증 전용 `-CancelAfterMs`가 release 복사 시작 후 앱 중지 메서드를 호출하도록 추가; 실제 종료 TACS VDI 200ms 실행에서 `중지됨 · 파일 0개`와 캡처 `vde015-external-tacs-cancel-1200x1000-054536.png`를 확인; virtual-disk 72 passed·2 ignored, release build·원본 불변·VM poweroff·process/session 0 확인 | 실제 대용량 파일 청크 중지·외부 키보드·독립 Visual Reviewer는 완료로 승격하지 않음 |
 | 2026-07-29 | 편의 기능 스플리터 3곳 | 공용 레이아웃 승격 | 패널별 고정 초기 폭 | `window::balanced_split` | 설정 pane 과도 축소 방지, 양쪽 가용폭 사용 |
 | 2026-07-29 | `app.rs` | 책임 단위 분할 + 재배치 | 1,798 | `app/` 7파일 (최대 564) | 대시보드·로그 렌더는 소유가 잘못돼 있어 `window/`로 이동 |
 | 2026-07-29 | `platform/windows.rs` | 책임 단위 분할 + 승격 | 1,361 | `platform/windows/` 6파일 (최대 344) | `wide_null`을 `windows/mod.rs`로 **공용 승격** |

@@ -110,6 +110,8 @@ pub(crate) struct VirtualDiskCopyState {
     pub(crate) summary: Option<VirtualDiskCopySummary>,
     pub(crate) cancel: Arc<AtomicBool>,
     pub(crate) validation_auto_copy_scheduled: bool,
+    /// 릴리스 검증 하네스 전용 자동 중지 지연. 일반 사용자 설정에는 저장하지 않는다.
+    pub(crate) validation_cancel_after_ms: Option<u64>,
 }
 
 /// 백그라운드 작업이 UI 채널로 전달하는 종료 결과.
@@ -303,6 +305,17 @@ impl AppRoot {
             );
             let _ = event_tx.send(PlatformEvent::VirtualDiskCopyFinished { outcome });
         });
+        if let Some(delay_ms) = self.virtual_disk.copy.validation_cancel_after_ms.take() {
+            cx.spawn_in(window, async move |this, cx| {
+                Timer::after(std::time::Duration::from_millis(delay_ms)).await;
+                let _ = this.update_in(cx, |this, window, cx| {
+                    if this.virtual_disk.copy.progress.is_some() {
+                        this.stop_virtual_disk_copy(window, cx);
+                    }
+                });
+            })
+            .detach();
+        }
         cx.notify();
     }
 
