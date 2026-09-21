@@ -115,6 +115,7 @@ fn test_app_root(active_panel: ActivePanel) -> AppRoot {
 fn initialize_components(cx: &mut TestAppContext) {
     cx.update(|cx| {
         gpui_component::init(cx);
+        crate::app::init_virtual_disk_keymap(cx);
         crate::theme::normalize_component_palette(cx);
     });
 }

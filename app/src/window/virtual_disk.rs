@@ -9,7 +9,10 @@ use gpui::{
 };
 use gpui_component::{h_flex, input::Input, theme::ActiveTheme, v_flex};
 
-use crate::app::AppRoot;
+use crate::app::{
+    AppRoot, CopySelected, EnterSelected, ParentDirectory, Refresh, SelectAll,
+    VIRTUAL_DISK_KEY_CONTEXT,
+};
 use crate::virtual_disk::{
     GuestFileAttributes, GuestFileKind, GuestFileSystem, PartitionTableKind,
 };
@@ -20,6 +23,7 @@ use super::ui::{self, ButtonStyle};
 pub fn render(this: &mut AppRoot, window: &mut Window, cx: &mut Context<AppRoot>) -> AnyElement {
     this.ensure_virtual_disk_input(window, cx);
     this.ensure_virtual_disk_target_input(window, cx);
+    this.ensure_virtual_disk_focus(cx);
 
     let page_scroll = this.virtual_disk_page_scroll.clone();
     scroll_pane(
@@ -179,6 +183,11 @@ fn render_partition_card(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyEl
 
 fn render_directory_card(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElement {
     let theme = cx.theme();
+    let focus_handle = this
+        .virtual_disk
+        .focus_handle
+        .clone()
+        .expect("virtual disk focus handle must be initialized before rendering");
     let current_path = this.virtual_disk.current_path.to_string();
     let selected_count = this.virtual_disk.selected_paths.len();
     let mut entries = v_flex().w_full().gap_1();
@@ -207,6 +216,7 @@ fn render_directory_card(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyEl
                 format_bytes(entry.size_bytes)
             };
             let name = entry.path.file_name().unwrap_or("/").to_string();
+            let row_focus_handle = focus_handle.clone();
             entries = entries.child(
                 h_flex()
                     .debug_selector(move || format!("virtual-disk-entry-{index}"))
@@ -226,7 +236,8 @@ fn render_directory_card(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyEl
                     .px_2()
                     .py_2()
                     .id(("virtual-disk-entry", index))
-                    .on_click(cx.listener(move |this, event: &ClickEvent, _window, cx| {
+                    .on_click(cx.listener(move |this, event: &ClickEvent, window, cx| {
+                        window.focus(&row_focus_handle);
                         let additive = event.modifiers().control || event.modifiers().shift;
                         if is_directory && event.click_count() >= 2 {
                             this.enter_virtual_disk_directory(index, cx);
@@ -269,6 +280,31 @@ fn render_directory_card(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyEl
 
     v_flex()
         .debug_selector(|| "virtual-disk-directory-card".to_string())
+        .key_context(VIRTUAL_DISK_KEY_CONTEXT)
+        .track_focus(&focus_handle)
+        .id("virtual-disk-directory-focus")
+        .on_click({
+            let click_focus_handle = focus_handle.clone();
+            cx.listener(move |_this, _event, window, _cx| {
+                window.focus(&click_focus_handle);
+            })
+        })
+        .on_action(cx.listener(|this, _: &CopySelected, window, cx| {
+            this.start_virtual_disk_copy(window, cx);
+        }))
+        .on_action(cx.listener(|this, _: &EnterSelected, _window, cx| {
+            this.enter_selected_virtual_disk_directory(cx);
+        }))
+        .on_action(cx.listener(|this, _: &ParentDirectory, _window, cx| {
+            this.go_to_virtual_disk_parent(cx);
+        }))
+        .on_action(cx.listener(|this, _: &SelectAll, _window, cx| {
+            this.select_all_virtual_disk_entries(cx);
+        }))
+        .on_action(cx.listener(|this, _: &Refresh, _window, cx| {
+            this.refresh_virtual_disk_directory(cx);
+            cx.notify();
+        }))
         .w_full()
         .min_w_0()
         .gap_3()
@@ -320,6 +356,12 @@ fn render_directory_card(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyEl
                             }),
                         )),
                 ),
+        )
+        .child(
+            div()
+                .min_w_0()
+                .text_color(theme.muted_foreground)
+                .child("Enter 폴더 열기 · Backspace 상위 · Ctrl+A 전체 선택 · F5 새로고침"),
         )
         .child(entries)
         .into_any_element()

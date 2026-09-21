@@ -6,7 +6,7 @@
 
 use std::{collections::HashSet, path::PathBuf};
 
-use gpui::{AppContext, Context, Entity, Window};
+use gpui::{AppContext, Context, Entity, FocusHandle, Window};
 use gpui_component::input::{InputEvent, InputState};
 
 use crate::virtual_disk::{
@@ -27,6 +27,7 @@ pub(crate) struct VirtualDiskSession {
     pub(crate) current_path: GuestPath,
     pub(crate) entries: Vec<GuestFileEntry>,
     pub(crate) selected_paths: HashSet<GuestPath>,
+    pub(crate) focus_handle: Option<FocusHandle>,
     pub(crate) copy: VirtualDiskCopyState,
     pub(crate) source: Option<NtfsGuestFileSource<VdiReader>>,
     pub(crate) error: Option<String>,
@@ -43,6 +44,7 @@ impl Default for VirtualDiskSession {
             current_path: GuestPath::root(),
             entries: Vec::new(),
             selected_paths: HashSet::new(),
+            focus_handle: None,
             copy: VirtualDiskCopyState::default(),
             source: None,
             error: None,
@@ -51,6 +53,13 @@ impl Default for VirtualDiskSession {
 }
 
 impl AppRoot {
+    /// 탐색기 목록이 키보드 단축키를 받을 수 있도록 포커스 핸들을 준비한다.
+    pub(crate) fn ensure_virtual_disk_focus(&mut self, cx: &mut Context<Self>) {
+        if self.virtual_disk.focus_handle.is_none() {
+            self.virtual_disk.focus_handle = Some(cx.focus_handle());
+        }
+    }
+
     /// VDI 경로 입력을 첫 렌더 시점에 준비한다.
     pub(crate) fn ensure_virtual_disk_input(
         &mut self,
@@ -205,7 +214,7 @@ impl AppRoot {
         cx.notify();
     }
 
-    /// 폴더를 열어 현재 경로를 이동한다. 실제 키보드 단축키는 VDE-016에서 연결한다.
+    /// 폴더를 열어 현재 경로를 이동한다.
     pub(crate) fn enter_virtual_disk_directory(&mut self, index: usize, cx: &mut Context<Self>) {
         let Some(entry) = self.virtual_disk.entries.get(index).cloned() else {
             return;
@@ -228,6 +237,23 @@ impl AppRoot {
         self.virtual_disk.selected_paths.clear();
         self.refresh_virtual_disk_directory(cx);
         cx.notify();
+    }
+
+    /// 현재 폴더의 모든 항목을 선택한다. 숨김·시스템 항목도 포함한다.
+    pub(crate) fn select_all_virtual_disk_entries(&mut self, cx: &mut Context<Self>) {
+        self.virtual_disk.selected_paths = select_all_paths(&self.virtual_disk.entries);
+        cx.notify();
+    }
+
+    /// 정확히 하나의 폴더가 선택된 경우 해당 폴더로 진입한다.
+    pub(crate) fn enter_selected_virtual_disk_directory(&mut self, cx: &mut Context<Self>) {
+        let Some(index) = selected_directory_index(
+            &self.virtual_disk.entries,
+            &self.virtual_disk.selected_paths,
+        ) else {
+            return;
+        };
+        self.enter_virtual_disk_directory(index, cx);
     }
 
     fn set_virtual_disk_error(&mut self, message: String, cx: &mut Context<Self>) {
@@ -256,6 +282,7 @@ mod tests {
         assert!(session.current_path.is_root());
         assert!(session.entries.is_empty());
         assert!(session.selected_paths.is_empty());
+        assert!(session.focus_handle.is_none());
         assert!(session.source.is_none());
         assert!(session.error.is_none());
     }
@@ -284,6 +311,24 @@ fn toggle_guest_selection(
     if !selected_paths.insert(path.clone()) {
         selected_paths.remove(&path);
     }
+}
+
+fn select_all_paths(entries: &[GuestFileEntry]) -> HashSet<GuestPath> {
+    entries.iter().map(|entry| entry.path.clone()).collect()
+}
+
+fn selected_directory_index(
+    entries: &[GuestFileEntry],
+    selected_paths: &HashSet<GuestPath>,
+) -> Option<usize> {
+    if selected_paths.len() != 1 {
+        return None;
+    }
+    entries
+        .iter()
+        .enumerate()
+        .find(|(_, entry)| entry.is_directory() && selected_paths.contains(&entry.path))
+        .map(|(index, _)| index)
 }
 
 #[cfg(test)]
@@ -317,5 +362,64 @@ mod path_tests {
         toggle_guest_selection(&mut selected, second.clone(), true);
         assert_eq!(selected.len(), 1);
         assert!(selected.contains(&first));
+    }
+
+    #[test]
+    fn select_all_includes_hidden_and_system_entries() {
+        let entries = vec![
+            GuestFileEntry {
+                path: GuestPath::new("visible.txt").unwrap(),
+                kind: GuestFileKind::File,
+                size_bytes: 1,
+                attributes: GuestFileAttributes::default(),
+                times: Default::default(),
+            },
+            GuestFileEntry {
+                path: GuestPath::new("hidden.sys").unwrap(),
+                kind: GuestFileKind::File,
+                size_bytes: 2,
+                attributes: GuestFileAttributes::from_bits(
+                    GuestFileAttributes::HIDDEN.bits() | GuestFileAttributes::SYSTEM.bits(),
+                ),
+                times: Default::default(),
+            },
+        ];
+
+        let selected = select_all_paths(&entries);
+
+        assert_eq!(selected.len(), 2);
+        assert!(selected.contains(&entries[0].path));
+        assert!(selected.contains(&entries[1].path));
+    }
+
+    #[test]
+    fn enter_shortcut_requires_exactly_one_selected_directory() {
+        let entries = vec![
+            GuestFileEntry {
+                path: GuestPath::new("folder").unwrap(),
+                kind: GuestFileKind::Directory,
+                size_bytes: 0,
+                attributes: GuestFileAttributes::default(),
+                times: Default::default(),
+            },
+            GuestFileEntry {
+                path: GuestPath::new("note.txt").unwrap(),
+                kind: GuestFileKind::File,
+                size_bytes: 1,
+                attributes: GuestFileAttributes::default(),
+                times: Default::default(),
+            },
+        ];
+        let folder = entries[0].path.clone();
+        let file = entries[1].path.clone();
+
+        assert_eq!(
+            selected_directory_index(&entries, &HashSet::from([folder.clone()])),
+            Some(0)
+        );
+        assert_eq!(
+            selected_directory_index(&entries, &HashSet::from([folder, file])),
+            None
+        );
     }
 }

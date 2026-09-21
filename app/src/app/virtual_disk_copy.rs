@@ -12,7 +12,7 @@ use std::{
     },
 };
 
-use gpui::{AppContext, Context, Entity, PathPromptOptions, Window};
+use gpui::{actions, App, AppContext, Context, Entity, KeyBinding, PathPromptOptions, Window};
 use gpui_component::{input::InputEvent, input::InputState, notification::NotificationType};
 
 use crate::virtual_disk::{
@@ -24,6 +24,31 @@ use crate::virtual_disk::{
 };
 
 use super::{state::PlatformEvent, AppRoot};
+
+actions!(
+    virtual_disk,
+    [
+        CopySelected,
+        EnterSelected,
+        ParentDirectory,
+        SelectAll,
+        Refresh,
+    ]
+);
+
+pub(crate) const VIRTUAL_DISK_KEY_CONTEXT: &str = "VirtualDisk";
+
+pub(crate) fn init_virtual_disk_keymap(cx: &mut App) {
+    cx.bind_keys([
+        KeyBinding::new("ctrl-c", CopySelected, Some(VIRTUAL_DISK_KEY_CONTEXT)),
+        KeyBinding::new("cmd-c", CopySelected, Some(VIRTUAL_DISK_KEY_CONTEXT)),
+        KeyBinding::new("enter", EnterSelected, Some(VIRTUAL_DISK_KEY_CONTEXT)),
+        KeyBinding::new("backspace", ParentDirectory, Some(VIRTUAL_DISK_KEY_CONTEXT)),
+        KeyBinding::new("ctrl-a", SelectAll, Some(VIRTUAL_DISK_KEY_CONTEXT)),
+        KeyBinding::new("cmd-a", SelectAll, Some(VIRTUAL_DISK_KEY_CONTEXT)),
+        KeyBinding::new("f5", Refresh, Some(VIRTUAL_DISK_KEY_CONTEXT)),
+    ]);
+}
 
 const COPY_CHUNK_BYTES: usize = 1024 * 1024;
 const MAX_HOST_PATH_UNITS: usize = 260;

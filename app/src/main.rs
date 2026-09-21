@@ -51,6 +51,7 @@ fn main() {
     let app = Application::new();
     app.run(move |cx| {
         gpui_component::init(cx);
+        app::init_virtual_disk_keymap(cx);
 
         let restore_saved_themes = |cx: &mut App| {
             let Ok(Some(cfg)) = load_config() else {

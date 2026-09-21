@@ -23,13 +23,13 @@
 | `app/src/virtual_disk/issues.rs` | **구현됨** — 원본 변경·대상 쓰기·지원 불가·메타데이터 오류 분류, 부분 복사 결과와 항목별 억제 키 | VDE-012 |
 | `app/src/virtual_disk/metadata.rs` | **구현됨** — 호스트 파일 속성·타임스탬프 적용과 구조화된 적용 실패 결과 | VDE-011 |
 | `app/src/window/virtual_disk.rs` | VDI 선택·파티션·탐색·파일 행 선택·상위 이동·단축키·진행 UI | VDE-013~017 |
-| `app/src/app/virtual_disk_ops.rs` | **구현됨** — read-only VDI 열기·파티션 검색/선택·게스트 경로 새로고침·폴더 이동·다중 선택 상태 | VDE-013~014 |
-| `app/src/app/virtual_disk_copy.rs` | **구현됨** — 대상 폴더 입력/선택, read-only VDI 재연결 백그라운드 복사, 진행·중지·완료 요약 이벤트 | VDE-015; 실제 이미지 E2E는 VDE-018~019 |
+| `app/src/app/virtual_disk_ops.rs` | **구현됨** — read-only VDI 열기·파티션 검색/선택·게스트 경로 새로고침·폴더 이동·다중 선택·탐색기 포커스 상태 | VDE-013~014·016 |
+| `app/src/app/virtual_disk_copy.rs` | **구현됨** — 대상 폴더 입력/선택, read-only VDI 재연결 백그라운드 복사, 진행·중지·완료 요약 이벤트, 탐색기 keymap 등록 | VDE-015~016; 실제 이미지 E2E는 VDE-018~019 |
 
 안전 경계: 원본 VDI는 read-only로만 열고, 실행 중 VM의 VDI 직접 읽기는 구현하지 않는다.
 실행 중 VM 지원은 후속 `GuestFileSource` 구현으로만 추가한다(VDE-021).
 
-**최종 측정**: 2026-09-21 · `app/src` 총 50개 파일 · 18,709줄
+**최종 측정**: 2026-09-21 · `app/src` 총 50개 파일 · 18,910줄
 
 ## 크기 기준 — 줄 수는 증상이다
 
@@ -76,11 +76,11 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 
 | 파일 | 줄 | 책임 |
 | --- | ---: | --- |
-| `mod.rs` | 455 | VDI·파티션·게스트 파일 항목 모델, 정규화된 게스트 경로·시간 메타데이터, `GuestFileSource`, 플랫폼 비의존 오류 계약 |
+| `mod.rs` | 456 | VDI·파티션·게스트 파일 항목 모델, 정규화된 게스트 경로·시간 메타데이터, `GuestFileSource`, 플랫폼 비의존 오류 계약 |
 | `vdi.rs` | 782 | VDI 1.1 read-only 헤더·블록 맵·동적/고정 블록 읽기, 잠금·VM 사용·크기/mtime 안정성 가드 |
 | `partition.rs` | 729 | read-only `PartitionSource` 경계, MBR·EBR·protective MBR·GPT 검색, 양쪽 CRC·LBA 범위 검증 |
 | `ntfs.rs` | 738 | 파티션 범위 `Read + Seek` 어댑터, NTFS 3.1 디렉터리·기본 데이터 스트림 읽기, 압축·암호화·범위·손상 오류와 속성·시간 보존 |
-| `path_policy.rs` | 334 | 절대 대상 루트 기준 게스트 경로 매핑, Windows 예약 이름·경로 길이 검증, 게스트·호스트 리파스 포인트/심볼릭 링크 추적 차단 |
+| `path_policy.rs` | 335 | 절대 대상 루트 기준 게스트 경로 매핑, Windows 예약 이름·경로 길이 검증, 게스트·호스트 리파스 포인트/심볼릭 링크 추적 차단 |
 | `copy.rs` | 834 | `GuestFileSource` 선택 파일·폴더의 설정 청크 복사, 대상 부모 생성, 건너뜀·덮어쓰기·새 이름 충돌 정책과 메타데이터 결과 집계 |
 | `issues.rs` | 146 | 복사 오류 종류·안정 억제 키·부분 복사 보고서 연결과 항목별 알림 억제 상태 |
 | `metadata.rs` | 403 | Windows 파일 속성·생성/접근/수정 시간과 비지원·권한 오류를 `MetadataFailure`로 수집 |
@@ -94,38 +94,38 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `mod.rs` | 650 | 폴더 동기화 엔진 (UI 비의존 순수 로직) — 진행 보고·중지·이어서 시작·제외 glob 적용 포함 |
 | `tests.rs` | 596 | 복사·건너뜀·미러 삭제·실패 사유·진행 보고·중지·이어서 시작·제외 glob 단위 테스트 |
 
-### 앱 루트 (`app/src/app/`) — 3,565줄 / 10파일
+### 앱 루트 (`app/src/app/`) — 3,698줄 / 10파일
 
 `app.rs`(1,798줄)를 책임별로 분할한 결과다.
 
 | 파일 | 줄 | 책임 |
 | --- | ---: | --- |
-| `mod.rs` | 742 | `AppRoot` 정의·생성자·백그라운드 UI wake·사이드바(전역 스위치 2개 포함)·최상위 레이아웃 |
+| `mod.rs` | 747 | `AppRoot` 정의·생성자·백그라운드 UI wake·사이드바(전역 스위치 2개 포함)·최상위 레이아웃 |
 | `sync_ops.rs` | 456 | 파일 동기화 작업 조작 (추가·삭제·선택·이름·경로·제외 패턴 입력 저장·수동 실행 큐·중지·전역 스위치·커서 무효화) |
 | `interval.rs` | 313 | 주기 선택 상태(`IntervalPicker`)와 조작 — 프리셋 추가·삭제·드롭다운 동기화 |
-| `events.rs` | 279 | `PlatformEvent` 채널 소비, 진행 상태 반영, 로그·토스트 유틸 |
+| `events.rs` | 298 | `PlatformEvent` 채널 소비, 진행 상태 반영, 로그·토스트 유틸 |
 | `background.rs` | 427 | 스캔 스레드와 동기화 스레드 (다중 광고 창 추적·복원·진행 이벤트 빈도 제한·중지·실행 위치 영속화) |
-| `state.rs` | 247 | 순수 데이터 타입 (`AppState`, `PlatformEvent`, `SyncRunning`, `ActivePanel`, 타깃별 `NAV_*`) |
-| `ops.rs` | 200 | 광고 차단·서비스 관리·로그 설정 조작 |
+| `state.rs` | 260 | 순수 데이터 타입 (`AppState`, `PlatformEvent`, `SyncRunning`, `ActivePanel`, 타깃별 `NAV_*`) |
+| `ops.rs` | 195 | 광고 차단·서비스 관리·로그 설정 조작 |
 | `inputs.rs` | 136 | 입력 위젯(`InputState`) 지연 생성과 값 동기화 — 파일 동기화 제외 패턴 멀티라인 편집기 포함 |
-| `virtual_disk_ops.rs` | 321 | VDI 경로 입력·read-only 열기·파티션 검색/선택·게스트 목록 새로고침·폴더 이동·다중 선택 |
-| `virtual_disk_copy.rs` | 416 | VDI 대상 폴더 입력·선택, 백그라운드 read-only 복사, 진행·중지·완료 요약 상태 |
+| `virtual_disk_ops.rs` | 425 | VDI 경로 입력·read-only 열기·파티션 검색/선택·게스트 목록 새로고침·폴더 이동·다중 선택·포커스 |
+| `virtual_disk_copy.rs` | 441 | VDI 대상 폴더 입력·선택, 백그라운드 read-only 복사, 진행·중지·완료 요약 상태·탐색기 keymap |
 
-### GPUI 회귀 테스트 (`app/src/app/tests/`) — 1,619줄 / 6파일
+### GPUI 회귀 테스트 (`app/src/app/tests/`) — 1,644줄 / 6파일
 
 `app/tests.rs`(929줄, 🟡)를 시나리오별로 나눈 결과다. 픽스처는 `mod.rs`가 단독 소유하고
 하위 모듈은 `use super::*`로 가져다 쓴다.
 
 | 파일 | 줄 | 책임 |
 | --- | ---: | --- |
-| `file_sync.rs` | 681 | 동기화 조작·진행 표시줄·중지·로그 요약·섹션 너비·전역 스위치·커서 무효화·제외 패턴 UI 경계·저장 연결 |
+| `file_sync.rs` | 682 | 동기화 조작·진행 표시줄·중지·로그 요약·섹션 너비·전역 스위치·커서 무효화·제외 패턴 UI 경계·저장 연결 |
 | `layout.rs` | 397 | 사이드바·스플리터·카드 경계·divider drag·스크롤 |
 | `interval.rs` | 226 | 주기 드롭다운·프리셋 추가/삭제·패널 간 공유 |
-| `mod.rs` | 176 | 공용 픽스처 (`test_app_root`·`TestPlatform`·`refresh`·`click_debug_element` 등) |
+| `mod.rs` | 177 | 공용 픽스처 (`test_app_root`·`TestPlatform`·`refresh`·`click_debug_element` 등) |
 | `theme.rs` | 85 | 테마 전환과 스위치 가시성 |
-| `virtual_disk.rs` | 53 | VirtualBox 탐색 네비게이션·VDI 입력·파티션 카드·현재 경로·상위 이동·복사 카드·새로고침 렌더 경계 |
+| `virtual_disk.rs` | 77 | VirtualBox 탐색 네비게이션·VDI 입력·파티션 카드·현재 경로·상위 이동·복사 카드·키보드 단축키·새로고침 렌더 경계 |
 
-### 패널 (`app/src/window/`) — 3,947줄 / 11파일
+### 패널 (`app/src/window/`) — 3,989줄 / 11파일
 
 | 파일 | 줄 | 책임 |
 | --- | ---: | --- |
@@ -139,7 +139,7 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `interval.rs` | 156 | 주기 선택 렌더 — 드롭다운 + (값·단위·추가) 행 + 등록된 프리셋 목록 |
 | `log_view.rs` | 110 | 시스템 — 화면 로그 가상 리스트와 로그 파일 현황 |
 | `mod.rs` | 107 | 패널 모듈 선언 + `balanced_split`·`scroll_pane` 레이아웃 헬퍼 |
-| `virtual_disk.rs` | 506 | 편의 기능 — VDI 경로 입력·파티션 선택·게스트 현재 경로·행 선택·폴더/상위 이동·대상 폴더·복사 진행·목록 새로고침 |
+| `virtual_disk.rs` | 548 | 편의 기능 — VDI 경로 입력·파티션 선택·게스트 현재 경로·행 선택·폴더/상위 이동·단축키 포커스·대상 폴더·복사 진행·목록 새로고침 |
 
 ### 플랫폼 (`app/src/platform/`) — 2,390줄 / 8파일
 

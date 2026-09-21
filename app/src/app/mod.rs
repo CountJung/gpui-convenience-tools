@@ -25,6 +25,10 @@ mod virtual_disk_copy;
 mod virtual_disk_ops;
 
 pub(crate) use interval::{IntervalPicker, IntervalTarget};
+pub(crate) use virtual_disk_copy::{
+    init_virtual_disk_keymap, CopySelected, EnterSelected, ParentDirectory, Refresh, SelectAll,
+    VIRTUAL_DISK_KEY_CONTEXT,
+};
 
 pub use state::{ActivePanel, AppState, LogEntry, SyncJobStatus, SyncRunning, TargetApp};
 use state::{PlatformEvent, ScannerState, SyncSharedState, NAV_SYSTEM, NAV_TOOLS};
