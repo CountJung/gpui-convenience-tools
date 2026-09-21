@@ -48,6 +48,7 @@ pub(super) fn seed_validation_virtual_disk(root: &mut AppRoot, cx: &mut Context<
                 Ok(guest_path) => {
                     root.virtual_disk.current_path = guest_path;
                     root.virtual_disk.selected_paths.clear();
+                    root.virtual_disk.selection_anchor = None;
                     root.refresh_virtual_disk_directory(cx);
                 }
                 Err(error) => {

@@ -275,11 +275,15 @@ fn render_directory_card(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyEl
                     .id(("virtual-disk-entry", index))
                     .on_click(cx.listener(move |this, event: &ClickEvent, window, cx| {
                         window.focus(&row_focus_handle);
-                        let additive = event.modifiers().control || event.modifiers().shift;
                         if is_directory && event.click_count() >= 2 {
                             this.enter_virtual_disk_directory(index, cx);
                         } else {
-                            this.select_virtual_disk_entry(index, additive, cx);
+                            this.select_virtual_disk_entry(
+                                index,
+                                event.modifiers().control,
+                                event.modifiers().shift,
+                                cx,
+                            );
                         }
                     }))
                     .child(

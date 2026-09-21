@@ -28,6 +28,7 @@ pub(crate) struct VirtualDiskSession {
     pub(crate) current_path: GuestPath,
     pub(crate) entries: Vec<GuestFileEntry>,
     pub(crate) selected_paths: HashSet<GuestPath>,
+    pub(crate) selection_anchor: Option<GuestPath>,
     pub(crate) focus_handle: Option<FocusHandle>,
     pub(crate) copy: VirtualDiskCopyState,
     pub(crate) source: Option<Box<dyn GuestFileSource>>,
@@ -47,6 +48,7 @@ impl Default for VirtualDiskSession {
             current_path: GuestPath::root(),
             entries: Vec::new(),
             selected_paths: HashSet::new(),
+            selection_anchor: None,
             focus_handle: None,
             copy: VirtualDiskCopyState::default(),
             source: None,
@@ -154,6 +156,7 @@ impl AppRoot {
         self.virtual_disk.error = None;
         self.virtual_disk.entries.clear();
         self.virtual_disk.selected_paths.clear();
+        self.virtual_disk.selection_anchor = None;
         self.virtual_disk.partitions.clear();
         self.virtual_disk.selected_partition = None;
         self.virtual_disk.source = None;
@@ -213,6 +216,7 @@ impl AppRoot {
                 self.virtual_disk.selected_partition = Some(index);
                 self.virtual_disk.current_path = GuestPath::root();
                 self.virtual_disk.selected_paths.clear();
+                self.virtual_disk.selection_anchor = None;
                 self.refresh_virtual_disk_directory(cx);
             }
             Err(error) => {
@@ -220,6 +224,7 @@ impl AppRoot {
                 // 불일치해 사용자가 잘못된 파일을 선택할 수 있다.
                 self.virtual_disk.entries.clear();
                 self.virtual_disk.selected_paths.clear();
+                self.virtual_disk.selection_anchor = None;
                 self.set_virtual_disk_error(format_virtual_disk_error(&error), cx);
             }
         }
@@ -253,6 +258,14 @@ impl AppRoot {
                 self.virtual_disk
                     .selected_paths
                     .retain(|path| entries.iter().any(|entry| &entry.path == path));
+                if self
+                    .virtual_disk
+                    .selection_anchor
+                    .as_ref()
+                    .is_some_and(|anchor| !entries.iter().any(|entry| &entry.path == anchor))
+                {
+                    self.virtual_disk.selection_anchor = None;
+                }
                 self.virtual_disk.entries = entries;
                 self.virtual_disk.error = None;
             }
@@ -261,6 +274,7 @@ impl AppRoot {
                 // 불일치해 사용자가 잘못된 파일을 선택할 수 있다.
                 self.virtual_disk.entries.clear();
                 self.virtual_disk.selected_paths.clear();
+                self.virtual_disk.selection_anchor = None;
                 self.set_virtual_disk_error(format_virtual_disk_error(&error), cx);
             }
         }
@@ -271,6 +285,7 @@ impl AppRoot {
         &mut self,
         index: usize,
         additive: bool,
+        range: bool,
         cx: &mut Context<Self>,
     ) {
         let Some(path) = self
@@ -281,7 +296,28 @@ impl AppRoot {
         else {
             return;
         };
-        toggle_guest_selection(&mut self.virtual_disk.selected_paths, path, additive);
+
+        if range {
+            if let Some(anchor) = self.virtual_disk.selection_anchor.as_ref() {
+                if let Some(range_paths) =
+                    select_guest_range(&self.virtual_disk.entries, anchor, index)
+                {
+                    if !additive {
+                        self.virtual_disk.selected_paths.clear();
+                    }
+                    self.virtual_disk.selected_paths.extend(range_paths);
+                    cx.notify();
+                    return;
+                }
+            }
+        }
+
+        toggle_guest_selection(
+            &mut self.virtual_disk.selected_paths,
+            path.clone(),
+            additive,
+        );
+        self.virtual_disk.selection_anchor = Some(path);
         cx.notify();
     }
 
@@ -295,6 +331,7 @@ impl AppRoot {
         }
         self.virtual_disk.current_path = entry.path;
         self.virtual_disk.selected_paths.clear();
+        self.virtual_disk.selection_anchor = None;
         self.refresh_virtual_disk_directory(cx);
         cx.notify();
     }
@@ -306,6 +343,7 @@ impl AppRoot {
         };
         self.virtual_disk.current_path = parent;
         self.virtual_disk.selected_paths.clear();
+        self.virtual_disk.selection_anchor = None;
         self.refresh_virtual_disk_directory(cx);
         cx.notify();
     }
@@ -313,6 +351,7 @@ impl AppRoot {
     /// 현재 폴더의 모든 항목을 선택한다. 숨김·시스템 항목도 포함한다.
     pub(crate) fn select_all_virtual_disk_entries(&mut self, cx: &mut Context<Self>) {
         self.virtual_disk.selected_paths = select_all_paths(&self.virtual_disk.entries);
+        self.virtual_disk.selection_anchor = None;
         cx.notify();
     }
 
@@ -424,6 +463,28 @@ fn toggle_guest_selection(
     }
 }
 
+fn select_guest_range(
+    entries: &[GuestFileEntry],
+    anchor: &GuestPath,
+    target_index: usize,
+) -> Option<HashSet<GuestPath>> {
+    let anchor_index = entries.iter().position(|entry| &entry.path == anchor)?;
+    let (start, end) = if anchor_index <= target_index {
+        (anchor_index, target_index)
+    } else {
+        (target_index, anchor_index)
+    };
+    if end >= entries.len() {
+        return None;
+    }
+    Some(
+        entries[start..=end]
+            .iter()
+            .map(|entry| entry.path.clone())
+            .collect(),
+    )
+}
+
 fn select_all_paths(entries: &[GuestFileEntry]) -> HashSet<GuestPath> {
     entries.iter().map(|entry| entry.path.clone()).collect()
 }
@@ -473,6 +534,38 @@ mod path_tests {
         toggle_guest_selection(&mut selected, second.clone(), true);
         assert_eq!(selected.len(), 1);
         assert!(selected.contains(&first));
+    }
+
+    #[test]
+    fn shift_range_selection_uses_anchor_in_both_directions() {
+        let entries: Vec<_> = ["a.txt", "b.txt", "c.txt", "d.txt"]
+            .into_iter()
+            .map(|path| GuestFileEntry {
+                path: GuestPath::new(path).unwrap(),
+                kind: GuestFileKind::File,
+                size_bytes: 1,
+                attributes: GuestFileAttributes::default(),
+                times: Default::default(),
+            })
+            .collect();
+        let anchor = entries[2].path.clone();
+
+        let forward = select_guest_range(&entries, &anchor, 3).unwrap();
+        assert_eq!(
+            forward,
+            HashSet::from([entries[2].path.clone(), entries[3].path.clone()])
+        );
+
+        let reverse = select_guest_range(&entries, &anchor, 0).unwrap();
+        assert_eq!(
+            reverse,
+            HashSet::from([
+                entries[0].path.clone(),
+                entries[1].path.clone(),
+                entries[2].path.clone(),
+            ])
+        );
+        assert!(select_guest_range(&entries, &GuestPath::new("missing.txt").unwrap(), 1).is_none());
     }
 
     #[test]
