@@ -449,11 +449,10 @@ fn sync_dir(
 
         if meta.file_type().is_symlink() {
             // 링크를 그대로 복제하려면 권한과 대상 종류 판별이 필요하다.
-            // 현재는 건너뛰고 사유를 남긴다.
-            outcome.fail(
-                relative_label(&src_path, root),
-                "심볼릭 링크/정션은 복사 대상에서 제외됩니다.",
-            );
+            // 현재 정책은 안전하게 건너뛰며, 지원하지 않는다는 사실은 실패가
+            // 아니라 건너뜀 수로 반영한다.
+            outcome.skipped += 1;
+            control.report(&relative_path, outcome);
             continue;
         }
 

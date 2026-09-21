@@ -137,6 +137,31 @@ fn copies_nested_files_and_skips_unchanged_on_second_run() {
     let _ = fs::remove_dir_all(&root);
 }
 
+#[cfg(windows)]
+#[test]
+fn skips_symbolic_links_without_reporting_a_sync_failure() {
+    use std::os::windows::fs::symlink_file;
+
+    let root = temp_dir("symbolic-link");
+    let src = root.join("src");
+    let dst = root.join("dst");
+    fs::create_dir_all(&src).unwrap();
+    let target = src.join("target.txt");
+    let link = src.join("link.txt");
+    fs::write(&target, b"target").unwrap();
+    symlink_file(&target, &link).expect("the Windows test environment must allow file symlinks");
+
+    let outcome = run_sync_job(&job(&src, &dst));
+
+    assert_eq!(outcome.copied, 1, "failures: {:?}", outcome.failures);
+    assert_eq!(outcome.skipped, 1);
+    assert!(outcome.failures.is_empty(), "failures: {:?}", outcome.failures);
+    assert!(dst.join("target.txt").exists());
+    assert!(!dst.join("link.txt").exists());
+
+    let _ = fs::remove_dir_all(&root);
+}
+
 #[test]
 fn overwrites_an_existing_readonly_target_file() {
     let root = temp_dir("readonly-target");
