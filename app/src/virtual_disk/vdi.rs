@@ -1,0 +1,525 @@
+//! VDI 1.1 read-only 컨테이너와 블록 맵 리더.
+//!
+//! 이 모듈은 `File::open`으로 원본을 읽기 전용으로 열고, VDI 가상 디스크의
+//! 오프셋을 호스트 파일의 물리 블록으로 변환한다. 동적 이미지의 미할당 블록과
+//! discarded 블록은 VDI 계약에 따라 0으로 반환한다. 차등 이미지·부모 체인은
+//! VDE-004 범위 밖이므로 열지 않는다.
+
+use std::{
+    collections::HashSet,
+    fs::File,
+    io::{Read, Seek, SeekFrom},
+    path::{Path, PathBuf},
+};
+
+use super::{UnsupportedFormatKind, VdiImage, VdiImageType, VdiVersion, VirtualDiskError};
+
+const HEADER_SIZE: usize = 512;
+const SIGNATURE: u32 = 0xbeda_107f;
+const IMAGE_TYPE_DYNAMIC: u32 = 1;
+const IMAGE_TYPE_FIXED: u32 = 2;
+const IMAGE_TYPE_DIFFERENCING: u32 = 4;
+const BLOCK_UNALLOCATED: u32 = 0xffff_ffff;
+const BLOCK_DISCARDED: u32 = 0xffff_fffe;
+const SECTOR_SIZE: u32 = 512;
+const MIN_HEADER_MAIN_SIZE: u32 = 0x180;
+const MAX_BLOCK_MAP_BYTES: u64 = 256 * 1024 * 1024;
+
+/// VDI 1.1 헤더에서 후속 블록 리더가 사용하는 값.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct VdiHeader {
+    pub version: VdiVersion,
+    pub header_size: u32,
+    pub image_type: VdiImageType,
+    pub image_flags: u32,
+    pub offset_bmap: u32,
+    pub offset_data: u32,
+    pub sector_size: u32,
+    pub disk_size: u64,
+    pub block_size: u32,
+    pub block_extra: u32,
+    pub blocks_in_image: u32,
+    pub blocks_allocated: u32,
+}
+
+/// 검증된 VDI 컨테이너의 read-only 블록 리더.
+pub struct VdiReader {
+    file: File,
+    file_len: u64,
+    path: PathBuf,
+    header: VdiHeader,
+    image: VdiImage,
+    block_map: Vec<u32>,
+}
+
+impl VdiReader {
+    /// VDI를 쓰기 권한 없이 열고 헤더·블록 맵·물리 범위를 검증한다.
+    pub fn open(path: impl AsRef<Path>) -> Result<Self, VirtualDiskError> {
+        let path = path.as_ref().to_path_buf();
+        let mut file = File::open(&path).map_err(|source| VirtualDiskError::Io {
+            operation: super::IoOperation::Open,
+            source,
+        })?;
+        let file_len = file
+            .metadata()
+            .map_err(|source| VirtualDiskError::Io {
+                operation: super::IoOperation::Open,
+                source,
+            })?
+            .len();
+
+        if file_len < HEADER_SIZE as u64 {
+            return Err(corrupt(format!(
+                "헤더가 512바이트보다 짧습니다: {file_len}"
+            )));
+        }
+
+        let raw = read_exact_at(&mut file, 0, HEADER_SIZE)?;
+        let header = parse_header(&raw)?;
+        validate_header(&header, file_len)?;
+
+        let map_size = block_map_size(&header)?;
+        if map_size > MAX_BLOCK_MAP_BYTES {
+            return Err(corrupt(format!(
+                "블록 맵이 안전한 메모리 한도를 초과합니다: {map_size}"
+            )));
+        }
+        let map_bytes = read_exact_at(&mut file, header.offset_bmap as u64, map_size as usize)?;
+        let block_map = parse_block_map(&map_bytes, &header, file_len)?;
+
+        let image_type = header.image_type;
+        let image = VdiImage {
+            path: path.clone(),
+            version: header.version,
+            image_type,
+            disk_size_bytes: header.disk_size,
+            sector_size: header.sector_size,
+        };
+
+        Ok(Self {
+            file,
+            file_len,
+            path,
+            header,
+            image,
+            block_map,
+        })
+    }
+
+    pub fn path(&self) -> &Path {
+        &self.path
+    }
+
+    pub fn image(&self) -> &VdiImage {
+        &self.image
+    }
+
+    pub fn header(&self) -> &VdiHeader {
+        &self.header
+    }
+
+    pub fn block_map(&self) -> &[u32] {
+        &self.block_map
+    }
+
+    pub fn file_len(&self) -> u64 {
+        self.file_len
+    }
+
+    /// 가상 디스크 offset에서 요청한 바이트를 읽는다.
+    ///
+    /// 미할당·discarded 블록은 파일에 존재하지 않아도 0으로 채운다.
+    pub fn read_at(&mut self, offset: u64, buffer: &mut [u8]) -> Result<usize, VirtualDiskError> {
+        let length = buffer.len() as u64;
+        if offset > self.header.disk_size || length > self.header.disk_size.saturating_sub(offset) {
+            return Err(VirtualDiskError::BoundsViolation {
+                offset,
+                length,
+                capacity: self.header.disk_size,
+            });
+        }
+        if buffer.is_empty() {
+            return Ok(0);
+        }
+
+        let mut done = 0usize;
+        while done < buffer.len() {
+            let virtual_offset = offset + done as u64;
+            let block_index = (virtual_offset / self.header.block_size as u64) as usize;
+            let offset_in_block = virtual_offset % self.header.block_size as u64;
+            let chunk = (self.header.block_size as u64 - offset_in_block)
+                .min((buffer.len() - done) as u64) as usize;
+            let map_entry = self.block_map[block_index];
+
+            if map_entry == BLOCK_UNALLOCATED || map_entry == BLOCK_DISCARDED {
+                buffer[done..done + chunk].fill(0);
+            } else {
+                let physical_offset = physical_offset(&self.header, map_entry, offset_in_block)?;
+                let bytes = read_exact_at(&mut self.file, physical_offset, chunk)?;
+                buffer[done..done + chunk].copy_from_slice(&bytes);
+            }
+            done += chunk;
+        }
+
+        Ok(done)
+    }
+}
+
+fn parse_header(raw: &[u8]) -> Result<VdiHeader, VirtualDiskError> {
+    let signature = le_u32(raw, 0x40)?;
+    if signature != SIGNATURE {
+        return Err(corrupt(format!(
+            "VDI 시그니처가 다릅니다: 0x{signature:08x}"
+        )));
+    }
+
+    let version = VdiVersion::from_raw(le_u32(raw, 0x44)?);
+    if version != VdiVersion::CURRENT {
+        return Err(VirtualDiskError::UnsupportedFormat {
+            kind: UnsupportedFormatKind::VdiVersion,
+            detail: format!("지원 버전은 1.1이며 현재 값은 {version}입니다"),
+        });
+    }
+
+    let raw_image_type = le_u32(raw, 0x4c)?;
+    let image_type = match raw_image_type {
+        IMAGE_TYPE_DYNAMIC => VdiImageType::Dynamic,
+        IMAGE_TYPE_FIXED => VdiImageType::Fixed,
+        IMAGE_TYPE_DIFFERENCING => VdiImageType::Differencing,
+        other => {
+            return Err(VirtualDiskError::UnsupportedFormat {
+                kind: UnsupportedFormatKind::VdiImageType,
+                detail: format!("지원하지 않는 VDI 이미지 유형: {other}"),
+            })
+        }
+    };
+
+    Ok(VdiHeader {
+        version,
+        header_size: le_u32(raw, 0x48)?,
+        image_type,
+        image_flags: le_u32(raw, 0x50)?,
+        offset_bmap: le_u32(raw, 0x154)?,
+        offset_data: le_u32(raw, 0x158)?,
+        sector_size: le_u32(raw, 0x168)?,
+        disk_size: le_u64(raw, 0x16c)?,
+        block_size: le_u32(raw, 0x174)?,
+        block_extra: le_u32(raw, 0x178)?,
+        blocks_in_image: le_u32(raw, 0x17c)?,
+        blocks_allocated: le_u32(raw, 0x180)?,
+    })
+}
+
+fn validate_header(header: &VdiHeader, file_len: u64) -> Result<(), VirtualDiskError> {
+    if header.image_type == VdiImageType::Differencing {
+        return Err(VirtualDiskError::UnsupportedFormat {
+            kind: UnsupportedFormatKind::VdiImageType,
+            detail: "차등 이미지와 부모 체인은 VDE-004에서 지원하지 않습니다".to_string(),
+        });
+    }
+    if header.header_size < MIN_HEADER_MAIN_SIZE {
+        return Err(corrupt(format!(
+            "VDI 주 헤더 크기가 너무 작습니다: {}",
+            header.header_size
+        )));
+    }
+    if header.sector_size != SECTOR_SIZE {
+        return Err(VirtualDiskError::UnsupportedFormat {
+            kind: UnsupportedFormatKind::SectorSize,
+            detail: format!(
+                "VDI 섹터 크기는 512바이트여야 합니다: {}",
+                header.sector_size
+            ),
+        });
+    }
+    if header.block_size == 0 || header.block_size % header.sector_size != 0 {
+        return Err(corrupt(format!(
+            "VDI 블록 크기가 섹터 경계에 맞지 않습니다: {}",
+            header.block_size
+        )));
+    }
+    if header.offset_bmap as u64 % header.sector_size as u64 != 0
+        || header.offset_data as u64 % header.sector_size as u64 != 0
+    {
+        return Err(corrupt(
+            "블록 맵 또는 데이터 오프셋이 섹터 경계에 맞지 않습니다",
+        ));
+    }
+
+    let capacity = (header.blocks_in_image as u64)
+        .checked_mul(header.block_size as u64)
+        .ok_or_else(|| corrupt("가상 디스크 용량 계산이 오버플로됩니다"))?;
+    if header.disk_size > capacity {
+        return Err(corrupt(format!(
+            "디스크 크기가 블록 맵 용량을 초과합니다: disk={}, capacity={capacity}",
+            header.disk_size
+        )));
+    }
+    let map_size = block_map_size(header)?;
+    let map_end = (header.offset_bmap as u64)
+        .checked_add(map_size)
+        .ok_or_else(|| corrupt("블록 맵 끝 오프셋이 오버플로됩니다"))?;
+    if (header.offset_bmap as u64) < HEADER_SIZE as u64 || map_end > file_len {
+        return Err(corrupt(format!(
+            "블록 맵 범위가 파일을 벗어납니다: offset={}, size={map_size}, file={file_len}",
+            header.offset_bmap
+        )));
+    }
+    if (header.offset_data as u64) < map_end || (header.offset_data as u64) > file_len {
+        return Err(corrupt(format!(
+            "데이터 오프셋이 블록 맵 뒤에 있지 않습니다: data={}, map_end={map_end}, file={file_len}",
+            header.offset_data
+        )));
+    }
+    Ok(())
+}
+
+fn block_map_size(header: &VdiHeader) -> Result<u64, VirtualDiskError> {
+    let raw_size = (header.blocks_in_image as u64)
+        .checked_mul(4)
+        .ok_or_else(|| corrupt("블록 맵 크기 계산이 오버플로됩니다"))?;
+    let sector = header.sector_size as u64;
+    if sector == 0 {
+        return Err(corrupt("섹터 크기가 0입니다"));
+    }
+    let remainder = raw_size % sector;
+    if remainder == 0 {
+        Ok(raw_size)
+    } else {
+        raw_size
+            .checked_add(sector - remainder)
+            .ok_or_else(|| corrupt("정렬된 블록 맵 크기가 오버플로됩니다"))
+    }
+}
+
+fn parse_block_map(
+    raw: &[u8],
+    header: &VdiHeader,
+    file_len: u64,
+) -> Result<Vec<u32>, VirtualDiskError> {
+    let count = usize::try_from(header.blocks_in_image)
+        .map_err(|_| corrupt("블록 맵 항목 수를 메모리 크기로 변환할 수 없습니다"))?;
+    let mut result = Vec::with_capacity(count);
+    let mut seen = HashSet::with_capacity(count);
+    let mut allocated = 0u32;
+
+    for index in 0..count {
+        let offset = index
+            .checked_mul(4)
+            .ok_or_else(|| corrupt("블록 맵 항목 오프셋이 오버플로됩니다"))?;
+        let entry = le_u32(raw, offset)?;
+        if entry < BLOCK_DISCARDED {
+            if entry >= header.blocks_in_image {
+                return Err(corrupt(format!(
+                    "블록 맵 항목 {index}가 이미지 블록 수를 벗어납니다: {entry}"
+                )));
+            }
+            if !seen.insert(entry) {
+                return Err(corrupt(format!("물리 블록이 중복 매핑되었습니다: {entry}")));
+            }
+            allocated = allocated
+                .checked_add(1)
+                .ok_or_else(|| corrupt("할당 블록 수가 오버플로됩니다"))?;
+            let end = physical_offset(header, entry, header.block_size as u64)?;
+            if end > file_len {
+                return Err(corrupt(format!(
+                    "할당된 블록 {entry}의 끝이 파일을 벗어납니다: {end} > {file_len}"
+                )));
+            }
+        } else if entry != BLOCK_UNALLOCATED && entry != BLOCK_DISCARDED {
+            return Err(corrupt(format!("알 수 없는 블록 맵 표식: 0x{entry:08x}")));
+        }
+        result.push(entry);
+    }
+
+    if allocated != header.blocks_allocated {
+        return Err(corrupt(format!(
+            "헤더의 할당 블록 수와 맵이 다릅니다: header={}, map={allocated}",
+            header.blocks_allocated
+        )));
+    }
+    Ok(result)
+}
+
+fn physical_offset(
+    header: &VdiHeader,
+    map_entry: u32,
+    offset_in_block: u64,
+) -> Result<u64, VirtualDiskError> {
+    let stride = (header.block_size as u64)
+        .checked_add(header.block_extra as u64)
+        .ok_or_else(|| corrupt("물리 블록 stride가 오버플로됩니다"))?;
+    let block = (map_entry as u64)
+        .checked_mul(stride)
+        .ok_or_else(|| corrupt("물리 블록 오프셋이 오버플로됩니다"))?;
+    (header.offset_data as u64)
+        .checked_add(block)
+        .and_then(|offset| offset.checked_add(header.block_extra as u64))
+        .and_then(|offset| offset.checked_add(offset_in_block))
+        .ok_or_else(|| corrupt("물리 블록 오프셋이 오버플로됩니다"))
+}
+
+fn read_exact_at(file: &mut File, offset: u64, length: usize) -> Result<Vec<u8>, VirtualDiskError> {
+    file.seek(SeekFrom::Start(offset))
+        .map_err(|source| VirtualDiskError::Io {
+            operation: super::IoOperation::Seek,
+            source,
+        })?;
+    let mut buffer = vec![0u8; length];
+    file.read_exact(&mut buffer)
+        .map_err(|source| VirtualDiskError::Io {
+            operation: super::IoOperation::Read,
+            source,
+        })?;
+    Ok(buffer)
+}
+
+fn le_u32(raw: &[u8], offset: usize) -> Result<u32, VirtualDiskError> {
+    let bytes = raw
+        .get(offset..offset + 4)
+        .ok_or_else(|| corrupt("VDI 헤더 필드가 잘렸습니다"))?;
+    Ok(u32::from_le_bytes(bytes.try_into().expect("4-byte slice")))
+}
+
+fn le_u64(raw: &[u8], offset: usize) -> Result<u64, VirtualDiskError> {
+    let bytes = raw
+        .get(offset..offset + 8)
+        .ok_or_else(|| corrupt("VDI 헤더 필드가 잘렸습니다"))?;
+    Ok(u64::from_le_bytes(bytes.try_into().expect("8-byte slice")))
+}
+
+fn corrupt(detail: impl Into<String>) -> VirtualDiskError {
+    VirtualDiskError::CorruptImage(detail.into())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::{
+        fs,
+        io::Write,
+        sync::atomic::{AtomicU64, Ordering},
+    };
+
+    const BLOCK_SIZE: u32 = 512;
+
+    #[test]
+    fn reads_dynamic_image_and_returns_zero_for_unallocated_blocks() {
+        let path = write_fixture(IMAGE_TYPE_DYNAMIC, &[1, BLOCK_UNALLOCATED, 0], 2);
+        let original = fs::read(&path).unwrap();
+        let mut reader = VdiReader::open(&path).unwrap();
+        let mut contents = vec![0u8; 3 * BLOCK_SIZE as usize];
+
+        assert_eq!(reader.read_at(0, &mut contents).unwrap(), contents.len());
+        assert_eq!(&contents[..512], vec![b'B'; 512].as_slice());
+        assert_eq!(&contents[512..1024], vec![0; 512].as_slice());
+        assert_eq!(&contents[1024..], vec![b'A'; 512].as_slice());
+        assert_eq!(reader.image().image_type, VdiImageType::Dynamic);
+        assert_eq!(fs::read(&path).unwrap(), original);
+        remove_fixture(&path);
+    }
+
+    #[test]
+    fn reads_fixed_image_using_the_block_map() {
+        let path = write_fixture(IMAGE_TYPE_FIXED, &[0, 1], 2);
+        let mut reader = VdiReader::open(&path).unwrap();
+        let mut contents = vec![0u8; 768];
+
+        reader.read_at(256, &mut contents).unwrap();
+
+        assert_eq!(&contents[..256], vec![b'A'; 256].as_slice());
+        assert_eq!(&contents[256..], vec![b'B'; 512].as_slice());
+        assert_eq!(reader.image().image_type, VdiImageType::Fixed);
+        remove_fixture(&path);
+    }
+
+    #[test]
+    fn rejects_out_of_range_map_entries_and_metadata_overflow() {
+        let invalid_entry = write_fixture(IMAGE_TYPE_DYNAMIC, &[3, BLOCK_UNALLOCATED, 0], 2);
+        assert!(matches!(
+            VdiReader::open(&invalid_entry),
+            Err(VirtualDiskError::CorruptImage(_))
+        ));
+        remove_fixture(&invalid_entry);
+
+        let overflow = fixture_path();
+        let mut header = base_header(IMAGE_TYPE_DYNAMIC, u32::MAX, 0);
+        write_u32(&mut header, 0x154, 512);
+        write_u32(&mut header, 0x158, 512);
+        let mut file = fs::File::create(&overflow).unwrap();
+        file.write_all(&header).unwrap();
+        assert!(matches!(
+            VdiReader::open(&overflow),
+            Err(VirtualDiskError::CorruptImage(_))
+        ));
+        remove_fixture(&overflow);
+    }
+
+    #[test]
+    fn rejects_differencing_images_before_reading_the_block_map() {
+        let path = write_fixture(IMAGE_TYPE_DIFFERENCING, &[0, 1], 2);
+
+        assert!(matches!(
+            VdiReader::open(&path),
+            Err(VirtualDiskError::UnsupportedFormat {
+                kind: UnsupportedFormatKind::VdiImageType,
+                ..
+            })
+        ));
+        remove_fixture(&path);
+    }
+
+    fn write_fixture(image_type: u32, map: &[u32], allocated: u32) -> PathBuf {
+        let path = fixture_path();
+        let mut header = base_header(image_type, map.len() as u32, allocated);
+        write_u32(&mut header, 0x154, 512);
+        write_u32(&mut header, 0x158, 1024);
+        let mut file = fs::File::create(&path).unwrap();
+        file.write_all(&header).unwrap();
+        let mut map_bytes = vec![0u8; 512];
+        for (index, entry) in map.iter().enumerate() {
+            write_u32(&mut map_bytes, index * 4, *entry);
+        }
+        file.write_all(&map_bytes).unwrap();
+        for block in [vec![b'A'; 512], vec![b'B'; 512]] {
+            file.write_all(&block).unwrap();
+        }
+        path
+    }
+
+    fn base_header(image_type: u32, blocks: u32, allocated: u32) -> Vec<u8> {
+        let mut header = vec![0u8; HEADER_SIZE];
+        write_u32(&mut header, 0x40, SIGNATURE);
+        write_u32(&mut header, 0x44, VdiVersion::CURRENT.raw());
+        write_u32(&mut header, 0x48, MIN_HEADER_MAIN_SIZE);
+        write_u32(&mut header, 0x4c, image_type);
+        write_u32(&mut header, 0x168, SECTOR_SIZE);
+        write_u64(&mut header, 0x16c, blocks as u64 * BLOCK_SIZE as u64);
+        write_u32(&mut header, 0x174, BLOCK_SIZE);
+        write_u32(&mut header, 0x178, 0);
+        write_u32(&mut header, 0x17c, blocks);
+        write_u32(&mut header, 0x180, allocated);
+        header
+    }
+
+    fn write_u32(buffer: &mut [u8], offset: usize, value: u32) {
+        buffer[offset..offset + 4].copy_from_slice(&value.to_le_bytes());
+    }
+
+    fn write_u64(buffer: &mut [u8], offset: usize, value: u64) {
+        buffer[offset..offset + 8].copy_from_slice(&value.to_le_bytes());
+    }
+
+    fn fixture_path() -> PathBuf {
+        static NEXT: AtomicU64 = AtomicU64::new(0);
+        let id = NEXT.fetch_add(1, Ordering::Relaxed);
+        std::env::temp_dir().join(format!(
+            "gpui-convenience-vde004-{}-{id}.vdi",
+            std::process::id()
+        ))
+    }
+
+    fn remove_fixture(path: &Path) {
+        let _ = fs::remove_file(path);
+    }
+}

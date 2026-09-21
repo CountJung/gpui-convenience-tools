@@ -35,7 +35,8 @@
 부가 요소로 대시보드, 자동 시작 등록(작업 스케줄러), 롤링 파일 로그, 21종 테마를 제공한다.
 
 > VirtualBox 디스크 탐색은 `MASTER_PLAN.md`의 Phase O-1 결정 완료 후
-> `TODO.md`의 `VDE-003`~`VDE-021` 단계로 구현 중이다.
+> `TODO.md`의 `VDE-003`~`VDE-021` 단계로 구현 중이며, 현재 오프라인 VDI 1.1
+> read-only 블록 리더(VDE-004)까지 완료했다.
 > 실행 중인 VM의 VDI를 직접 읽는 기능은 기본 경로로 제공하지 않으며, 오프라인 읽기 전용
 > 경로가 안정화된 뒤 Guest Additions 기반 `VBoxManage guestcontrol`을 별도 검토한다.
 

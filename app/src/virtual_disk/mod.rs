@@ -1,12 +1,12 @@
 //! VirtualBox 오프라인 디스크 탐색에 사용하는 플랫폼 비의존 도메인 모델.
 //!
 //! 이 모듈은 아직 VDI·파일시스템을 직접 열지 않는다. 읽기 전용 컨테이너와 게스트
-//! 파일시스템 구현이 같은 계약을 사용하도록 경계를 먼저 고정하며, 실제 파서는 후속
-//! VDE 작업에서 추가한다.
+//! 파일시스템 구현이 같은 계약을 사용하도록 경계를 먼저 고정한다.
 
-// VDE-003에서 계약을 먼저 추가하고 VDE-004 이후 구현체가 연결된다. 그때 이 허용을
-// 제거하여 실제 사용되지 않는 모델이 다시 유입되지 않도록 한다.
+// 아직 UI·파티션 계층이 연결되지 않은 도메인 모델도 단계별로 먼저 고정한다.
 #![allow(dead_code)]
+
+pub mod vdi;
 
 use std::{fmt, io, path::PathBuf};
 
@@ -277,6 +277,9 @@ pub enum VirtualDiskError {
         kind: UnsupportedFormatKind,
         detail: String,
     },
+
+    #[error("VDI 메타데이터가 손상되었습니다: {0}")]
+    CorruptImage(String),
 
     #[error("읽기 전용 접근 위반: {0}")]
     ReadOnlyViolation(String),
