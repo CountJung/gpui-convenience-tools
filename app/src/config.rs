@@ -104,6 +104,20 @@ pub fn normalize_interval_presets(presets: &mut Vec<u32>) {
 // 파일 동기화 설정
 // ─────────────────────────────────────────────
 
+/// 파일 동기화 작업이 다음 실행을 기다리는 방식.
+///
+/// 기존 설정 파일은 필드가 없으므로 `Interval`을 기본값으로 사용한다. 실제 감시
+/// 스레드와 디바운스 정책은 D-011~D-012에서 이 값에 연결한다.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WatchMode {
+    /// 설정된 주기가 도래할 때 작업을 실행한다.
+    #[default]
+    Interval,
+    /// 원본 변경 이벤트를 받아 작업을 실행한다.
+    Realtime,
+}
+
 /// 원본 폴더 → 대상 폴더 동기화 작업 하나.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct SyncJob {
@@ -125,6 +139,9 @@ pub struct SyncJob {
     /// 감시 주기(초).
     #[serde(default = "default_sync_interval_secs")]
     pub interval_secs: u32,
+    /// 작업 실행을 기다리는 방식. 구버전 설정은 주기 모드로 읽는다.
+    #[serde(default)]
+    pub watch_mode: WatchMode,
     /// 원본에서 삭제된 파일을 대상에서도 삭제할지 여부.
     #[serde(default)]
     pub mirror_deletes: bool,
@@ -202,6 +219,7 @@ impl Default for SyncJob {
             target: String::new(),
             enabled: true,
             interval_secs: default_sync_interval_secs(),
+            watch_mode: WatchMode::Interval,
             mirror_deletes: false,
             include_hidden: true,
             exclude_patterns: Vec::new(),
@@ -522,6 +540,7 @@ mod tests {
 
         assert!(job.id.is_empty());
         assert!(job.exclude_patterns.is_empty());
+        assert_eq!(job.watch_mode, WatchMode::Interval);
         job.ensure_id();
         assert!(!job.id.is_empty());
 
@@ -529,6 +548,26 @@ mod tests {
         let existing = job.id.clone();
         job.ensure_id();
         assert_eq!(job.id, existing);
+    }
+
+    /// 실시간 감시 모드는 설정에 저장·복원되고, 필드가 없는 구버전 설정은 주기 모드로 남는다.
+    #[test]
+    fn sync_job_watch_mode_round_trips_with_interval_compatibility() {
+        let job = SyncJob {
+            watch_mode: WatchMode::Realtime,
+            ..SyncJob::default()
+        };
+
+        let json = serde_json::to_string(&job).expect("SyncJob 감시 방식 직렬화");
+        assert!(json.contains("\"watch_mode\":\"realtime\""));
+
+        let restored: SyncJob = serde_json::from_str(&json).expect("SyncJob 감시 방식 복원");
+        assert_eq!(restored.watch_mode, WatchMode::Realtime);
+
+        let legacy = r#"{"source":"C:\\a","target":"C:\\b","interval_secs":30}"#;
+        let restored_legacy: SyncJob =
+            serde_json::from_str(legacy).expect("감시 방식 없는 구버전 SyncJob");
+        assert_eq!(restored_legacy.watch_mode, WatchMode::Interval);
     }
 
     /// 새로 만든 작업들은 서로 다른 ID를 갖는다.
