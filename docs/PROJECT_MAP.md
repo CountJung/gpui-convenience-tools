@@ -30,7 +30,7 @@
 안전 경계: 원본 VDI는 read-only로만 열고, 실행 중 VM의 VDI 직접 읽기는 구현하지 않는다.
 실행 중 VM 지원은 후속 `GuestFileSource` 구현으로만 추가한다(VDE-021).
 
-**최종 측정**: 2026-09-22 · `app/src` 총 53개 파일 · 20,789줄
+**최종 측정**: 2026-09-22 · `app/src` 총 53개 파일 · 20,817줄
 
 ## 크기 기준 — 줄 수는 증상이다
 
@@ -74,12 +74,12 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `sync_history.rs` | 223 | 동기화 완료 이력의 JSON 배열 저장·순서 보장·손상 파일 보존·개수/기간 보존·최신 목록 로드·소요 시간 계산 |
 | `util.rs` | 139 | 도메인 주인이 없는 순수 헬퍼 — `format_interval`·`interval_to_secs`·`TimeUnit` |
 
-### VirtualBox 도메인 (`app/src/virtual_disk/`) — 4,649줄 / 8파일
+### VirtualBox 도메인 (`app/src/virtual_disk/`) — 4,677줄 / 8파일
 
 | 파일 | 줄 | 책임 |
 | --- | ---: | --- |
 | `mod.rs` | 456 | VDI·파티션·게스트 파일 항목 모델, 정규화된 게스트 경로·시간 메타데이터, `GuestFileSource`, 플랫폼 비의존 오류 계약 |
-| `vdi.rs` | 883 | VDI 1.1 read-only 헤더·블록 맵·동적/고정 블록 읽기, 잠금·VM 사용·크기/mtime 안정성 가드, 합성 NTFS VDI 통합 픽스처·검증 시드 export |
+| `vdi.rs` | 911 | 표준 VDI 1.1 read-only 헤더·블록 맵·동적/고정 블록 읽기, 잠금·VM 사용·크기/mtime 안정성 가드, 합성 NTFS raw/VDI fixture export |
 | `partition.rs` | 791 | read-only `PartitionSource` 경계, MBR·EBR·protective MBR·GPT 검색, 양쪽 CRC·LBA 범위 검증, NTFS 3.1 부트 섹터 판정 |
 | `ntfs.rs` | 801 | 파티션 범위 `Read + Seek` 어댑터, NTFS 3.1 디렉터리·기본 데이터 스트림 읽기, 압축·암호화·범위·손상 오류와 속성·시간 보존, 고정/손상 픽스처 테스트 |
 | `path_policy.rs` | 335 | 절대 대상 루트 기준 게스트 경로 매핑, Windows 예약 이름·경로 길이 검증, 게스트·호스트 리파스 포인트/심볼릭 링크 추적 차단 |
@@ -336,7 +336,8 @@ G-001 판단: `muted`는 비활성 의미이므로 테두리와 hover를 추가�
 | 2026-09-22 | `app/src/config.rs`·`app/src/app/mod.rs`·`app/tests/mod.rs` | G-003 스플리터 폭 영속화 | 앱 재시작 시 사용자가 조정한 사이드바 폭이 기본 240px로 돌아감 | `sidebar_width` 설정 필드·200~360px 보정, `ResizableState::sizes()` mouse-up 저장, 시작 시 복원, 설정/GPUI 회귀 테스트·전체 140 passed·4 ignored·Clippy 기존 경고 7건, 51개 파일·19,558줄 기준 지도 갱신 | 격리 release 기본 캡처 `g003-default-003709.png`·320px 시드 복원 캡처 `g003-restored-width-003742.png` 성공; 하네스가 divider 드래그를 지원하지 않아 실제 저장 콜백과 독립 Visual Reviewer는 후속 |
 | 2026-09-22 | `app/src/config.rs`·`app/src/app/mod.rs`·`app/src/app/virtual_disk_ops.rs`·`app/src/app/virtual_disk_copy.rs`·`app/src/window/virtual_disk.rs`·`app/src/app/tests/virtual_disk.rs` | VDE-012 GPUI 오류 알림 연결 | 도메인 오류 보고는 있었지만 화면 상세 로그·반복 알림 억제 상태·항목별 UI 조작이 연결되지 않음 | 항목별 상세 로그, 미억제 오류에만 반복 토스트, 요약 카드의 억제/재표시 버튼, `AppConfig` 저장·복원, 관련 GPUI 직접 상태 전환 테스트와 전체 140 passed·4 ignored·Clippy 기존 경고 7건, 51개 파일·19,707줄 기준 지도 갱신 | 격리 release 기본 캡처 `vde012-default-004932.png` 성공; 실제 VDI 오류 카드·버튼 click dispatch·복사 대상 E2E는 실제 이미지/하네스 제약으로 미확인하며 VDE-019에서 후속 |
 | 2026-09-22 | `app/src/sync/mod.rs`·`app/src/sync/tests.rs` | D-017 심볼릭 링크 건너뜀 계상 | 심볼릭 링크·정션을 복사하지 않으면서 실패로 집계해 정상 동기화와 오류가 섞임 | 링크를 따라가지 않고 `skipped`로 계상하며 진행 콜백에 반영, 실제 Windows 심볼릭 링크 회귀 테스트와 전체 141 passed·4 ignored·Clippy 기존 경고 7건, 51개 파일·19,731줄 기준 지도 갱신 | 현재 정책은 안전 `Skip` 고정이며 `Follow`·`Recreate` 옵션과 권한 범위는 사용자·제품 판단으로 D-014~016에 남김; commit `6cf305c` push 완료 |
-| 2026-09-22 | `app/src/config.rs`·`app/src/sync/mod.rs`·`app/src/sync/tests.rs` | D-015 링크 처리 모드 스키마 경계 | 링크 정책을 확장할 때 설정·엔진·구버전 복원 계약이 없으면 미구현 모드가 조용히 무시될 수 있음 | `SymlinkMode::{Skip, Follow, Recreate}`·`SyncJob.symlink_mode`와 snake_case/구버전 Skip 테스트 추가; Follow/Recreate는 명시적 실패로 남김; 전용 테스트·cargo check·git diff --check 통과, 53개 파일·20,789줄 기준 지도 갱신 | 실제 Follow/Recreate·UI 옵션은 원본 루트 탈출·순환 링크·권한 정책 판단 후 D-014·D-016에서 구현; 전체 테스트/Clippy 재검증 후 commit 예정 |
+| 2026-09-22 | `app/src/config.rs`·`app/src/sync/mod.rs`·`app/src/sync/tests.rs` | D-015 링크 처리 모드 스키마 경계 | 링크 정책을 확장할 때 설정·엔진·구버전 복원 계약이 없으면 미구현 모드가 조용히 무시될 수 있음 | `SymlinkMode::{Skip, Follow, Recreate}`·`SyncJob.symlink_mode`와 snake_case/구버전 Skip 테스트 추가; Follow/Recreate는 명시적 실패로 남김; 전용 테스트·cargo check·git diff --check 통과, 53개 파일·20,789줄 기준 지도 갱신 | 실제 Follow/Recreate·UI 옵션은 원본 루트 탈출·순환 링크·권한 정책 판단 후 D-014·D-016에서 구현; commit `38dddb3` push 완료 |
+| 2026-09-22 | `app/src/virtual_disk/vdi.rs`·`app/src/virtual_disk/partition.rs`·`app/src/virtual_disk/ntfs.rs`·`app/src/app/mod.rs`·`scripts/Invoke-ClaudeVisualCheck.ps1` | VDE-019 실제 VirtualBox VDI 릴리스 E2E와 표준 헤더 수정 | 앱 파서가 VirtualBox 표준 헤더의 블록 필드를 4~8바이트 앞에서 읽어 실제 VDI를 거부함 | 표준 VDI 1.1 오프셋으로 파서·fixture writer를 수정하고 raw NTFS fixture export를 추가; VBoxManage 7.2.14 `convertfromraw` VDI를 release 앱에서 열어 17개·937,234바이트 복사와 손상 항목 요약을 확인; 전체 155 passed·4 ignored, VDI 60 passed·2 ignored, 캡처·정리 증거 기록 | 외부 키보드 입력·독립 Visual Reviewer·Guest Control VM은 후속; implementation commit은 이 변경과 함께 push |
 | 2026-09-22 | `app/src/sync_history.rs`·`app/src/app/background.rs`·`app/src/main.rs` | D-018 동기화 실행 이력 저장 | 실행 결과가 화면 로그와 설정 상태에만 남아 앱 재시작 후 이력을 조회할 파일이 없음 | `sync-history.json`에 실행 순서·작업 식별자·시각·결과 건수·중지·요약을 append하고 손상 JSON은 덮어쓰지 않음, 전용 2개 테스트와 전체 143 passed·4 ignored·Clippy 기존 경고 7건, 52개 파일·19,884줄 기준 지도 갱신 | 이력 보존 정책은 로그와 동일하게 D-019에서, UI 목록은 D-020에서 후속; commit `97009c3` push 완료 |
 | 2026-09-22 | `app/src/sync_history.rs` | D-019 동기화 이력 보존 정책 | JSON 이력은 추가만 되어 오래된 실행 결과가 무한히 남을 수 있음 | `LogConfig.max_age_days`·`max_files`로 기간·개수 초과분을 새 append 전에 제거하고 최소 한 건을 유지, 보존 경계 테스트·전체 144 passed·4 ignored·Clippy 기존 경고 7건, 52개 파일·19,946줄 기준 지도 갱신 | 파일 용량 롤링은 JSON 이력에 적용하지 않으며 최근 이력 화면은 D-020 후속; commit `ed71af4` push 완료 |
 | 2026-09-22 | `app/src/sync_history.rs`·`app/src/app/mod.rs`·`app/src/app/events.rs`·`app/src/window/file_sync.rs`·`app/src/app/tests/file_sync.rs`·`scripts/Invoke-ClaudeVisualCheck.ps1` | D-020 최근 동기화 이력 카드 부분 구현 | 저장된 실행 결과를 앱 재시작 후 패널에서 볼 수 없고 완료 직후 목록 갱신도 없음 | 최신 20건 로드·완료 이벤트 새로고침·상태/결과 건수/소요 시간 카드·폭 회귀 테스트와 GPUI 시드 렌더 테스트, `-SeedHistory`·`-InitialPanel FileSync` 검증 경로 추가, 전체 145 passed·4 ignored·Clippy 기존 경고 7건, 52개 파일·20,101줄 기준 지도 갱신 | 격리 release 시드 패널 캡처 `d020-history-panel-012458.png`에서 중지/실패/성공 3행 확인, processCount=0·sessionCount=0; 독립 Visual Reviewer는 후속; commits `031148e`, `ff9dc72` push 완료 |

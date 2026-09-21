@@ -747,8 +747,10 @@ GPUI 파일 행·키보드·복사 UI의 실제 이미지 E2E는 VDE-019의 범�
 제한·출력 상한·격리 VM을 후속 구현 조건으로 고정했다.
 
 Oracle 공식 7.1/7.2 문서와 현재 소스의 `GuestFileSource` 계약을 대조해 설계를 작성했으며,
-검토 머신에는 `VBoxManage.exe`가 없어 실제 Guest Control 동작은 검증하지 않았다. VDE-019의
-실제 패널/복사 E2E 완료 전에는 이 설계를 구현 완료로 승격하지 않는다.
+검토 머신의 PATH에는 `VBoxManage.exe`가 없었지만 `C:\Program Files\Oracle\VirtualBox\VBoxManage.exe`
+설치본을 환경 변수로 주입해 오프라인 VDI의 실행 중 VM 가드를 확인했다. Guest Additions·테스트
+VM·credential 주입이 없어 실제 Guest Control 동작은 검증하지 않았으며, 이 설계를 구현 완료로
+승격하지 않는다.
 
 ### Phase O-19 — VDE-019 격리 합성 VDI 릴리스 검증 보강 진행 중
 
@@ -758,12 +760,12 @@ Oracle 공식 7.1/7.2 문서와 현재 소스의 `GuestFileSource` 계약을 대
 대상 폴더로 자동 복사한다. 일반 실행에는 환경 변수가 없으므로 제품 동작과 사용자 설정에
 영향을 주지 않는다.
 
-`CLAUDE_LOCAL` 릴리스 실행에서 MBR·NTFS 3.1 파티션과 숨김/시스템 항목 17개, 937,234바이트
-복사 결과, 손상된 `many_subdirs` 항목의 오류 사유를 확인했다. 캡처는
-`vde019-loaded-vdi-021115.png`와 `vde019-copy-summary-visible-021528.png`이며, 세션 종료 후
-프로세스·세션 루트·임시 대상이 모두 정리되었다. 실제 VirtualBox가 생성한 VDI와 독립 Visual
-Reviewer 확인은 외부 환경이 필요해 완료 처리하지 않는다.
-구현 커밋은 `87937dc`이다.
+VirtualBox 7.2.14의 `convertfromraw`로 만든 표준 VDI를 사용해 표준 헤더 오프셋을 실제로
+검증했다. `CLAUDE_LOCAL` 릴리스 실행에서 MBR·NTFS 3.1 파티션과 숨김/시스템 항목 17개,
+937,234바이트 복사 결과, 손상된 `many_subdirs` 항목의 오류 사유를 확인했다. 캡처는
+`vde019-vbox-standard-loaded-023912.png`이며, 세션 종료 후 프로세스·세션 루트·임시 대상이
+모두 정리되었다. 외부 키보드 입력과 독립 Visual Reviewer 확인은 잔여다.
+표준 VDI 파서·raw fixture export와 검증 커밋은 후속 커밋으로 기록한다.
 
 ### Phase T-1 — T-001·T-002 회귀 테스트 보강 완료 ✅
 

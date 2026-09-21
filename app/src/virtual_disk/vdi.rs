@@ -379,11 +379,13 @@ fn parse_header(raw: &[u8]) -> Result<VdiHeader, VirtualDiskError> {
         offset_bmap: le_u32(raw, 0x154)?,
         offset_data: le_u32(raw, 0x158)?,
         sector_size: le_u32(raw, 0x168)?,
-        disk_size: le_u64(raw, 0x16c)?,
-        block_size: le_u32(raw, 0x174)?,
-        block_extra: le_u32(raw, 0x178)?,
-        blocks_in_image: le_u32(raw, 0x17c)?,
-        blocks_allocated: le_u32(raw, 0x180)?,
+        // VDI 1.1의 디스크 크기·블록 필드는 0x170부터 시작한다. 0x16c는
+        // 예약 필드이고, VirtualBox가 실제로 생성한 이미지도 이 표준 배치를 쓴다.
+        disk_size: le_u64(raw, 0x170)?,
+        block_size: le_u32(raw, 0x178)?,
+        block_extra: le_u32(raw, 0x17c)?,
+        blocks_in_image: le_u32(raw, 0x180)?,
+        blocks_allocated: le_u32(raw, 0x184)?,
     })
 }
 
@@ -766,6 +768,22 @@ mod tests {
         assert!(destination.is_file());
     }
 
+    #[test]
+    fn exports_ntfs_raw_fixture_when_requested() {
+        let Ok(destination) = std::env::var("GPUI_CONVENIENCE_TOOLS_EXPORT_NTFS_RAW_FIXTURE")
+        else {
+            return;
+        };
+        let destination = PathBuf::from(destination);
+        if let Some(parent) = destination.parent() {
+            fs::create_dir_all(parent).unwrap();
+        }
+        let source = write_ntfs_raw_fixture();
+        fs::copy(&source, &destination).unwrap();
+        remove_fixture(&source);
+        assert!(destination.is_file());
+    }
+
     fn write_fixture(image_type: u32, map: &[u32], allocated: u32) -> PathBuf {
         let path = fixture_path();
         let mut header = base_header(image_type, map.len() as u32, allocated);
@@ -785,23 +803,7 @@ mod tests {
     }
 
     fn write_ntfs_vdi_fixture() -> PathBuf {
-        let ntfs_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("testdata")
-            .join("ntfs-testfs1.img");
-        let ntfs = fs::read(ntfs_path).expect("bundled NTFS fixture must be present");
-        assert!(ntfs.len().is_multiple_of(BLOCK_SIZE as usize));
-
-        let mut disk = vec![0u8; BLOCK_SIZE as usize];
-        disk[510..512].copy_from_slice(&[0x55, 0xaa]);
-        disk[446 + 4] = 0x07;
-        disk[446 + 8..446 + 12].copy_from_slice(&1u32.to_le_bytes());
-        disk[446 + 12..446 + 16].copy_from_slice(
-            &u32::try_from(ntfs.len() / BLOCK_SIZE as usize)
-                .unwrap()
-                .to_le_bytes(),
-        );
-        disk.extend_from_slice(&ntfs);
-
+        let disk = ntfs_disk_bytes();
         let block_count = u32::try_from(disk.len() / BLOCK_SIZE as usize).unwrap();
         let map_size = block_map_size(&VdiHeader {
             version: VdiVersion::CURRENT,
@@ -840,6 +842,32 @@ mod tests {
         path
     }
 
+    fn write_ntfs_raw_fixture() -> PathBuf {
+        let path = fixture_path().with_file_name("disk.raw");
+        fs::write(&path, ntfs_disk_bytes()).unwrap();
+        path
+    }
+
+    fn ntfs_disk_bytes() -> Vec<u8> {
+        let ntfs_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("testdata")
+            .join("ntfs-testfs1.img");
+        let ntfs = fs::read(ntfs_path).expect("bundled NTFS fixture must be present");
+        assert!(ntfs.len().is_multiple_of(BLOCK_SIZE as usize));
+
+        let mut disk = vec![0u8; BLOCK_SIZE as usize];
+        disk[510..512].copy_from_slice(&[0x55, 0xaa]);
+        disk[446 + 4] = 0x07;
+        disk[446 + 8..446 + 12].copy_from_slice(&1u32.to_le_bytes());
+        disk[446 + 12..446 + 16].copy_from_slice(
+            &u32::try_from(ntfs.len() / BLOCK_SIZE as usize)
+                .unwrap()
+                .to_le_bytes(),
+        );
+        disk.extend_from_slice(&ntfs);
+        disk
+    }
+
     fn base_header(image_type: u32, blocks: u32, allocated: u32) -> Vec<u8> {
         let mut header = vec![0u8; HEADER_SIZE];
         write_u32(&mut header, 0x40, SIGNATURE);
@@ -847,11 +875,11 @@ mod tests {
         write_u32(&mut header, 0x48, MIN_HEADER_MAIN_SIZE);
         write_u32(&mut header, 0x4c, image_type);
         write_u32(&mut header, 0x168, SECTOR_SIZE);
-        write_u64(&mut header, 0x16c, blocks as u64 * BLOCK_SIZE as u64);
-        write_u32(&mut header, 0x174, BLOCK_SIZE);
-        write_u32(&mut header, 0x178, 0);
-        write_u32(&mut header, 0x17c, blocks);
-        write_u32(&mut header, 0x180, allocated);
+        write_u64(&mut header, 0x170, blocks as u64 * BLOCK_SIZE as u64);
+        write_u32(&mut header, 0x178, BLOCK_SIZE);
+        write_u32(&mut header, 0x17c, 0);
+        write_u32(&mut header, 0x180, blocks);
+        write_u32(&mut header, 0x184, allocated);
         header
     }
 
