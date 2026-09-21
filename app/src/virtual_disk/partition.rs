@@ -273,11 +273,13 @@ fn parse_gpt<S: PartitionSource>(
         total_sectors,
         sector_size,
         backup_lba,
-        first_usable,
-        last_usable,
-        entry_count,
-        entry_size,
-        stored_array_crc,
+        &GptLayout {
+            first_usable,
+            last_usable,
+            entry_count,
+            entry_size,
+            expected_array_crc: stored_array_crc,
+        },
     )?;
 
     let entry_size = entry_size as usize;
@@ -318,11 +320,7 @@ fn validate_backup_gpt<S: PartitionSource>(
     total_sectors: u64,
     sector_size: u32,
     backup_lba: u64,
-    first_usable: u64,
-    last_usable: u64,
-    entry_count: u32,
-    entry_size: u32,
-    expected_array_crc: u32,
+    layout: &GptLayout,
 ) -> Result<(), VirtualDiskError> {
     if backup_lba != total_sectors - 1 {
         return Err(corrupt(
@@ -348,17 +346,17 @@ fn validate_backup_gpt<S: PartitionSource>(
 
     if le_u64(&header, 24)? != backup_lba
         || le_u64(&header, 32)? != 1
-        || le_u64(&header, 40)? != first_usable
-        || le_u64(&header, 48)? != last_usable
-        || le_u32(&header, 80)? != entry_count
-        || le_u32(&header, 84)? != entry_size
+        || le_u64(&header, 40)? != layout.first_usable
+        || le_u64(&header, 48)? != layout.last_usable
+        || le_u32(&header, 80)? != layout.entry_count
+        || le_u32(&header, 84)? != layout.entry_size
     {
         return Err(corrupt("GPT 백업 헤더가 주 헤더와 일치하지 않습니다"));
     }
 
     let entries_lba = le_u64(&header, 72)?;
-    let array_bytes = (entry_count as u64)
-        .checked_mul(entry_size as u64)
+    let array_bytes = (layout.entry_count as u64)
+        .checked_mul(layout.entry_size as u64)
         .ok_or_else(|| corrupt("GPT 백업 배열 크기가 오버플로됩니다"))?;
     let array_offset = entries_lba
         .checked_mul(sector_size as u64)
@@ -375,7 +373,9 @@ fn validate_backup_gpt<S: PartitionSource>(
 
     let mut array = vec![0u8; array_bytes as usize];
     read_exact(source, array_offset, &mut array)?;
-    if crc32(&array) != expected_array_crc || le_u32(&header, 88)? != expected_array_crc {
+    if crc32(&array) != layout.expected_array_crc
+        || le_u32(&header, 88)? != layout.expected_array_crc
+    {
         return Err(corrupt("GPT 백업 파티션 배열 CRC가 일치하지 않습니다"));
     }
     Ok(())
@@ -460,6 +460,14 @@ struct MbrEntry {
     partition_type: u8,
     start_lba: u32,
     sector_count: u32,
+}
+
+struct GptLayout {
+    first_usable: u64,
+    last_usable: u64,
+    entry_count: u32,
+    entry_size: u32,
+    expected_array_crc: u32,
 }
 
 impl MbrEntry {

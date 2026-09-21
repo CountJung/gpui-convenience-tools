@@ -25,7 +25,7 @@
 안전 경계: 원본 VDI는 read-only로만 열고, 실행 중 VM의 VDI 직접 읽기는 구현하지 않는다.
 실행 중 VM 지원은 후속 `GuestFileSource` 구현으로만 추가한다(VDE-021).
 
-**최종 측정**: 2026-09-21 · `app/src` 총 40개 파일 · 14,837줄
+**최종 측정**: 2026-09-21 · `app/src` 총 40개 파일 · 14,845줄
 
 ## 크기 기준 — 줄 수는 증상이다
 
@@ -74,7 +74,7 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | --- | ---: | --- |
 | `mod.rs` | 406 | VDI·파티션·게스트 파일 항목 모델, 정규화된 게스트 경로, `GuestFileSource`, 플랫폼 비의존 오류 계약 |
 | `vdi.rs` | 782 | VDI 1.1 read-only 헤더·블록 맵·동적/고정 블록 읽기, 잠금·VM 사용·크기/mtime 안정성 가드 |
-| `partition.rs` | 721 | read-only `PartitionSource` 경계, MBR·EBR·protective MBR·GPT 검색, 양쪽 CRC·LBA 범위 검증 |
+| `partition.rs` | 729 | read-only `PartitionSource` 경계, MBR·EBR·protective MBR·GPT 검색, 양쪽 CRC·LBA 범위 검증 |
 
 ### 동기화 엔진 (`app/src/sync/`) — 1,246줄 / 2파일
 
@@ -283,7 +283,7 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | 2026-09-17 | `virtual_disk/mod.rs` | VDE-003 도메인 경계 추가 | VirtualBox 탐색 모델 없음 | 403줄의 플랫폼 비의존 모델·읽기 계약·오류 분류 | VDI 실제 파서와 GPUI 화면은 VDE-004 이후 연결 |
 | 2026-09-21 | `virtual_disk/vdi.rs` | VDE-004 VDI 블록 리더 추가 | VDI 헤더·블록 맵 구현 없음 | 512줄의 read-only 헤더·맵 검증·동적/고정 블록 읽기 | 파티션·NTFS·잠금 안정성은 VDE-005~008에서 연결 |
 | 2026-09-21 | `virtual_disk/vdi.rs` | VDE-005 안전 가드 추가 | 파일 잠금·원본 변경·실행 중 VM 대조 없음 | 782줄의 잠금 표식·환경변수 기반 VBoxManage 조회·크기/mtime 스냅샷·read-only 핸들 검증 | 800줄 주의 구간에 접근했으므로 VDE-006 전에 책임 단위 분할 후보를 검토 |
-| 2026-09-21 | `virtual_disk/partition.rs` | VDE-006 MBR/GPT 파서 추가 | 파티션 검색 구현 없음 | 721줄의 MBR·EBR·GPT 양쪽 CRC·범위 검증과 `PartitionSource` 어댑터 | NTFS 파일시스템 판정은 VDE-007~008에서 연결 |
+| 2026-09-21 | `virtual_disk/partition.rs` | VDE-006 MBR/GPT 파서 추가 | 파티션 검색 구현 없음 | 729줄의 MBR·EBR·GPT 양쪽 CRC·범위 검증과 `PartitionSource` 어댑터 | NTFS 파일시스템 판정은 VDE-007~008에서 연결 |
 | 2026-07-29 | 편의 기능 스플리터 3곳 | 공용 레이아웃 승격 | 패널별 고정 초기 폭 | `window::balanced_split` | 설정 pane 과도 축소 방지, 양쪽 가용폭 사용 |
 | 2026-07-29 | `app.rs` | 책임 단위 분할 + 재배치 | 1,798 | `app/` 7파일 (최대 564) | 대시보드·로그 렌더는 소유가 잘못돼 있어 `window/`로 이동 |
 | 2026-07-29 | `platform/windows.rs` | 책임 단위 분할 + 승격 | 1,361 | `platform/windows/` 6파일 (최대 344) | `wide_null`을 `windows/mod.rs`로 **공용 승격** |
