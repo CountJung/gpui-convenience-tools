@@ -906,6 +906,16 @@ flowchart TD
   `file_sync_run_button_saves_current_inputs_and_queues_selected_job`로 입력 영역 경계와
   실행 저장 경로를 고정했다.
 
+#### D-017 — 심볼릭 링크 건너뜀 계상 완료 ✅
+
+- 현재 안전 정책은 심볼릭 링크·정션을 따라가지 않고 복사 대상에서 제외한다. 제외된 링크는
+  파일 복사 실패가 아니라 `skipped`로 계상하며, 진행 콜백에도 반영한다.
+- 실제 Windows 심볼릭 링크와 일반 파일을 함께 둔 임시 원본으로 링크 미복사·일반 파일 복사·
+  실패 목록 비어 있음을 회귀 테스트로 고정했다.
+
+`skips_symbolic_links_without_reporting_a_sync_failure`, `cargo check --locked`, 전체 141
+passed·4 ignored, Clippy exit 0, `git diff --check`를 통과했으며 구현 커밋은 `6cf305c`이다.
+
 - 실시간 감시(`notify` 크레이트, 이미 의존성 트리에 존재)
 - 제외 패턴(glob) 지원
 - 진행률 표시 및 취소

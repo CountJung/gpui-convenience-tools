@@ -30,7 +30,7 @@
 안전 경계: 원본 VDI는 read-only로만 열고, 실행 중 VM의 VDI 직접 읽기는 구현하지 않는다.
 실행 중 VM 지원은 후속 `GuestFileSource` 구현으로만 추가한다(VDE-021).
 
-**최종 측정**: 2026-09-22 · `app/src` 총 51개 파일 · 19,707줄
+**최종 측정**: 2026-09-22 · `app/src` 총 51개 파일 · 19,731줄
 
 ## 크기 기준 — 줄 수는 증상이다
 
@@ -86,14 +86,14 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `issues.rs` | 146 | 복사 오류 종류·안정 억제 키·부분 복사 보고서 연결과 항목별 알림 억제 상태 |
 | `metadata.rs` | 403 | Windows 파일 속성·생성/접근/수정 시간과 비지원·권한 오류를 `MetadataFailure`로 수집 |
 
-### 동기화 엔진 (`app/src/sync/`) — 1,273줄 / 2파일
+### 동기화 엔진 (`app/src/sync/`) — 1,297줄 / 2파일
 
 동기화 엔진을 `sync/mod.rs` 본문과 `sync/tests.rs` 테스트로 나눈 결과다.
 
 | 파일 | 줄 | 책임 |
 | --- | ---: | --- |
-| `mod.rs` | 650 | 폴더 동기화 엔진 (UI 비의존 순수 로직) — 진행 보고·중지·이어서 시작·제외 glob 적용 포함 |
-| `tests.rs` | 623 | 복사·건너뜀·읽기 전용 대상 덮어쓰기·미러 삭제·실패 사유·진행 보고·중지·이어서 시작·제외 glob 단위 테스트 |
+| `mod.rs` | 649 | 폴더 동기화 엔진 (UI 비의존 순수 로직) — 진행 보고·중지·이어서 시작·제외 glob·심볼릭 링크 안전 건너뜀 포함 |
+| `tests.rs` | 648 | 복사·건너뜀·심볼릭 링크 안전 건너뜀·읽기 전용 대상 덮어쓰기·미러 삭제·실패 사유·진행 보고·중지·이어서 시작·제외 glob 단위 테스트 |
 
 ### 앱 루트 (`app/src/app/`) — 3,887줄 / 11파일
 
@@ -327,6 +327,7 @@ G-001 판단: `muted`는 비활성 의미이므로 테두리와 hover를 추가�
 | 2026-09-22 | `app/src/app/ui_state.rs`·`app/mod.rs`·기능별 참조 호출부 | G-002 `AppRoot` 기능 상태 묶음 | 서비스·동기화·광고 스크롤과 작업 상태가 루트 엔티티 필드에 혼재해 소유 경계가 흐림 | GPUI 엔티티는 하나로 유지하고 `ServiceState`·`SyncState`·`AdBlockState` 일반 구조체로 상태 소유권 분리, 전체 139 passed·4 ignored·Clippy 기존 경고 7건, 51개 파일·19,496줄 기준 지도 갱신 | 동작 변경 없는 구조 리팩터링; 실제 화면 검증은 UI 동작 변경이 없어 N/A |
 | 2026-09-22 | `app/src/config.rs`·`app/src/app/mod.rs`·`app/tests/mod.rs` | G-003 스플리터 폭 영속화 | 앱 재시작 시 사용자가 조정한 사이드바 폭이 기본 240px로 돌아감 | `sidebar_width` 설정 필드·200~360px 보정, `ResizableState::sizes()` mouse-up 저장, 시작 시 복원, 설정/GPUI 회귀 테스트·전체 140 passed·4 ignored·Clippy 기존 경고 7건, 51개 파일·19,558줄 기준 지도 갱신 | 격리 release 기본 캡처 `g003-default-003709.png`·320px 시드 복원 캡처 `g003-restored-width-003742.png` 성공; 하네스가 divider 드래그를 지원하지 않아 실제 저장 콜백과 독립 Visual Reviewer는 후속 |
 | 2026-09-22 | `app/src/config.rs`·`app/src/app/mod.rs`·`app/src/app/virtual_disk_ops.rs`·`app/src/app/virtual_disk_copy.rs`·`app/src/window/virtual_disk.rs`·`app/src/app/tests/virtual_disk.rs` | VDE-012 GPUI 오류 알림 연결 | 도메인 오류 보고는 있었지만 화면 상세 로그·반복 알림 억제 상태·항목별 UI 조작이 연결되지 않음 | 항목별 상세 로그, 미억제 오류에만 반복 토스트, 요약 카드의 억제/재표시 버튼, `AppConfig` 저장·복원, 관련 GPUI 직접 상태 전환 테스트와 전체 140 passed·4 ignored·Clippy 기존 경고 7건, 51개 파일·19,707줄 기준 지도 갱신 | 격리 release 기본 캡처 `vde012-default-004932.png` 성공; 실제 VDI 오류 카드·버튼 click dispatch·복사 대상 E2E는 실제 이미지/하네스 제약으로 미확인하며 VDE-019에서 후속 |
+| 2026-09-22 | `app/src/sync/mod.rs`·`app/src/sync/tests.rs` | D-017 심볼릭 링크 건너뜀 계상 | 심볼릭 링크·정션을 복사하지 않으면서 실패로 집계해 정상 동기화와 오류가 섞임 | 링크를 따라가지 않고 `skipped`로 계상하며 진행 콜백에 반영, 실제 Windows 심볼릭 링크 회귀 테스트와 전체 141 passed·4 ignored·Clippy 기존 경고 7건, 51개 파일·19,731줄 기준 지도 갱신 | 현재 정책은 안전 `Skip` 고정이며 `Follow`·`Recreate` 옵션과 권한 범위는 사용자·제품 판단으로 D-014~016에 남김; commit `6cf305c` push 완료 |
 | 2026-07-29 | 편의 기능 스플리터 3곳 | 공용 레이아웃 승격 | 패널별 고정 초기 폭 | `window::balanced_split` | 설정 pane 과도 축소 방지, 양쪽 가용폭 사용 |
 | 2026-07-29 | `app.rs` | 책임 단위 분할 + 재배치 | 1,798 | `app/` 7파일 (최대 564) | 대시보드·로그 렌더는 소유가 잘못돼 있어 `window/`로 이동 |
 | 2026-07-29 | `platform/windows.rs` | 책임 단위 분할 + 승격 | 1,361 | `platform/windows/` 6파일 (최대 344) | `wide_null`을 `windows/mod.rs`로 **공용 승격** |
