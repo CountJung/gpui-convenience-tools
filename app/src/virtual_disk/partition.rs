@@ -268,6 +268,17 @@ fn parse_gpt<S: PartitionSource>(
     if crc32(&array) != stored_array_crc {
         return Err(corrupt("GPT 파티션 배열 CRC가 일치하지 않습니다"));
     }
+    validate_backup_gpt(
+        source,
+        total_sectors,
+        sector_size,
+        backup_lba,
+        first_usable,
+        last_usable,
+        entry_count,
+        entry_size,
+        stored_array_crc,
+    )?;
 
     let entry_size = entry_size as usize;
     let mut result = Vec::new();
@@ -300,6 +311,74 @@ fn parse_gpt<S: PartitionSource>(
         });
     }
     Ok(result)
+}
+
+fn validate_backup_gpt<S: PartitionSource>(
+    source: &mut S,
+    total_sectors: u64,
+    sector_size: u32,
+    backup_lba: u64,
+    first_usable: u64,
+    last_usable: u64,
+    entry_count: u32,
+    entry_size: u32,
+    expected_array_crc: u32,
+) -> Result<(), VirtualDiskError> {
+    if backup_lba != total_sectors - 1 {
+        return Err(corrupt(
+            "GPT 백업 헤더가 디스크 마지막 섹터에 있지 않습니다",
+        ));
+    }
+    let header = read_sector_at(source, backup_lba)?;
+    if header.get(0..8) != Some(GPT_SIGNATURE.as_slice()) {
+        return Err(corrupt("GPT 백업 헤더 서명이 없습니다"));
+    }
+    let header_size = le_u32(&header, 12)?;
+    if !(GPT_HEADER_MIN_SIZE..=sector_size).contains(&header_size) {
+        return Err(corrupt(format!(
+            "GPT 백업 헤더 크기가 유효하지 않습니다: {header_size}"
+        )));
+    }
+    let stored_header_crc = le_u32(&header, 16)?;
+    let mut header_for_crc = header[..header_size as usize].to_vec();
+    header_for_crc[16..20].fill(0);
+    if crc32(&header_for_crc) != stored_header_crc {
+        return Err(corrupt("GPT 백업 헤더 CRC가 일치하지 않습니다"));
+    }
+
+    if le_u64(&header, 24)? != backup_lba
+        || le_u64(&header, 32)? != 1
+        || le_u64(&header, 40)? != first_usable
+        || le_u64(&header, 48)? != last_usable
+        || le_u32(&header, 80)? != entry_count
+        || le_u32(&header, 84)? != entry_size
+    {
+        return Err(corrupt("GPT 백업 헤더가 주 헤더와 일치하지 않습니다"));
+    }
+
+    let entries_lba = le_u64(&header, 72)?;
+    let array_bytes = (entry_count as u64)
+        .checked_mul(entry_size as u64)
+        .ok_or_else(|| corrupt("GPT 백업 배열 크기가 오버플로됩니다"))?;
+    let array_offset = entries_lba
+        .checked_mul(sector_size as u64)
+        .ok_or_else(|| corrupt("GPT 백업 배열 오프셋이 오버플로됩니다"))?;
+    let array_end = array_offset
+        .checked_add(array_bytes)
+        .ok_or_else(|| corrupt("GPT 백업 배열 끝 오프셋이 오버플로됩니다"))?;
+    let backup_offset = backup_lba
+        .checked_mul(sector_size as u64)
+        .ok_or_else(|| corrupt("GPT 백업 헤더 오프셋이 오버플로됩니다"))?;
+    if entries_lba >= total_sectors || array_end > backup_offset {
+        return Err(corrupt("GPT 백업 배열이 디스크 범위를 벗어납니다"));
+    }
+
+    let mut array = vec![0u8; array_bytes as usize];
+    read_exact(source, array_offset, &mut array)?;
+    if crc32(&array) != expected_array_crc || le_u32(&header, 88)? != expected_array_crc {
+        return Err(corrupt("GPT 백업 파티션 배열 CRC가 일치하지 않습니다"));
+    }
+    Ok(())
 }
 
 fn read_sector<S: PartitionSource>(source: &mut S, lba: u64) -> Result<Vec<u8>, VirtualDiskError> {
@@ -476,14 +555,31 @@ mod tests {
 
         fn refresh_gpt_crcs(&mut self, entry_count: usize) {
             let array_len = entry_count * 128;
-            let array = &self.bytes[2 * SECTOR_SIZE..2 * SECTOR_SIZE + array_len];
-            let array_crc = crc32(array);
+            let array = self.bytes[2 * SECTOR_SIZE..2 * SECTOR_SIZE + array_len].to_vec();
+            let array_crc = crc32(&array);
             self.bytes[SECTOR_SIZE + 88..SECTOR_SIZE + 92]
                 .copy_from_slice(&array_crc.to_le_bytes());
             self.bytes[SECTOR_SIZE + 16..SECTOR_SIZE + 20].fill(0);
             let header_crc = crc32(&self.bytes[SECTOR_SIZE..SECTOR_SIZE + 92]);
             self.bytes[SECTOR_SIZE + 16..SECTOR_SIZE + 20]
                 .copy_from_slice(&header_crc.to_le_bytes());
+
+            let backup_lba = self.bytes.len() / SECTOR_SIZE - 1;
+            let backup_array_lba = backup_lba - 1;
+            let backup_array_offset = backup_array_lba * SECTOR_SIZE;
+            self.bytes[backup_array_offset..backup_array_offset + array_len]
+                .copy_from_slice(&array);
+            let mut backup_header = self.bytes[SECTOR_SIZE..2 * SECTOR_SIZE].to_vec();
+            backup_header[24..32].copy_from_slice(&(backup_lba as u64).to_le_bytes());
+            backup_header[32..40].copy_from_slice(&1u64.to_le_bytes());
+            backup_header[72..80].copy_from_slice(&(backup_array_lba as u64).to_le_bytes());
+            backup_header[88..92].copy_from_slice(&array_crc.to_le_bytes());
+            backup_header[16..20].fill(0);
+            let backup_header_crc = crc32(&backup_header[..92]);
+            backup_header[16..20].copy_from_slice(&backup_header_crc.to_le_bytes());
+            let backup_header_offset = backup_lba * SECTOR_SIZE;
+            self.bytes[backup_header_offset..backup_header_offset + SECTOR_SIZE]
+                .copy_from_slice(&backup_header);
         }
     }
 
@@ -596,6 +692,30 @@ mod tests {
         assert!(matches!(
             discover_partitions(&mut disk),
             Err(VirtualDiskError::CorruptImage(message)) if message.contains("GPT 주 헤더 CRC")
+        ));
+    }
+
+    #[test]
+    fn rejects_gpt_backup_header_crc_mismatch() {
+        let mut disk = MemoryDisk::new(4096);
+        disk.set_mbr_signature();
+        disk.mbr_entry(0, TYPE_PROTECTIVE_MBR, 1, 4095);
+        disk.bytes[SECTOR_SIZE..SECTOR_SIZE + 8].copy_from_slice(GPT_SIGNATURE);
+        disk.bytes[SECTOR_SIZE + 12..SECTOR_SIZE + 16].copy_from_slice(&92u32.to_le_bytes());
+        disk.bytes[SECTOR_SIZE + 24..SECTOR_SIZE + 32].copy_from_slice(&1u64.to_le_bytes());
+        disk.bytes[SECTOR_SIZE + 32..SECTOR_SIZE + 40].copy_from_slice(&4095u64.to_le_bytes());
+        disk.bytes[SECTOR_SIZE + 40..SECTOR_SIZE + 48].copy_from_slice(&34u64.to_le_bytes());
+        disk.bytes[SECTOR_SIZE + 48..SECTOR_SIZE + 56].copy_from_slice(&4062u64.to_le_bytes());
+        disk.bytes[SECTOR_SIZE + 72..SECTOR_SIZE + 80].copy_from_slice(&2u64.to_le_bytes());
+        disk.bytes[SECTOR_SIZE + 80..SECTOR_SIZE + 84].copy_from_slice(&4u32.to_le_bytes());
+        disk.bytes[SECTOR_SIZE + 84..SECTOR_SIZE + 88].copy_from_slice(&128u32.to_le_bytes());
+        disk.refresh_gpt_crcs(4);
+        let backup_header = (4095 * SECTOR_SIZE) + 16;
+        disk.bytes[backup_header] ^= 1;
+
+        assert!(matches!(
+            discover_partitions(&mut disk),
+            Err(VirtualDiskError::CorruptImage(message)) if message.contains("GPT 백업 헤더 CRC")
         ));
     }
 }
