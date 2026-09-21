@@ -7,6 +7,7 @@
 #![allow(dead_code)]
 
 pub mod copy;
+pub mod issues;
 pub mod metadata;
 pub mod ntfs;
 pub mod partition;

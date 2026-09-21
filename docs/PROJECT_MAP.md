@@ -19,15 +19,16 @@
 | `app/src/virtual_disk/partition.rs` | **구현됨** — MBR·EBR·protective MBR·GPT 검색과 CRC·범위 검증 | VDE-006 |
 | `app/src/virtual_disk/ntfs.rs` | **구현됨** — NTFS 디렉터리 열거·기본 데이터 스트림 읽기·속성 보존·항목별 오류 경계 | VDE-007~008 |
 | `app/src/virtual_disk/path_policy.rs` | **구현됨** — 게스트 경로의 호스트 매핑, 예약 이름·길이·링크 추적 안전 정책 | VDE-009 |
-| `app/src/virtual_disk/copy.rs` | **구현됨** — 선택 파일·폴더의 청크 복사와 건너뜀·덮어쓰기·새 이름 충돌 정책 | VDE-010; 속성·오류 알림은 VDE-011~012 |
-| `app/src/virtual_disk/metadata.rs` | **구현됨** — 호스트 파일 속성·타임스탬프 적용과 구조화된 적용 실패 결과 | VDE-011~012 |
+| `app/src/virtual_disk/copy.rs` | **구현됨** — 선택 파일·폴더의 청크 복사와 건너뜀·덮어쓰기·새 이름 충돌 정책, 메타데이터 결과 집계 | VDE-010~011 |
+| `app/src/virtual_disk/issues.rs` | **구현됨** — 원본 변경·대상 쓰기·지원 불가·메타데이터 오류 분류, 부분 복사 결과와 항목별 억제 키 | VDE-012 |
+| `app/src/virtual_disk/metadata.rs` | **구현됨** — 호스트 파일 속성·타임스탬프 적용과 구조화된 적용 실패 결과 | VDE-011 |
 | `app/src/window/virtual_disk.rs` | VDI 선택·파티션·탐색·선택·단축키·진행 UI | VDE-013~017 |
 | `app/src/app/virtual_disk_ops.rs` | 탐색기 상태·이벤트·복사 작업 조작 | VDE-013~016 |
 
 안전 경계: 원본 VDI는 read-only로만 열고, 실행 중 VM의 VDI 직접 읽기는 구현하지 않는다.
 실행 중 VM 지원은 후속 `GuestFileSource` 구현으로만 추가한다(VDE-021).
 
-**최종 측정**: 2026-09-21 · `app/src` 총 45개 파일 · 17,024줄
+**최종 측정**: 2026-09-21 · `app/src` 총 46개 파일 · 17,350줄
 
 ## 크기 기준 — 줄 수는 증상이다
 
@@ -41,7 +42,7 @@
 | 800~1,000 | 🟡 경고 | 다음 작업 전에 구조 리팩터링 |
 | 1,000 초과 | 🔴 위반 | **즉시 리팩터링.** 다른 작업보다 우선 |
 
-현재 🔴 위반 **없음**, 🟡 경고 **없음**. 최대 파일은 782줄(`virtual_disk/vdi.rs`).
+현재 🔴 위반 **없음**, 🟡 경고 **1개**. 최대 파일은 834줄(`virtual_disk/copy.rs`)이며, 다음 VirtualBox UI 작업 전에 책임 단위 분할을 검토한다.
 줄 수와 무관하게 처리하는 중복 헬퍼는 아래 「중복 헬퍼 추적」에서 관리한다.
 
 ### 줄 수 측정 명령
@@ -70,7 +71,7 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `logging.rs` | 560 | 롤링 파일 로거 (`log::Log` 구현, 테스트용 출력 경로 주입) |
 | `util.rs` | 139 | 도메인 주인이 없는 순수 헬퍼 — `format_interval`·`interval_to_secs`·`TimeUnit` |
 
-### VirtualBox 도메인 (`app/src/virtual_disk/`) — 4,097줄 / 7파일
+### VirtualBox 도메인 (`app/src/virtual_disk/`) — 4,423줄 / 8파일
 
 | 파일 | 줄 | 책임 |
 | --- | ---: | --- |
@@ -79,8 +80,9 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `partition.rs` | 729 | read-only `PartitionSource` 경계, MBR·EBR·protective MBR·GPT 검색, 양쪽 CRC·LBA 범위 검증 |
 | `ntfs.rs` | 738 | 파티션 범위 `Read + Seek` 어댑터, NTFS 3.1 디렉터리·기본 데이터 스트림 읽기, 압축·암호화·범위·손상 오류와 속성·시간 보존 |
 | `path_policy.rs` | 334 | 절대 대상 루트 기준 게스트 경로 매핑, Windows 예약 이름·경로 길이 검증, 게스트·호스트 리파스 포인트/심볼릭 링크 추적 차단 |
-| `copy.rs` | 660 | `GuestFileSource` 선택 파일·폴더의 설정 청크 복사, 대상 부모 생성, 건너뜀·덮어쓰기·새 이름 충돌 정책과 메타데이터 결과 집계 |
-| `metadata.rs` | 398 | Windows 파일 속성·생성/접근/수정 시간과 비지원·권한 오류를 `MetadataFailure`로 수집 |
+| `copy.rs` | 834 | `GuestFileSource` 선택 파일·폴더의 설정 청크 복사, 대상 부모 생성, 건너뜀·덮어쓰기·새 이름 충돌 정책과 메타데이터 결과 집계 |
+| `issues.rs` | 146 | 복사 오류 종류·안정 억제 키·부분 복사 보고서 연결과 항목별 알림 억제 상태 |
+| `metadata.rs` | 403 | Windows 파일 속성·생성/접근/수정 시간과 비지원·권한 오류를 `MetadataFailure`로 수집 |
 
 ### 동기화 엔진 (`app/src/sync/`) — 1,246줄 / 2파일
 
@@ -295,6 +297,7 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | 2026-09-21 | `virtual_disk/path_policy.rs`·`virtual_disk/mod.rs` | VDE-009 호스트 경로 안전 매핑 추가 | 게스트 경로를 호스트 복사 대상에 연결하는 안전 경계 없음 | 절대 대상 루트, Windows 예약 이름·금지 문자·UTF-16 길이 제한, 게스트 리파스 포인트와 기존 호스트 링크 추적 차단, 6개 정책 테스트 | 실제 파일 복사·충돌·속성·오류 알림 연결은 VDE-010~012에서 수행 |
 | 2026-09-21 | `virtual_disk/path_policy.rs`·`virtual_disk/copy.rs` | VDE-010 복사 엔진과 경로 정책 분리 | 경로 정책과 복사 엔진이 한 파일에 모여 952줄 경고 구간에 접근 | 경로 정책을 334줄 모듈로 분리하고 복사 엔진을 629줄로 유지, 청크 복사·부모 생성·건너뜀·덮어쓰기·새 이름 충돌과 13개 테스트 추가 | 파일 속성·항목별 실패 알림은 VDE-011~012에서 연결 |
 | 2026-09-21 | `virtual_disk/metadata.rs`·`virtual_disk/ntfs.rs`·`virtual_disk/copy.rs` | VDE-011 메타데이터 적용 추가 | 게스트 속성과 시간 정보가 호스트 복사 결과에 반영되지 않음 | NTFS 생성·수정·접근 시간 모델링, Windows 속성·생성 시간·접근/수정 시간 적용, 비지원·권한 실패 수집, 5개 테스트 | 실제 VDI 이미지의 모든 메타데이터 조합과 UI 알림 연결은 VDE-018~019·VDE-012에서 후속 검증 |
+| 2026-09-21 | `virtual_disk/issues.rs`·`virtual_disk/copy.rs` | VDE-012 오류 수집 도메인 경계 추가 | 복사 실패가 전체 작업 중단으로만 전달되고 반복 알림 억제 계약이 없음 | 오류 종류 분류, 형제 항목 계속 처리, `CopyReport.issues`, 경로·종류 기반 안정 억제 키와 중복 알림 차단, 11개 관련 테스트 | GPUI 토스트/로그 연결과 억제 상태 영속화는 VDE-013~019 후속 작업 |
 | 2026-07-29 | 편의 기능 스플리터 3곳 | 공용 레이아웃 승격 | 패널별 고정 초기 폭 | `window::balanced_split` | 설정 pane 과도 축소 방지, 양쪽 가용폭 사용 |
 | 2026-07-29 | `app.rs` | 책임 단위 분할 + 재배치 | 1,798 | `app/` 7파일 (최대 564) | 대시보드·로그 렌더는 소유가 잘못돼 있어 `window/`로 이동 |
 | 2026-07-29 | `platform/windows.rs` | 책임 단위 분할 + 승격 | 1,361 | `platform/windows/` 6파일 (최대 344) | `wide_null`을 `windows/mod.rs`로 **공용 승격** |

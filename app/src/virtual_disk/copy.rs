@@ -13,6 +13,7 @@ use super::{
     GuestFileEntry, GuestFileKind, GuestFileSource, GuestPath, IoOperation, VirtualDiskError,
 };
 
+pub use super::issues::{CopyIssue, CopyIssueLog};
 pub use super::metadata::{MetadataFailure, MetadataPolicy};
 pub use super::path_policy::HostPathPolicy;
 
@@ -37,6 +38,7 @@ pub struct CopyReport {
     pub renamed_entries: u64,
     pub created_directories: u64,
     pub metadata_failures: Vec<MetadataFailure>,
+    pub issues: Vec<CopyIssue>,
 }
 
 impl CopyReport {
@@ -47,6 +49,7 @@ impl CopyReport {
         self.renamed_entries += other.renamed_entries;
         self.created_directories += other.created_directories;
         self.metadata_failures.extend(other.metadata_failures);
+        self.issues.extend(other.issues);
     }
 }
 
@@ -114,6 +117,138 @@ impl GuestCopyEngine {
         }
     }
 
+    /// 복사 중 항목별 오류를 수집하고 가능한 형제 항목은 계속 처리한다.
+    ///
+    /// UI·로그 계층은 반환된 `CopyReport::issues`를 `CopyIssueLog::record`에 전달해
+    /// 토스트를 한 번만 보여주거나, 사용자가 확인한 키를 억제할 수 있다.
+    pub fn copy_entry_collecting<S: GuestFileSource>(
+        &self,
+        source: &mut S,
+        entry: &GuestFileEntry,
+        issue_log: &mut CopyIssueLog,
+    ) -> CopyReport {
+        let mut report = CopyReport::default();
+        let destination = match self.path_policy.map_entry(entry) {
+            Ok(destination) => destination,
+            Err(error) => {
+                self.record_issue(&mut report, issue_log, &entry.path, &error);
+                return report;
+            }
+        };
+
+        match entry.kind {
+            GuestFileKind::File => match self.copy_file(source, entry, &destination) {
+                Ok(child_report) => {
+                    self.merge_collected_report(&mut report, child_report, issue_log)
+                }
+                Err(error) => self.record_issue(&mut report, issue_log, &entry.path, &error),
+            },
+            GuestFileKind::Directory => {
+                self.copy_directory_collecting(source, entry, &destination, &mut report, issue_log)
+            }
+        }
+        report
+    }
+
+    fn copy_directory_collecting<S: GuestFileSource>(
+        &self,
+        source: &mut S,
+        entry: &GuestFileEntry,
+        destination: &Path,
+        report: &mut CopyReport,
+        issue_log: &mut CopyIssueLog,
+    ) {
+        let destination = match self.prepare_directory(destination, report) {
+            Ok(Some(destination)) => destination,
+            Ok(None) => return,
+            Err(error) => {
+                self.record_issue(report, issue_log, &entry.path, &error);
+                return;
+            }
+        };
+        let children = match source.list_directory(entry) {
+            Ok(children) => children,
+            Err(error) => {
+                self.record_issue(report, issue_log, &entry.path, &error);
+                return;
+            }
+        };
+
+        for child in children {
+            if let Err(error) = self.path_policy.map_entry(&child) {
+                self.record_issue(report, issue_log, &child.path, &error);
+                continue;
+            }
+            let child_destination = match self.child_destination(&destination, &entry.path, &child)
+            {
+                Ok(destination) => destination,
+                Err(error) => {
+                    self.record_issue(report, issue_log, &child.path, &error);
+                    continue;
+                }
+            };
+            match child.kind {
+                GuestFileKind::File => match self.copy_file(source, &child, &child_destination) {
+                    Ok(child_report) => {
+                        self.merge_collected_report(report, child_report, issue_log)
+                    }
+                    Err(error) => self.record_issue(report, issue_log, &child.path, &error),
+                },
+                GuestFileKind::Directory => self.copy_directory_collecting(
+                    source,
+                    &child,
+                    &child_destination,
+                    report,
+                    issue_log,
+                ),
+            }
+        }
+
+        if let Err(error) = self.path_policy.validate_target_path(&destination) {
+            self.record_issue(report, issue_log, &entry.path, &error);
+            return;
+        }
+        let issue_start = report.issues.len();
+        self.append_metadata(report, &destination, entry);
+        for issue in &report.issues[issue_start..] {
+            issue_log.record(issue.clone());
+        }
+    }
+
+    fn merge_collected_report(
+        &self,
+        report: &mut CopyReport,
+        child_report: CopyReport,
+        issue_log: &mut CopyIssueLog,
+    ) {
+        for issue in &child_report.issues {
+            issue_log.record(issue.clone());
+        }
+        report.merge(child_report);
+    }
+
+    fn record_issue(
+        &self,
+        report: &mut CopyReport,
+        issue_log: &mut CopyIssueLog,
+        path: &GuestPath,
+        error: &VirtualDiskError,
+    ) {
+        let issue = CopyIssue::from_error(path, error);
+        issue_log.record(issue.clone());
+        report.issues.push(issue);
+    }
+
+    fn append_metadata(&self, report: &mut CopyReport, destination: &Path, entry: &GuestFileEntry) {
+        let failures = super::metadata::apply_metadata(destination, entry, self.metadata_policy);
+        for failure in &failures {
+            report
+                .issues
+                .push(CopyIssue::from_metadata_failure(failure));
+        }
+        report.metadata_failures.extend(failures);
+    }
+
     fn copy_directory<S: GuestFileSource>(
         &self,
         source: &mut S,
@@ -143,13 +278,7 @@ impl GuestCopyEngine {
         }
 
         self.path_policy.validate_target_path(&destination)?;
-        report
-            .metadata_failures
-            .extend(super::metadata::apply_metadata(
-                &destination,
-                entry,
-                self.metadata_policy,
-            ));
+        self.append_metadata(&mut report, &destination, entry);
         Ok(report)
     }
 
@@ -243,13 +372,7 @@ impl GuestCopyEngine {
             source,
         })?;
         drop(output);
-        report
-            .metadata_failures
-            .extend(super::metadata::apply_metadata(
-                &destination,
-                entry,
-                self.metadata_policy,
-            ));
+        self.append_metadata(&mut report, &destination, entry);
         report.copied_files = 1;
         report.copied_bytes = entry.size_bytes;
         Ok(report)
@@ -423,6 +546,7 @@ mod tests {
         time::{SystemTime, UNIX_EPOCH},
     };
 
+    use super::super::issues::CopyIssueKind;
     use super::*;
     use crate::virtual_disk::{GuestFileAttributes, GuestFileKind, GuestFileSystem};
 
@@ -643,6 +767,56 @@ mod tests {
         assert_eq!(report.renamed_entries, 1);
         assert_eq!(
             fs::read(destination.join("folder (1)/data.txt")).unwrap(),
+            b"0123456789"
+        );
+        fs::remove_dir_all(destination).unwrap();
+    }
+
+    #[test]
+    fn collecting_copy_errors_keeps_the_error_in_the_report_and_issue_log() {
+        let destination = test_destination("issues");
+        let (mut source, _, mut file) = fixture_source();
+        file.size_bytes = 12;
+        let mut issue_log = CopyIssueLog::default();
+
+        let report = engine(&destination, CollisionPolicy::Skip).copy_entry_collecting(
+            &mut source,
+            &file,
+            &mut issue_log,
+        );
+
+        assert_eq!(report.copied_files, 0);
+        assert_eq!(report.issues.len(), 1);
+        assert_eq!(issue_log.issues().len(), 1);
+        assert_eq!(report.issues[0].kind, CopyIssueKind::SourceChanged);
+        fs::remove_dir_all(destination).unwrap();
+    }
+
+    #[test]
+    fn collecting_directory_copy_continues_with_sibling_files_after_failure() {
+        let destination = test_destination("issues-continue");
+        let (mut source, directory, valid_file) = fixture_source();
+        let broken_file = file("folder/broken.txt", 3);
+        source
+            .files
+            .insert(broken_file.path.to_string(), b"x".to_vec());
+        source
+            .directories
+            .insert("folder".to_string(), vec![broken_file, valid_file]);
+        let mut issue_log = CopyIssueLog::default();
+
+        let report = engine(&destination, CollisionPolicy::Skip).copy_entry_collecting(
+            &mut source,
+            &directory,
+            &mut issue_log,
+        );
+
+        assert_eq!(report.copied_files, 1);
+        assert_eq!(report.issues.len(), 1);
+        assert_eq!(issue_log.issues().len(), 1);
+        assert_eq!(report.issues[0].kind, CopyIssueKind::SourceChanged);
+        assert_eq!(
+            fs::read(destination.join("folder/data.txt")).unwrap(),
             b"0123456789"
         );
         fs::remove_dir_all(destination).unwrap();
