@@ -623,8 +623,10 @@ switch ($Action) {
         $end = Resolve-ClientPoint $hwnd $ToX $ToY
         [void][ClaudeVisualInterop]::SetCursorPos($start.X, $start.Y)
         Start-Sleep -Milliseconds 250
+        $buttonDown = $false
         try {
             Send-MouseInput $MOUSEEVENTF_LEFTDOWN 0
+            $buttonDown = $true
             $last = $start
             $steps = 12
             for ($i = 1; $i -le $steps; $i++) {
@@ -636,8 +638,13 @@ switch ($Action) {
                 Start-Sleep -Milliseconds 45
             }
             Send-MouseInput $MOUSEEVENTF_LEFTUP 0
+            $buttonDown = $false
         }
         finally {
+            if ($buttonDown) {
+                # 이동 중 예외가 나도 전역 마우스 버튼을 누른 채 남기지 않는다.
+                Send-MouseInput $MOUSEEVENTF_LEFTUP 0
+            }
             [void][ClaudeVisualInterop]::SetCursorPos($origin.X, $origin.Y)
         }
         Start-Sleep -Milliseconds $SettleMs
