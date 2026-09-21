@@ -52,6 +52,9 @@ param(
     # Start 전용. VDI 시드 직후 전체 항목을 선택한다. 자동 복사 시에는 자동으로 켜진다.
     [switch]$SelectAllVdi,
 
+    # Start 전용. 시드 VDI를 열고 지정한 게스트 상대 경로를 초기 목록으로 표시한다.
+    [string]$InitialGuestPath,
+
     # Start 전용. 검증 전용 환경 변수로 패널 전환 입력 없이 특정 화면을 연다.
     [ValidateSet("Dashboard", "FileSync", "VirtualDisk", "AutoStart")]
     [string]$InitialPanel = "Dashboard",
@@ -364,6 +367,7 @@ switch ($Action) {
         $previousValidationVdiTarget = $env:GPUI_CONVENIENCE_TOOLS_VALIDATION_VDI_TARGET
         $previousValidationVdiSelectAll = $env:GPUI_CONVENIENCE_TOOLS_VALIDATION_VDI_SELECT_ALL
         $previousValidationVdiAutoCopy = $env:GPUI_CONVENIENCE_TOOLS_VALIDATION_VDI_AUTO_COPY
+        $previousValidationVdiGuestPath = $env:GPUI_CONVENIENCE_TOOLS_VALIDATION_VDI_GUEST_PATH
         try {
             $env:APPDATA = $appData
             $env:GPUI_CONVENIENCE_TOOLS_DATA_DIR = $appData
@@ -384,6 +388,9 @@ switch ($Action) {
                 }
                 if ($AutoCopyVdi) {
                     $env:GPUI_CONVENIENCE_TOOLS_VALIDATION_VDI_AUTO_COPY = "1"
+                }
+                if (-not [string]::IsNullOrWhiteSpace($InitialGuestPath)) {
+                    $env:GPUI_CONVENIENCE_TOOLS_VALIDATION_VDI_GUEST_PATH = $InitialGuestPath
                 }
             }
             $process = Start-Process -FilePath $BinaryPath -PassThru
@@ -415,6 +422,10 @@ switch ($Action) {
                 Remove-Item Env:\GPUI_CONVENIENCE_TOOLS_VALIDATION_VDI_AUTO_COPY -ErrorAction SilentlyContinue
             }
             else { $env:GPUI_CONVENIENCE_TOOLS_VALIDATION_VDI_AUTO_COPY = $previousValidationVdiAutoCopy }
+            if ($null -eq $previousValidationVdiGuestPath) {
+                Remove-Item Env:\GPUI_CONVENIENCE_TOOLS_VALIDATION_VDI_GUEST_PATH -ErrorAction SilentlyContinue
+            }
+            else { $env:GPUI_CONVENIENCE_TOOLS_VALIDATION_VDI_GUEST_PATH = $previousValidationVdiGuestPath }
         }
 
         $hwnd = [IntPtr]::Zero

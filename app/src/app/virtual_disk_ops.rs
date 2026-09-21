@@ -215,7 +215,13 @@ impl AppRoot {
                 self.virtual_disk.selected_paths.clear();
                 self.refresh_virtual_disk_directory(cx);
             }
-            Err(error) => self.set_virtual_disk_error(format_virtual_disk_error(&error), cx),
+            Err(error) => {
+                // 오류가 난 경로에 이전 디렉터리의 행을 남기면 현재 경로와 목록이
+                // 불일치해 사용자가 잘못된 파일을 선택할 수 있다.
+                self.virtual_disk.entries.clear();
+                self.virtual_disk.selected_paths.clear();
+                self.set_virtual_disk_error(format_virtual_disk_error(&error), cx);
+            }
         }
         cx.notify();
     }
@@ -250,7 +256,13 @@ impl AppRoot {
                 self.virtual_disk.entries = entries;
                 self.virtual_disk.error = None;
             }
-            Err(error) => self.set_virtual_disk_error(format_virtual_disk_error(&error), cx),
+            Err(error) => {
+                // 오류가 난 경로에 이전 디렉터리의 행을 남기면 현재 경로와 목록이
+                // 불일치해 사용자가 잘못된 파일을 선택할 수 있다.
+                self.virtual_disk.entries.clear();
+                self.virtual_disk.selected_paths.clear();
+                self.set_virtual_disk_error(format_virtual_disk_error(&error), cx);
+            }
         }
     }
 

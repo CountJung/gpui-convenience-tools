@@ -843,6 +843,19 @@ VDE-017·VDE-019에 계속 남긴다.
 이상 파일은 즉시 실패하며, `Verify-Workspace.ps1`가 문서 게이트 다음에 이 검사를 실행한다.
 현재 측정값은 54개 파일·20,894줄·최대 834줄·경고 3개로 일치한다.
 
+### Phase O-24 — 손상 하위 폴더의 stale 목록 제거 및 진입 재현 완료 ✅
+
+검증 하네스에 `-InitialGuestPath`를 추가해 포그라운드 클릭 없이 실제 VDI의 하위 폴더를
+초기 경로로 열 수 있게 했다. 최종 release에서 이 경로로 손상된 `many_subdirs` 폴더를
+확인하는 과정 중,
+디렉터리 열거 실패 시 이전 경로의 행이 남던 문제를 발견해 목록과 선택 집합을 비우도록
+수정했다. `virtual_disk_clears_stale_entries_when_directory_refresh_fails` 회귀 테스트와
+실제 release 캡처 `vde014-initial-guest-path-many-subdirs-final-042633.png`를 남겼다.
+
+전체 테스트 158 passed·4 ignored, 문서 게이트와 release 세션 정리
+(`PROCESS_COUNT=0`, `SESSION_COUNT=0`)를 확인했으며, 실제 포그라운드 폴더 Click 자체는
+안전 차단 범위로 계속 미검증이다.
+
 ### Phase T-1 — T-001·T-002 회귀 테스트 보강 완료 ✅
 
 동기화 엔진이 읽기 전용 대상 파일을 실제로 덮어쓸 수 있는지 확인하는 테스트와,

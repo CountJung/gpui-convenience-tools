@@ -11,6 +11,42 @@ struct TestGuestSource {
     entries: Vec<GuestFileEntry>,
 }
 
+struct ErrorOnNestedDirectorySource;
+
+impl GuestFileSource for ErrorOnNestedDirectorySource {
+    fn filesystem(&self) -> GuestFileSystem {
+        GuestFileSystem::ntfs_3_1()
+    }
+
+    fn list_directory(
+        &mut self,
+        directory: &GuestFileEntry,
+    ) -> Result<Vec<GuestFileEntry>, VirtualDiskError> {
+        if directory.path.is_root() {
+            Ok(vec![GuestFileEntry {
+                path: crate::virtual_disk::GuestPath::new("broken").unwrap(),
+                kind: GuestFileKind::Directory,
+                size_bytes: 0,
+                attributes: Default::default(),
+                times: Default::default(),
+            }])
+        } else {
+            Err(VirtualDiskError::CorruptImage(
+                "nested directory fixture failure".to_string(),
+            ))
+        }
+    }
+
+    fn read_at(
+        &mut self,
+        _file: &GuestFileEntry,
+        _offset: u64,
+        _buffer: &mut [u8],
+    ) -> Result<usize, VirtualDiskError> {
+        Ok(0)
+    }
+}
+
 impl GuestFileSource for TestGuestSource {
     fn filesystem(&self) -> GuestFileSystem {
         GuestFileSystem::ntfs_3_1()
@@ -188,6 +224,46 @@ fn virtual_disk_panel_renders_loaded_hidden_entries_and_selects_all_with_ctrl_a(
         selected_count, 2,
         "Ctrl+A should include hidden/system entries"
     );
+}
+
+#[gpui::test]
+fn virtual_disk_clears_stale_entries_when_directory_refresh_fails(cx: &mut TestAppContext) {
+    initialize_components(cx);
+    let (view, cx) = cx.add_window_view(|_, _| {
+        let mut root = test_app_root(ActivePanel::VirtualDisk);
+        root.virtual_disk.entries = vec![GuestFileEntry {
+            path: crate::virtual_disk::GuestPath::new("broken").unwrap(),
+            kind: GuestFileKind::Directory,
+            size_bytes: 0,
+            attributes: Default::default(),
+            times: Default::default(),
+        }];
+        root.virtual_disk.source = Some(Box::new(ErrorOnNestedDirectorySource));
+        root
+    });
+
+    cx.simulate_resize(size(px(1200.0), px(1000.0)));
+    refresh(cx);
+    cx.update(|_, app| {
+        view.update(app, |root, cx| {
+            root.enter_virtual_disk_directory(0, cx);
+        });
+    });
+    refresh(cx);
+
+    let (entry_count, error, current_path) = cx.update(|_, app| {
+        let root = view.read(app);
+        (
+            root.virtual_disk.entries.len(),
+            root.virtual_disk.error.clone(),
+            root.virtual_disk.current_path.to_string(),
+        )
+    });
+    assert_eq!(entry_count, 0, "failed directory must not keep stale rows");
+    assert!(error
+        .as_deref()
+        .is_some_and(|message| message.contains("손상")));
+    assert_eq!(current_path, "broken");
 }
 
 #[gpui::test]
