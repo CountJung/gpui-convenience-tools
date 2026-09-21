@@ -162,6 +162,34 @@ fn skips_symbolic_links_without_reporting_a_sync_failure() {
     let _ = fs::remove_dir_all(&root);
 }
 
+#[cfg(windows)]
+#[test]
+fn rejects_unimplemented_symbolic_link_modes_instead_of_silently_skipping() {
+    use std::os::windows::fs::symlink_file;
+
+    let root = temp_dir("symbolic-link-mode-boundary");
+    let src = root.join("src");
+    let dst = root.join("dst");
+    fs::create_dir_all(&src).unwrap();
+    let target = src.join("target.txt");
+    let link = src.join("link.txt");
+    fs::write(&target, b"target").unwrap();
+    symlink_file(&target, &link).expect("the Windows test environment must allow file symlinks");
+
+    for mode in [SymlinkMode::Follow, SymlinkMode::Recreate] {
+        let mut configured = job(&src, &dst);
+        configured.symlink_mode = mode;
+        let outcome = run_sync_job(&configured);
+
+        assert_eq!(outcome.copied, 1, "the ordinary target file remains supported");
+        assert_eq!(outcome.failures.len(), 1, "the unimplemented link mode is explicit");
+        assert!(outcome.failures[0].reason.contains("아직 구현되지 않았습니다"));
+        let _ = fs::remove_file(dst.join("target.txt"));
+    }
+
+    let _ = fs::remove_dir_all(&root);
+}
+
 #[test]
 fn overwrites_an_existing_readonly_target_file() {
     let root = temp_dir("readonly-target");

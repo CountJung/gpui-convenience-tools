@@ -118,6 +118,24 @@ pub enum WatchMode {
     Realtime,
 }
 
+/// 원본의 심볼릭 링크·정션을 처리하는 방식.
+///
+/// 기본값은 `Skip`이다. 링크를 따라가면 원본 루트 밖으로 탈출하거나 순환 링크를
+/// 만날 수 있고, 링크를 다시 만들려면 Windows 권한 정책이 개입하므로 옵션을
+/// 추가하는 단계와 실제 동작을 분리한다. `Follow`·`Recreate`의 실행 경계는
+/// D-014~D-016에서 각각 확정한다.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SymlinkMode {
+    /// 링크를 따라가지 않고 안전하게 건너뛴다.
+    #[default]
+    Skip,
+    /// 링크가 가리키는 대상을 일반 파일·폴더처럼 처리한다(후속 구현).
+    Follow,
+    /// 링크 자체를 대상에 재생성한다(후속 구현).
+    Recreate,
+}
+
 /// 원본 폴더 → 대상 폴더 동기화 작업 하나.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct SyncJob {
@@ -142,6 +160,9 @@ pub struct SyncJob {
     /// 작업 실행을 기다리는 방식. 구버전 설정은 주기 모드로 읽는다.
     #[serde(default)]
     pub watch_mode: WatchMode,
+    /// 심볼릭 링크·정션 처리 방식. 구버전 설정은 안전한 `Skip`으로 읽는다.
+    #[serde(default)]
+    pub symlink_mode: SymlinkMode,
     /// 원본에서 삭제된 파일을 대상에서도 삭제할지 여부.
     #[serde(default)]
     pub mirror_deletes: bool,
@@ -220,6 +241,7 @@ impl Default for SyncJob {
             enabled: true,
             interval_secs: default_sync_interval_secs(),
             watch_mode: WatchMode::Interval,
+            symlink_mode: SymlinkMode::Skip,
             mirror_deletes: false,
             include_hidden: true,
             exclude_patterns: Vec::new(),
@@ -568,6 +590,31 @@ mod tests {
         let restored_legacy: SyncJob =
             serde_json::from_str(legacy).expect("감시 방식 없는 구버전 SyncJob");
         assert_eq!(restored_legacy.watch_mode, WatchMode::Interval);
+        assert_eq!(restored_legacy.symlink_mode, SymlinkMode::Skip);
+    }
+
+    /// 링크 처리 모드는 snake_case로 저장되고 구버전 작업은 안전한 Skip으로 읽힌다.
+    #[test]
+    fn sync_job_symlink_mode_round_trips_with_skip_compatibility() {
+        for (mode, encoded) in [
+            (SymlinkMode::Skip, "skip"),
+            (SymlinkMode::Follow, "follow"),
+            (SymlinkMode::Recreate, "recreate"),
+        ] {
+            let job = SyncJob {
+                symlink_mode: mode,
+                ..SyncJob::default()
+            };
+            let json = serde_json::to_string(&job).expect("링크 처리 모드 직렬화");
+            assert!(json.contains(&format!("\"symlink_mode\":\"{encoded}\"")));
+
+            let restored: SyncJob = serde_json::from_str(&json).expect("링크 처리 모드 복원");
+            assert_eq!(restored.symlink_mode, mode);
+        }
+
+        let legacy = r#"{"source":"C:\\a","target":"C:\\b"}"#;
+        let restored: SyncJob = serde_json::from_str(legacy).expect("링크 처리 모드 없는 구버전");
+        assert_eq!(restored.symlink_mode, SymlinkMode::Skip);
     }
 
     /// 새로 만든 작업들은 서로 다른 ID를 갖는다.

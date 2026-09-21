@@ -17,7 +17,7 @@ use std::{
     time::SystemTime,
 };
 
-use crate::config::SyncJob;
+use crate::config::{SymlinkMode, SyncJob};
 
 /// 파일 하나를 처리하기 직전에 보고되는 진행 상황.
 ///
@@ -448,10 +448,26 @@ fn sync_dir(
         }
 
         if meta.file_type().is_symlink() {
-            // 링크를 그대로 복제하려면 권한과 대상 종류 판별이 필요하다.
-            // 현재 정책은 안전하게 건너뛰며, 지원하지 않는다는 사실은 실패가
-            // 아니라 건너뜀 수로 반영한다.
-            outcome.skipped += 1;
+            match job.symlink_mode {
+                SymlinkMode::Skip => {
+                    // 링크를 그대로 복제하려면 권한과 대상 종류 판별이 필요하다.
+                    // 기본 정책은 안전하게 건너뛰며, 지원하지 않는다는 사실은 실패가
+                    // 아니라 건너뜀 수로 반영한다.
+                    outcome.skipped += 1;
+                }
+                SymlinkMode::Follow | SymlinkMode::Recreate => {
+                    // 스키마를 먼저 도입하더라도 미구현 정책을 조용히 Skip으로
+                    // 강등하면 사용자가 설정한 동작과 실제 결과가 달라진다.
+                    // 후속 구현 전에는 명시적인 실패로 남겨 안전한 오작동을 막는다.
+                    outcome.fail(
+                        &relative_path,
+                        format!(
+                            "링크 처리 모드 '{}'는 아직 구현되지 않았습니다.",
+                            symlink_mode_label(job.symlink_mode)
+                        ),
+                    );
+                }
+            }
             control.report(&relative_path, outcome);
             continue;
         }
@@ -564,6 +580,14 @@ fn copy_file(src: &Path, dst: &Path) -> Result<(), String> {
     match fs::copy(src, dst) {
         Ok(_) => Ok(()),
         Err(err) => Err(describe_io_error(&err)),
+    }
+}
+
+fn symlink_mode_label(mode: SymlinkMode) -> &'static str {
+    match mode {
+        SymlinkMode::Skip => "건너뛰기",
+        SymlinkMode::Follow => "대상 따라가기",
+        SymlinkMode::Recreate => "링크 재생성",
     }
 }
 

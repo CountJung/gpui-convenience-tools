@@ -1001,6 +1001,17 @@ passed·4 ignored, Clippy exit 0, `git diff --check`를 통과했으며 구현 �
 `applies_log_count_and_age_retention_before_appending`, `cargo check --locked`, 전체 144
 passed·4 ignored, Clippy exit 0, `git diff --check`를 통과했으며 구현 커밋은 `ed71af4`이다.
 
+#### D-015 — 링크 처리 모드 스키마 경계 진행 중
+
+- `SyncJob.symlink_mode`와 `SymlinkMode::{Skip, Follow, Recreate}`를 추가했다. 필드가 없는
+  구버전 작업은 안전한 `Skip`으로 복원하고, `snake_case`로 저장·복원한다.
+- 기본 `Skip`은 기존 동작을 유지한다. 아직 구현하지 않은 `Follow`·`Recreate`를 설정 파일에서
+  직접 요청하면 조용히 건너뛰지 않고 항목별 명시적 실패로 남긴다. 원본 루트 탈출·순환 링크·
+  Windows 권한 경계를 먼저 확정한 뒤 D-014·D-016에서 실제 동작을 추가한다.
+- 전용 설정/경계 테스트, `cargo check --locked`, 전체 `cargo test --all-targets --all-features --locked`
+  (154 passed·4 ignored), `Verify-Workspace.ps1`의 IDE 검증, 표준 Clippy(exit 0, 기존 baseline
+  경고 7건)를 통과했다. 전체 포맷 검사는 기존 baseline 불일치로 별도 보류한다.
+
 #### D-020 — 최근 동기화 이력 카드 부분 구현
 
 - 앱 시작 시 `sync-history.json`의 최신 20건을 읽고, 동기화 완료 이벤트 후 목록을 새로 고친다.
