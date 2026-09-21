@@ -4,7 +4,7 @@
 //! `VdiReader`의 read-only 경계로 열며, 이 단계에서는 디스크·파티션·현재 경로를
 //! 준비하고 목록을 새로 고치는 작업만 제공한다.
 
-use std::path::PathBuf;
+use std::{collections::HashSet, path::PathBuf};
 
 use gpui::{AppContext, Context, Entity, Window};
 use gpui_component::input::{InputEvent, InputState};
@@ -25,6 +25,7 @@ pub(crate) struct VirtualDiskSession {
     pub(crate) selected_partition: Option<usize>,
     pub(crate) current_path: GuestPath,
     pub(crate) entries: Vec<GuestFileEntry>,
+    pub(crate) selected_paths: HashSet<GuestPath>,
     pub(crate) source: Option<NtfsGuestFileSource<VdiReader>>,
     pub(crate) error: Option<String>,
 }
@@ -39,6 +40,7 @@ impl Default for VirtualDiskSession {
             selected_partition: None,
             current_path: GuestPath::root(),
             entries: Vec::new(),
+            selected_paths: HashSet::new(),
             source: None,
             error: None,
         }
@@ -80,6 +82,7 @@ impl AppRoot {
         let path_text = self.virtual_disk.path_text.trim().to_string();
         self.virtual_disk.error = None;
         self.virtual_disk.entries.clear();
+        self.virtual_disk.selected_paths.clear();
         self.virtual_disk.partitions.clear();
         self.virtual_disk.selected_partition = None;
         self.virtual_disk.source = None;
@@ -138,6 +141,7 @@ impl AppRoot {
                 self.virtual_disk.source = Some(source);
                 self.virtual_disk.selected_partition = Some(index);
                 self.virtual_disk.current_path = GuestPath::root();
+                self.virtual_disk.selected_paths.clear();
                 self.refresh_virtual_disk_directory(cx);
             }
             Err(error) => self.set_virtual_disk_error(format_virtual_disk_error(&error), cx),
@@ -169,11 +173,58 @@ impl AppRoot {
                         .cmp(&right_kind)
                         .then_with(|| left.path.as_str().cmp(right.path.as_str()))
                 });
+                self.virtual_disk
+                    .selected_paths
+                    .retain(|path| entries.iter().any(|entry| &entry.path == path));
                 self.virtual_disk.entries = entries;
                 self.virtual_disk.error = None;
             }
             Err(error) => self.set_virtual_disk_error(format_virtual_disk_error(&error), cx),
         }
+    }
+
+    /// 항목을 선택하거나 Ctrl/Shift 선택으로 현재 선택 집합에 추가·제거한다.
+    pub(crate) fn select_virtual_disk_entry(
+        &mut self,
+        index: usize,
+        additive: bool,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(path) = self
+            .virtual_disk
+            .entries
+            .get(index)
+            .map(|entry| entry.path.clone())
+        else {
+            return;
+        };
+        toggle_guest_selection(&mut self.virtual_disk.selected_paths, path, additive);
+        cx.notify();
+    }
+
+    /// 폴더를 열어 현재 경로를 이동한다. 실제 키보드 단축키는 VDE-016에서 연결한다.
+    pub(crate) fn enter_virtual_disk_directory(&mut self, index: usize, cx: &mut Context<Self>) {
+        let Some(entry) = self.virtual_disk.entries.get(index).cloned() else {
+            return;
+        };
+        if !entry.is_directory() {
+            return;
+        }
+        self.virtual_disk.current_path = entry.path;
+        self.virtual_disk.selected_paths.clear();
+        self.refresh_virtual_disk_directory(cx);
+        cx.notify();
+    }
+
+    /// 현재 게스트 경로의 부모로 이동한다. 루트에서는 아무 동작도 하지 않는다.
+    pub(crate) fn go_to_virtual_disk_parent(&mut self, cx: &mut Context<Self>) {
+        let Some(parent) = parent_guest_path(&self.virtual_disk.current_path) else {
+            return;
+        };
+        self.virtual_disk.current_path = parent;
+        self.virtual_disk.selected_paths.clear();
+        self.refresh_virtual_disk_directory(cx);
+        cx.notify();
     }
 
     fn set_virtual_disk_error(&mut self, message: String, cx: &mut Context<Self>) {
@@ -201,7 +252,67 @@ mod tests {
         assert!(session.selected_partition.is_none());
         assert!(session.current_path.is_root());
         assert!(session.entries.is_empty());
+        assert!(session.selected_paths.is_empty());
         assert!(session.source.is_none());
         assert!(session.error.is_none());
+    }
+}
+
+fn parent_guest_path(path: &GuestPath) -> Option<GuestPath> {
+    if path.is_root() {
+        return None;
+    }
+    let parent = path
+        .as_str()
+        .rsplit_once('/')
+        .map(|(parent, _)| parent)
+        .unwrap_or("");
+    GuestPath::new(parent).ok()
+}
+
+fn toggle_guest_selection(
+    selected_paths: &mut HashSet<GuestPath>,
+    path: GuestPath,
+    additive: bool,
+) {
+    if !additive {
+        selected_paths.clear();
+    }
+    if !selected_paths.insert(path.clone()) {
+        selected_paths.remove(&path);
+    }
+}
+
+#[cfg(test)]
+mod path_tests {
+    use super::*;
+
+    #[test]
+    fn parent_path_stops_at_guest_root() {
+        let nested = GuestPath::new("Users/guest/Documents").unwrap();
+        let top = GuestPath::new("Users").unwrap();
+        let root = GuestPath::root();
+
+        assert_eq!(parent_guest_path(&nested).unwrap().as_str(), "Users/guest");
+        assert_eq!(parent_guest_path(&top).unwrap().as_str(), "");
+        assert!(parent_guest_path(&root).is_none());
+    }
+
+    #[test]
+    fn guest_selection_supports_single_and_additive_toggle() {
+        let first = GuestPath::new("first.txt").unwrap();
+        let second = GuestPath::new("second.txt").unwrap();
+        let mut selected = HashSet::new();
+
+        toggle_guest_selection(&mut selected, first.clone(), false);
+        assert_eq!(selected.len(), 1);
+        assert!(selected.contains(&first));
+
+        toggle_guest_selection(&mut selected, second.clone(), true);
+        assert_eq!(selected.len(), 2);
+
+        toggle_guest_selection(&mut selected, second.clone(), true);
+        assert_eq!(selected.len(), 1);
+        assert!(selected.contains(&first));
     }
 }

@@ -1,4 +1,4 @@
-//! VirtualBox 탐색기 VDE-013 UI 회귀 테스트.
+//! VirtualBox 탐색기 VDE-013~014 UI 회귀 테스트.
 
 use super::*;
 
@@ -33,5 +33,9 @@ fn virtual_disk_panel_registers_navigation_and_renders_read_only_shell(cx: &mut 
     assert!(
         cx.debug_bounds("virtual-disk-refresh").is_some(),
         "directory refresh action should be rendered"
+    );
+    assert!(
+        cx.debug_bounds("virtual-disk-parent").is_some(),
+        "parent directory action should be rendered"
     );
 }

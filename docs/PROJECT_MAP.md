@@ -22,13 +22,13 @@
 | `app/src/virtual_disk/copy.rs` | **구현됨** — 선택 파일·폴더의 청크 복사와 건너뜀·덮어쓰기·새 이름 충돌 정책, 메타데이터 결과 집계 | VDE-010~011 |
 | `app/src/virtual_disk/issues.rs` | **구현됨** — 원본 변경·대상 쓰기·지원 불가·메타데이터 오류 분류, 부분 복사 결과와 항목별 억제 키 | VDE-012 |
 | `app/src/virtual_disk/metadata.rs` | **구현됨** — 호스트 파일 속성·타임스탬프 적용과 구조화된 적용 실패 결과 | VDE-011 |
-| `app/src/window/virtual_disk.rs` | VDI 선택·파티션·탐색·선택·단축키·진행 UI | VDE-013~017 |
-| `app/src/app/virtual_disk_ops.rs` | **구현됨** — read-only VDI 열기·파티션 검색/선택·게스트 현재 경로 새로고침 상태 | VDE-013; 폴더·복사 조작은 VDE-014~016 |
+| `app/src/window/virtual_disk.rs` | VDI 선택·파티션·탐색·파일 행 선택·상위 이동·단축키·진행 UI | VDE-013~017 |
+| `app/src/app/virtual_disk_ops.rs` | **구현됨** — read-only VDI 열기·파티션 검색/선택·게스트 경로 새로고침·폴더 이동·다중 선택 상태 | VDE-013~014; 복사 조작은 VDE-015~016 |
 
 안전 경계: 원본 VDI는 read-only로만 열고, 실행 중 VM의 VDI 직접 읽기는 구현하지 않는다.
 실행 중 VM 지원은 후속 `GuestFileSource` 구현으로만 추가한다(VDE-021).
 
-**최종 측정**: 2026-09-21 · `app/src` 총 49개 파일 · 17,954줄
+**최종 측정**: 2026-09-21 · `app/src` 총 49개 파일 · 18,077줄
 
 ## 크기 기준 — 줄 수는 증상이다
 
@@ -93,7 +93,7 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `mod.rs` | 650 | 폴더 동기화 엔진 (UI 비의존 순수 로직) — 진행 보고·중지·이어서 시작·제외 glob 적용 포함 |
 | `tests.rs` | 596 | 복사·건너뜀·미러 삭제·실패 사유·진행 보고·중지·이어서 시작·제외 glob 단위 테스트 |
 
-### 앱 루트 (`app/src/app/`) — 3,002줄 / 9파일
+### 앱 루트 (`app/src/app/`) — 3,087줄 / 9파일
 
 `app.rs`(1,798줄)를 책임별로 분할한 결과다.
 
@@ -107,9 +107,9 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `state.rs` | 247 | 순수 데이터 타입 (`AppState`, `PlatformEvent`, `SyncRunning`, `ActivePanel`, 타깃별 `NAV_*`) |
 | `ops.rs` | 200 | 광고 차단·서비스 관리·로그 설정 조작 |
 | `inputs.rs` | 136 | 입력 위젯(`InputState`) 지연 생성과 값 동기화 — 파일 동기화 제외 패턴 멀티라인 편집기 포함 |
-| `virtual_disk_ops.rs` | 207 | VDI 경로 입력·read-only 열기·파티션 검색/선택·게스트 루트 목록 새로고침 |
+| `virtual_disk_ops.rs` | 292 | VDI 경로 입력·read-only 열기·파티션 검색/선택·게스트 목록 새로고침·폴더 이동·다중 선택 |
 
-### GPUI 회귀 테스트 (`app/src/app/tests/`) — 1,603줄 / 6파일
+### GPUI 회귀 테스트 (`app/src/app/tests/`) — 1,607줄 / 6파일
 
 `app/tests.rs`(929줄, 🟡)를 시나리오별로 나눈 결과다. 픽스처는 `mod.rs`가 단독 소유하고
 하위 모듈은 `use super::*`로 가져다 쓴다.
@@ -121,9 +121,9 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `interval.rs` | 226 | 주기 드롭다운·프리셋 추가/삭제·패널 간 공유 |
 | `mod.rs` | 176 | 공용 픽스처 (`test_app_root`·`TestPlatform`·`refresh`·`click_debug_element` 등) |
 | `theme.rs` | 85 | 테마 전환과 스위치 가시성 |
-| `virtual_disk.rs` | 37 | VirtualBox 탐색 네비게이션·VDI 입력·파티션 카드·현재 경로·새로고침 렌더 경계 |
+| `virtual_disk.rs` | 41 | VirtualBox 탐색 네비게이션·VDI 입력·파티션 카드·현재 경로·상위 이동·새로고침 렌더 경계 |
 
-### 패널 (`app/src/window/`) — 3,767줄 / 11파일
+### 패널 (`app/src/window/`) — 3,801줄 / 11파일
 
 | 파일 | 줄 | 책임 |
 | --- | ---: | --- |
@@ -137,7 +137,7 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `interval.rs` | 156 | 주기 선택 렌더 — 드롭다운 + (값·단위·추가) 행 + 등록된 프리셋 목록 |
 | `log_view.rs` | 110 | 시스템 — 화면 로그 가상 리스트와 로그 파일 현황 |
 | `mod.rs` | 107 | 패널 모듈 선언 + `balanced_split`·`scroll_pane` 레이아웃 헬퍼 |
-| `virtual_disk.rs` | 330 | 편의 기능 — VDI 경로 입력·파티션 선택·게스트 현재 경로·목록 새로고침 셸 |
+| `virtual_disk.rs` | 364 | 편의 기능 — VDI 경로 입력·파티션 선택·게스트 현재 경로·행 선택·폴더/상위 이동·목록 새로고침 |
 
 ### 플랫폼 (`app/src/platform/`) — 2,390줄 / 8파일
 
@@ -302,6 +302,7 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | 2026-09-21 | `virtual_disk/metadata.rs`·`virtual_disk/ntfs.rs`·`virtual_disk/copy.rs` | VDE-011 메타데이터 적용 추가 | 게스트 속성과 시간 정보가 호스트 복사 결과에 반영되지 않음 | NTFS 생성·수정·접근 시간 모델링, Windows 속성·생성 시간·접근/수정 시간 적용, 비지원·권한 실패 수집, 5개 테스트 | 실제 VDI 이미지의 모든 메타데이터 조합과 UI 알림 연결은 VDE-018~019·VDE-012에서 후속 검증 |
 | 2026-09-21 | `virtual_disk/issues.rs`·`virtual_disk/copy.rs` | VDE-012 오류 수집 도메인 경계 추가 | 복사 실패가 전체 작업 중단으로만 전달되고 반복 알림 억제 계약이 없음 | 오류 종류 분류, 형제 항목 계속 처리, `CopyReport.issues`, 경로·종류 기반 안정 억제 키와 중복 알림 차단, 11개 관련 테스트 | GPUI 토스트/로그 연결과 억제 상태 영속화는 VDE-013~019 후속 작업 |
 | 2026-09-21 | `app/state.rs`·`app/virtual_disk_ops.rs`·`window/virtual_disk.rs`·`app/tests/virtual_disk.rs` | VDE-013 오프라인 VDI 탐색기 셸 추가 | VirtualBox 도메인이 GPUI 네비게이션과 연결되지 않음 | `ActivePanel`·`NAV_TOOLS` 등록, VDI 경로 입력, read-only VDI/파티션 검색, NTFS 선택 연결, 게스트 루트 경로·새로고침 카드, GPUI 회귀 테스트와 920/1280px 실제 캡처 | 실제 VDI 이미지 성공 경로와 파일 목록 E2E는 VDE-018에서 수행 |
+| 2026-09-21 | `app/virtual_disk_ops.rs`·`window/virtual_disk.rs`·`app/tests/virtual_disk.rs` | VDE-014 탐색기 목록 조작 추가 | VDI 셸에 파일 행 조작과 경로 이동이 없음 | 숨김·시스템 항목을 필터링하지 않는 목록 행, 파일 종류·속성·크기 표시, 폴더 더블클릭, 상위 이동, Ctrl/Shift 선택 집합, 선택 카운트와 GPUI 상위 액션 회귀 테스트, 920/1280px 실제 캡처 | 실제 VDI 파일 행·숨김 항목·범위 선택 상호작용은 VDE-018~019와 VDE-016에서 검증 |
 | 2026-07-29 | 편의 기능 스플리터 3곳 | 공용 레이아웃 승격 | 패널별 고정 초기 폭 | `window::balanced_split` | 설정 pane 과도 축소 방지, 양쪽 가용폭 사용 |
 | 2026-07-29 | `app.rs` | 책임 단위 분할 + 재배치 | 1,798 | `app/` 7파일 (최대 564) | 대시보드·로그 렌더는 소유가 잘못돼 있어 `window/`로 이동 |
 | 2026-07-29 | `platform/windows.rs` | 책임 단위 분할 + 승격 | 1,361 | `platform/windows/` 6파일 (최대 344) | `wide_null`을 `windows/mod.rs`로 **공용 승격** |

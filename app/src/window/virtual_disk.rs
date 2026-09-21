@@ -1,10 +1,11 @@
 //! VirtualBox 오프라인 VDI 탐색 패널.
 //!
-//! VDE-013 범위는 VDI 경로 입력, 파티션 선택, 현재 게스트 경로와 새로고침이다.
-//! 폴더 진입·선택·복사는 후속 단계에서 이 목록 위에 연결한다.
+//! VDE-013~014 범위는 VDI 경로 입력, 파티션 선택, 현재 게스트 경로, 목록 표시,
+//! 폴더 이동과 기본 선택이다. 실제 복사와 키보드 단축키는 후속 단계에서 연결한다.
 
 use gpui::{
-    div, px, AnyElement, Context, InteractiveElement, IntoElement, ParentElement, Styled, Window,
+    div, px, AnyElement, ClickEvent, Context, InteractiveElement, IntoElement, ParentElement,
+    StatefulInteractiveElement, Styled, Window,
 };
 use gpui_component::{h_flex, input::Input, theme::ActiveTheme, v_flex};
 
@@ -177,6 +178,7 @@ fn render_partition_card(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyEl
 fn render_directory_card(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElement {
     let theme = cx.theme();
     let current_path = this.virtual_disk.current_path.to_string();
+    let selected_count = this.virtual_disk.selected_paths.len();
     let mut entries = v_flex().w_full().gap_1();
 
     if this.virtual_disk.source.is_none() {
@@ -194,6 +196,7 @@ fn render_directory_card(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyEl
     } else {
         for (index, entry) in this.virtual_disk.entries.iter().enumerate() {
             let is_directory = matches!(entry.kind, GuestFileKind::Directory);
+            let selected = this.virtual_disk.selected_paths.contains(&entry.path);
             let kind_label = if is_directory { "폴더" } else { "파일" };
             let attribute_label = format_attribute_label(entry.attributes);
             let size_label = if is_directory {
@@ -209,10 +212,26 @@ fn render_directory_card(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyEl
                     .min_w_0()
                     .gap_2()
                     .items_center()
+                    .cursor_pointer()
+                    .bg(if selected {
+                        theme.list_active
+                    } else {
+                        theme.secondary
+                    })
+                    .hover(|style| style.bg(theme.secondary_hover))
                     .border_b_1()
                     .border_color(theme.border)
                     .px_2()
                     .py_2()
+                    .id(("virtual-disk-entry", index))
+                    .on_click(cx.listener(move |this, event: &ClickEvent, _window, cx| {
+                        let additive = event.modifiers().control || event.modifiers().shift;
+                        if is_directory && event.click_count() >= 2 {
+                            this.enter_virtual_disk_directory(index, cx);
+                        } else {
+                            this.select_virtual_disk_entry(index, additive, cx);
+                        }
+                    }))
                     .child(
                         div()
                             .flex_1()
@@ -268,7 +287,22 @@ fn render_directory_card(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyEl
                         .flex_1()
                         .min_w_0()
                         .text_color(theme.foreground)
-                        .child(format!("현재 경로: {current_path}")),
+                        .child(format!(
+                            "현재 경로: {current_path} · {selected_count}개 선택"
+                        )),
+                )
+                .child(
+                    div()
+                        .debug_selector(|| "virtual-disk-parent".to_string())
+                        .child(ui::action_button(
+                            "virtual-disk-parent-action",
+                            "상위",
+                            ui::Size::Md,
+                            ButtonStyle::secondary(cx),
+                            cx.listener(|this, _event, _window, cx| {
+                                this.go_to_virtual_disk_parent(cx);
+                            }),
+                        )),
                 )
                 .child(
                     div()
