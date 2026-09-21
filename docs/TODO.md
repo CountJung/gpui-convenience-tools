@@ -130,11 +130,11 @@
   - [ ] K-004 | 0% | `.icns` 앱 아이콘 (현재 기본 아이콘으로 배포됨)
   - [ ] K-005 | 0% | 코드 서명·공증 — Apple Developer 계정 확보 시
 
-- [ ] G-003 | 90% | **스플리터 폭 영속화**
+- [ ] G-003 | 95% | **스플리터 폭 영속화**
   `ResizableState`의 `sizes()`를 `on_resize`에서 읽어 config에 저장하고 복원한다.
   기본 폭·범위 보정, 설정 저장·복원, GPUI 드래그 회귀 테스트와 격리 release 복원 캡처 완료;
-  실제 divider 드래그 mouse-up 저장과 독립 Visual Reviewer는 하네스가 드래그 입력을 지원하지
-  않아 후속 확인 필요 (90%).
+  실제 divider 드래그 mouse-up 저장을 위해 검증 하네스에 안전한 `Drag` 입력을 추가했으며,
+  독립 Visual Reviewer 확인은 후속 환경 의존 항목이다.
 
 - [ ] G-004 | 0% | **UAC 매니페스트 결정**
   `app/resources.rc`와 `app/*.exe.manifest`는 현재 빌드에 반영되지 않는 죽은 파일이다.

@@ -16,6 +16,7 @@
     Capture 대상 창만 PNG로 캡처한다.
     Wheel   대상 창의 지정 지점에 휠 입력을 보낸다.
     Click   대상 창의 지정 지점을 좌클릭한다.
+    Drag    대상 창의 지정 지점에서 `-ToX`·`-ToY`로 좌클릭 드래그한다.
     Key     대상 창에 지원된 키 조합을 보낸다(`Ctrl+A`).
     Resize  대상 창 크기를 바꾼다(최소 지원 크기 회귀 확인용).
     Stop    기록된 PID와 작업 전용 임시 루트만 정리한다.
@@ -30,7 +31,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet("Start", "Capture", "Wheel", "Click", "Key", "Resize", "Stop")]
+    [ValidateSet("Start", "Capture", "Wheel", "Click", "Drag", "Key", "Resize", "Stop")]
     [string]$Action,
 
     [string]$BinaryPath,
@@ -78,6 +79,8 @@ param(
     [string]$Name = "capture",
     [double]$X = 0.5,
     [double]$Y = 0.5,
+    [double]$ToX = -1,
+    [double]$ToY = -1,
     [int]$Delta = -3,
     [int]$Width = 1000,
     [int]$Height = 700,
@@ -140,6 +143,7 @@ public static class ClaudeVisualInterop {
 [void][ClaudeVisualInterop]::SetProcessDPIAware()
 
 $PW_RENDERFULLCONTENT = 2
+$MOUSEEVENTF_MOVE = 0x0001
 $MOUSEEVENTF_WHEEL = 0x0800
 $MOUSEEVENTF_LEFTDOWN = 0x0002
 $MOUSEEVENTF_LEFTUP = 0x0004
@@ -256,6 +260,22 @@ function Send-MouseInput([uint32]$flags, [uint32]$data) {
         throw ("SendInput이 입력을 받아들이지 않았다(sent=$sent, " +
             "err=$([Runtime.InteropServices.Marshal]::GetLastWin32Error())). " +
             "대상 앱이 관리자 권한으로 실행 중이면 UIPI가 입력을 차단한다.")
+    }
+}
+
+function Send-MouseMove([int]$dx, [int]$dy) {
+    $input = New-Object ClaudeVisualInterop+INPUT
+    $input.type = 0
+    $mouse = New-Object ClaudeVisualInterop+MOUSEINPUT
+    $mouse.dx = $dx
+    $mouse.dy = $dy
+    $mouse.dwFlags = $MOUSEEVENTF_MOVE
+    $input.mi = $mouse
+    $size = [Runtime.InteropServices.Marshal]::SizeOf([Type]'ClaudeVisualInterop+INPUT')
+    $sent = [ClaudeVisualInterop]::SendInput(1, @($input), $size)
+    if ($sent -ne 1) {
+        throw ("SendInput 마우스 이동을 받아들이지 않았다(sent=$sent, " +
+            "err=$([Runtime.InteropServices.Marshal]::GetLastWin32Error())).")
     }
 }
 
@@ -587,6 +607,45 @@ switch ($Action) {
         }
         Start-Sleep -Milliseconds $SettleMs
         [ordered]@{ action = "Click"; at = ("{0},{1}" -f $point.X, $point.Y) } | ConvertTo-Json -Depth 3
+    }
+
+    "Drag" {
+        if ($ToX -lt 0 -or $ToX -gt 1 -or $ToY -lt 0 -or $ToY -gt 1) {
+            throw "Drag에는 0~1 범위의 -ToX·-ToY가 필요하다."
+        }
+        $session = Read-Session
+        $hwnd = [IntPtr][int64]$session.windowHandle
+        Assert-ForegroundTarget $hwnd
+
+        $origin = New-Object ClaudeVisualInterop+POINT
+        [void][ClaudeVisualInterop]::GetCursorPos([ref]$origin)
+        $start = Resolve-ClientPoint $hwnd $X $Y
+        $end = Resolve-ClientPoint $hwnd $ToX $ToY
+        [void][ClaudeVisualInterop]::SetCursorPos($start.X, $start.Y)
+        Start-Sleep -Milliseconds 250
+        try {
+            Send-MouseInput $MOUSEEVENTF_LEFTDOWN 0
+            $last = $start
+            $steps = 12
+            for ($i = 1; $i -le $steps; $i++) {
+                $nextX = [int]([Math]::Round($start.X + (($end.X - $start.X) * $i / $steps)))
+                $nextY = [int]([Math]::Round($start.Y + (($end.Y - $start.Y) * $i / $steps)))
+                Send-MouseMove ($nextX - $last.X) ($nextY - $last.Y)
+                $last.X = $nextX
+                $last.Y = $nextY
+                Start-Sleep -Milliseconds 45
+            }
+            Send-MouseInput $MOUSEEVENTF_LEFTUP 0
+        }
+        finally {
+            [void][ClaudeVisualInterop]::SetCursorPos($origin.X, $origin.Y)
+        }
+        Start-Sleep -Milliseconds $SettleMs
+        [ordered]@{
+            action = "Drag"
+            from = ("{0},{1}" -f $start.X, $start.Y)
+            to = ("{0},{1}" -f $end.X, $end.Y)
+        } | ConvertTo-Json -Depth 3
     }
 
     "Key" {

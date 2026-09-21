@@ -461,7 +461,7 @@ Win32 창 캡처·입력을 제공하고, Claude는 저장된 PNG를 Read 도구
 - 캡처는 `PrintWindow(..., PW_RENDERFULLCONTENT)`로 **대상 창만** 가져온다. 전체 데스크톱을
   캡처하지 않으므로 창이 가려져 있어도 되고, 사용자의 다른 화면 내용은 파일에 남지 않는다.
   GPU 렌더링(GPUI/Blade) 내용도 이 플래그가 있어야 비트맵에 들어온다.
-- 입력은 `SendInput` 휠·좌클릭과 `MoveWindow` 크기 변경을 지원한다. 좌표는 클라이언트 영역
+- 입력은 `SendInput` 휠·좌클릭·좌클릭 드래그와 `MoveWindow` 크기 변경을 지원한다. 좌표는 클라이언트 영역
   기준 0~1 비율이라 창 크기가 달라져도 같은 지점을 가리킨다.
 - 검증 대상 프로세스는 작업 전용 임시 루트를 `GPUI_CONVENIENCE_TOOLS_DATA_DIR`로 지정해
   실행한다. 앱은 `dirs::config_dir()`(= `SHGetKnownFolderPath`)로 데이터 루트를 찾으므로
@@ -472,6 +472,7 @@ Win32 창 캡처·입력을 제공하고, Claude는 저장된 PNG를 Read 도구
 scripts\Invoke-ClaudeVisualCheck.ps1 -Action Start -Width 920 -Height 480
 scripts\Invoke-ClaudeVisualCheck.ps1 -Action Capture -Name sidebar-before
 scripts\Invoke-ClaudeVisualCheck.ps1 -Action Wheel -X 0.12 -Y 0.65 -Delta -8
+scripts\Invoke-ClaudeVisualCheck.ps1 -Action Drag -X 0.24 -Y 0.50 -ToX 0.32 -ToY 0.50
 scripts\Invoke-ClaudeVisualCheck.ps1 -Action Capture -Name sidebar-after
 scripts\Invoke-ClaudeVisualCheck.ps1 -Action Stop
 ```

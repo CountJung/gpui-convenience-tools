@@ -191,7 +191,7 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `.codex/agents/code-reviewer.toml` | 9 | Codex용 Code Reviewer 얇은 어댑터 |
 | `.codex/agents/docs-sync.toml` | 9 | Codex용 Documentation Sync 얇은 어댑터 |
 | `scripts/Verify-Workspace.ps1` | 167 | VS Code용 Rust/GPUI 자동 검증과 ChatGPT 데스크톱 handoff manifest·해시 고정 빌드 생성 |
-| `scripts/Invoke-ClaudeVisualCheck.ps1` | 664 | `CLAUDE_LOCAL` 시각 검증 하네스 — 격리 실행(`-SeedConfig`·`-SeedHistory`·`-InitialPanel`로 상태 재현), 다중 파티션 VDI 선택(`-VdiPartitionNumber`), 원본 복사 없는 대용량 VDI 연결(`-ExternalVdiPath`), 자동 중지(`-CancelAfterMs`)·읽기 지연(`-ReadDelayMs`), 창 캡처(`PrintWindow`)·입력(`SendInput`)·정리 |
+| `scripts/Invoke-ClaudeVisualCheck.ps1` | 723 | `CLAUDE_LOCAL` 시각 검증 하네스 — 격리 실행(`-SeedConfig`·`-SeedHistory`·`-InitialPanel`로 상태 재현), 다중 파티션 VDI 선택(`-VdiPartitionNumber`), 원본 복사 없는 대용량 VDI 연결(`-ExternalVdiPath`), 자동 중지(`-CancelAfterMs`)·읽기 지연(`-ReadDelayMs`), 창 캡처(`PrintWindow`)·입력(`SendInput`, `Drag`)·정리 |
 | `scripts/Verify-AdWindowState.ps1` | 282 | 지정 PID와 앱 조상·자손의 최상위·선택적 자식 창 상태와 클래스 후보를 읽기 전용 점검(AD-002·AD-005 진단) |
 | `scripts/Start-DesktopVisualValidation.ps1` | 126 | manifest 해시 검증 후 단일 임시 데이터 루트 격리 프로세스·세션 파일 생성과 실패 롤백 |
 | `scripts/Stop-DesktopVisualValidation.ps1` | 75 | 기록된 검증 PID·시작 시각과 작업 전용 임시 루트만 검증 후 정리 |
@@ -200,7 +200,7 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `.github/workflows/release.yml` | 140 | `v*` 태그 → Windows·macOS 병렬 빌드 후 단일 Release 생성 |
 | `.github/workflows/macos-build.yml` | 47 | push/PR마다 macOS check·test·패키징 — 비Windows cfg 경로의 **유일한** 검증 지점 |
 
-> `Invoke-ClaudeVisualCheck.ps1`은 664줄이지만 분할하지 않는다. 하나의 Win32 시퀀스
+> `Invoke-ClaudeVisualCheck.ps1`은 723줄이지만 분할하지 않는다. 하나의 Win32 시퀀스
 > (P/Invoke 선언 → 세션 → 캡처 → 입력 → 정리)를 공유하고, 쪼개면 각 파일이 같은 `Add-Type`
 > 블록과 세션 스키마를 중복 소유하게 되어 응집도가 깨진다.
 > 정본의 「구조 리팩터링 기준 > 예외」 조항을 적용한다.
@@ -375,6 +375,7 @@ G-001 판단: `muted`는 비활성 의미이므로 테두리와 hover를 추가�
 | 2026-09-22 | `app/src/app/validation.rs`·`scripts/Invoke-ClaudeVisualCheck.ps1`·`docs/TODO.md`·`docs/VERIFICATION.md` | VDE-015·VDE-019 다중 파티션 실제 VDI 중지 재검증 | TACS VDI의 기본 선택 파티션은 작은 시스템 파티션이어서 OS 경로를 재현할 수 없었고, 파티션 선택 입력은 포그라운드 안전 차단으로 보낼 수 없음 | 검증 전용 `-VdiPartitionNumber`와 `GPUI_CONVENIENCE_TOOLS_VALIDATION_VDI_PARTITION_NUMBER`를 추가하고, 실제 종료 TACS 파티션 5 선택 캡처 `vde015-tacs-partition5-root-060904.png`를 확인; 파티션 1 `$Extend`에서 250ms 중지 `vde015-tacs-extend-cancel-061128.png`는 파일 0개 중지, 600ms `vde015-tacs-extend-cancel-600-061151.png`는 8개·4.1MB 완료로 확인; 원본 길이 85,269,151,744바이트 불변·VM poweroff·process/session 0 | 실제 대용량 파일 청크 중지·외부 키보드·독립 Visual Reviewer는 여전히 미검증 |
 | 2026-09-22 | `app/src/app/tests/virtual_disk.rs`·`scripts/Verify-Workspace.ps1`·`docs/TODO.md`·`docs/VERIFICATION.md` | VDE-014 폴더 더블클릭 GPUI 이벤트 검증 | 기존 폴더 진입 테스트가 상태 메서드 직접 호출에 머물러 실제 행 `on_click`의 더블클릭 분기를 고정하지 못함 | `virtual_disk_directory_row_double_click_enters_directory_and_refreshes_entries`가 렌더된 폴더 행에 `MouseDown/MouseUp click_count=2`를 전달해 경로 이동·새로고침·오류 시 목록 제거를 확인; 필수 GPUI 테스트 26개·전체 161 passed·4 ignored·check·Clippy·구조/문서 게이트 통과; 최신 구조 56개 파일·21,371줄·최대 821줄 | 실제 데스크톱 Click·Shift 입력과 독립 Visual Reviewer는 포그라운드 안전 경계로 미검증 |
 | 2026-09-22 | `app/src/app/virtual_disk_copy.rs`·`app/src/app/validation.rs`·`scripts/Invoke-ClaudeVisualCheck.ps1`·`docs/TODO.md`·`docs/VERIFICATION.md` | VDE-015 실제 대용량 청크 취소 보조 검증 | 실제 TACS VDI에서 자연 속도 복사가 빨리 끝나 대용량 파일 중간 취소를 일정하게 재현하기 어려움 | 검증 전용 `-ReadDelayMs`를 추가해 일반 실행에는 지연을 주지 않고 게스트 `read_at` 호출만 늦춤; 종료된 TACS의 `$Extend/$RmMetadata/$TxfLog`에서 실제 2MiB 파일 복사 중 0바이트 부분 파일을 관찰하고 `-CancelAfterMs 2200` 후 미완성 파일 제거·완료 파일 보존, UI `중지됨 · 파일 2개 · 64.0 KB`와 캡처 `vde015-txf-log-slow-chunk-before-cancel-062617.png`, `vde015-txf-log-slow-chunk-after-cancel-062619.png` 확인; 원본 85,269,151,744바이트·VM poweroff·process/session 0 | 자연 속도 대용량 청크 중지·독립 Visual Reviewer·실제 릴리스 버튼 조작은 후속 |
+| 2026-09-22 | `scripts/Invoke-ClaudeVisualCheck.ps1`·`docs/DEVELOPMENT_GUIDE.md`·`docs/VERIFICATION.md`·`docs/TODO.md` | G-003 실제 divider 드래그 검증 경로 보강 | 기존 `CLAUDE_LOCAL` 하네스가 Click·Wheel만 지원해 스플리터 mouse-up 저장 콜백을 실제 창에서 시도할 수 없음 | 포그라운드 안전 검사를 유지한 `-Action Drag -X -Y -ToX -ToY`와 단계별 상대 마우스 이동을 추가하고, 개발·검증 문서와 G-003 작업 상태를 갱신; PowerShell 구문 분석 및 기존 GPUI 드래그 회귀 테스트로 검증 | 실제 데스크톱 포그라운드 확보와 독립 Visual Reviewer는 후속 |
 | 2026-07-29 | 편의 기능 스플리터 3곳 | 공용 레이아웃 승격 | 패널별 고정 초기 폭 | `window::balanced_split` | 설정 pane 과도 축소 방지, 양쪽 가용폭 사용 |
 | 2026-07-29 | `app.rs` | 책임 단위 분할 + 재배치 | 1,798 | `app/` 7파일 (최대 564) | 대시보드·로그 렌더는 소유가 잘못돼 있어 `window/`로 이동 |
 | 2026-07-29 | `platform/windows.rs` | 책임 단위 분할 + 승격 | 1,361 | `platform/windows/` 6파일 (최대 344) | `wide_null`을 `windows/mod.rs`로 **공용 승격** |

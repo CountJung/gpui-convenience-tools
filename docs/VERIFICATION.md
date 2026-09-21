@@ -18,7 +18,7 @@
    `scripts/Invoke-ClaudeVisualCheck.ps1` 또는 데스크톱 handoff 절차로 실제 창 전환·스크롤·
    캡처를 확인한다. 캡처만으로 GPUI 자체 테스트를 대신하지 않는다.
 
-텍스트 입력·divider drag처럼 로컬 창 하네스가 지원하지 않는 입력은 GPUI 테스트로 검증하고,
+텍스트 입력처럼 로컬 창 하네스가 지원하지 않는 입력은 GPUI 테스트로 검증하고,
 하네스 미지원 상태를 `N/A` 사유 없이 `PASS`로 기록하지 않는다.
 
 최신 품질 게이트 기준은 `cargo check -p gpui-convenience-tools --locked`, 전체 테스트
@@ -86,7 +86,7 @@ scripts\Invoke-ClaudeVisualCheck.ps1 -Action Stop
 cargo build -p gpui-convenience-tools --release
 scripts\Invoke-ClaudeVisualCheck.ps1 -Action Start -Width 994 -Height 702
 scripts\Invoke-ClaudeVisualCheck.ps1 -Action Capture -Name before
-# 필요한 경우 Click 또는 Wheel 실행 후 반드시 다시 Capture
+# 필요한 경우 Click·Wheel·Drag 실행 후 반드시 다시 Capture
 scripts\Invoke-ClaudeVisualCheck.ps1 -Action Stop
 ```
 
@@ -142,7 +142,7 @@ SHA-256을 기록한다. 다른 검증자의 독립 검토가 요구되는 UI �
 | E-004 | E2E | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | — |
 | G-001 | E2E | [x] | [x] | [x] | [x] | [x] | [x] | `ButtonStyle` 기본값 통일 및 개별 덮어쓰기 제거; 검증 전용 `-InitialPanel`로 패널 전환 입력을 격리 실행에 주입; `cargo check -p gpui-convenience-tools --locked`; 관련 GPUI 테스트 `ad_block_cards_contain_long_content_at_supported_widths`, `service_rows_keep_names_readable_at_supported_window_widths`, `file_sync_sections_share_one_width_at_every_window_width`; 전체 테스트 145 passed·4 ignored; Clippy exit 0(기존 경고 7건); 격리 release 파일 동기화 캡처 `target/visual-validation/captures/g001-file-sync-013019.png`와 자동 시작 캡처 `target/visual-validation/captures/g001-auto-start-013004.png`에서 두 화면과 공용 버튼 스타일 확인, processCount=0·sessionCount=0; 독립 Visual Reviewer는 후속; commits `0d7bf25` 및 후속 검증 경로 커밋 push 완료 |
 | K-001 | RUST | [ ] | [ ] | — | — | [ ] | [ ] | — |
-| G-003 | E2E | [x] | [x] | [x] | [ ] | [x] | [x] | `sidebar_width` 설정 필드와 200~360px 보정·기본 240px 복원; `sidebar_width_is_normalized_to_supported_range`, `update_config_preserves_unedited_fields`, GPUI `sidebar_divider_drag_resizes_navigation_and_content`; 전체 140 passed·4 ignored; Clippy 기존 경고 7건; 격리 release 기본 캡처 `target/visual-validation/captures/g003-default-003709.png`, `sidebar_width=320` 시드 복원 캡처 `target/visual-validation/captures/g003-restored-width-003742.png`; 하네스가 divider 드래그를 지원하지 않아 실제 mouse-up 저장 콜백·독립 Visual Reviewer는 후속; commit `0a793b8` push 완료 |
+| G-003 | E2E | [x] | [x] | [x] | [ ] | [x] | [x] | `sidebar_width` 설정 필드와 200~360px 보정·기본 240px 복원; `sidebar_width_is_normalized_to_supported_range`, `update_config_preserves_unedited_fields`, GPUI `sidebar_divider_drag_resizes_navigation_and_content`; 전체 최신 테스트는 상단 품질 게이트 기준 161 passed·4 ignored; 격리 release 기본 캡처 `target/visual-validation/captures/g003-default-003709.png`, `sidebar_width=320` 시드 복원 캡처 `target/visual-validation/captures/g003-restored-width-003742.png`; 검증 하네스에 `-Action Drag -X -Y -ToX -ToY`를 추가했으며 실제 데스크톱 mouse-up 저장 콜백과 독립 Visual Reviewer는 포그라운드 환경 의존 후속 |
 | G-004 | RUST | [ ] | [ ] | — | — | [ ] | [ ] | — |
 | K-002 | RUST | [ ] | [ ] | — | — | [ ] | [ ] | macOS 메뉴 막대 지원은 macOS 실행 환경 확인 후 진행 |
 | K-003 | RUST | [ ] | [ ] | — | — | [ ] | [ ] | `launchd` 자동 시작은 macOS 실행 환경 확인 후 진행 |
@@ -163,6 +163,14 @@ MBR 타입 `0x83`·NTFS 부트 시그니처가 없는 VDI를 격리 생성한 �
 확인했으며 캡처는 `vde017-unsupported-partition-release-fixed-033450.png`이다. 검증 후
 `PROCESS_COUNT=0`·`SESSION_COUNT=0`을 확인했다. fixture가 NTFS로 오인되지 않는지
 `reads_unsupported_partition_fixture_without_claiming_ntfs` 단위 테스트도 통과했다.
+
+G-003의 실제 divider 드래그 경로는 검증 하네스에 `-Action Drag -X <start> -Y <start>
+-ToX <end> -ToY <end>`를 추가한 뒤 1000×700 release 화면에서 시도했다. 시작 캡처는
+`target/visual-validation/captures/g003-drag-before-063747.png`에 남겼지만, 현재 데스크톱의
+포그라운드를 검증 창으로 전환하지 못해 하네스가 전역 입력을 보내지 않고 중단했다. 따라서
+실제 mouse-up 저장 콜백 성공으로 기록하지 않으며, 세션 정리 후 `PROCESS_COUNT=0`·
+`SESSION_COUNT=0`을 확인했다. GPUI `sidebar_divider_drag_resizes_navigation_and_content`
+회귀 테스트와 하네스 구문 검증은 통과했다.
 
 ## 완료 검증 기록
 
