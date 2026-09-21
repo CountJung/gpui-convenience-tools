@@ -112,7 +112,7 @@ SHA-256을 기록한다. 다른 검증자의 독립 검토가 요구되는 UI �
 | ID | 프로필 | B | T | E | V | R | C | 증거 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | VDE-007 | RUST | [x] | [x] | — | — | [x] | [x] | `cargo check -p gpui-convenience-tools`; `cargo test -p gpui-convenience-tools` (95 passed, 3 ignored); env 주입 실제 NTFS 이미지 테스트 1 passed; commit·push 완료 |
-| VDE-008 | RUST | [ ] | [ ] | — | — | [ ] | [ ] | — |
+| VDE-008 | RUST | [x] | [x] | — | — | [x] | [x] | `cargo check -p gpui-convenience-tools --locked`; `cargo test --all-targets --all-features` (99 passed, 4 ignored); NTFS 오류 경계 7 passed; 실제 NTFS 이미지 1 passed; 손상 부트 섹터 이미지 1 passed; commit·push 완료 |
 | VDE-009 | RUST | [ ] | [ ] | — | — | [ ] | [ ] | — |
 | VDE-010 | RUST | [ ] | [ ] | — | — | [ ] | [ ] | — |
 | VDE-011 | RUST | [ ] | [ ] | — | — | [ ] | [ ] | — |

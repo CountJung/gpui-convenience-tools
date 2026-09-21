@@ -6,9 +6,9 @@
 // 아직 UI·파티션 계층이 연결되지 않은 도메인 모델도 단계별로 먼저 고정한다.
 #![allow(dead_code)]
 
-pub mod vdi;
-pub mod partition;
 pub mod ntfs;
+pub mod partition;
+pub mod vdi;
 
 use std::{fmt, io, path::PathBuf};
 
@@ -297,12 +297,31 @@ pub enum VirtualDiskError {
     #[error("원본 변경이 감지되었습니다: {0}")]
     SourceChanged(String),
 
+    #[error("게스트 항목({path}) 처리 실패: {source}")]
+    GuestEntry {
+        path: String,
+        #[source]
+        source: Box<Self>,
+    },
+
     #[error("{operation} 중 I/O 오류: {source}")]
     Io {
         operation: IoOperation,
         #[source]
         source: io::Error,
     },
+}
+
+impl VirtualDiskError {
+    pub fn with_guest_path(self, path: &GuestPath) -> Self {
+        match self {
+            Self::SourceChanged(_) | Self::GuestEntry { .. } => self,
+            source => Self::GuestEntry {
+                path: path.to_string(),
+                source: Box::new(source),
+            },
+        }
+    }
 }
 
 /// 지원하지 않는 형식을 사용자 메시지·알림 억제 키에 매핑할 분류.

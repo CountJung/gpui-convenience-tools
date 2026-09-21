@@ -44,6 +44,7 @@ impl<S: PartitionSource> PartitionIo<S> {
         partition: &VdiPartition,
         sector_size: u32,
     ) -> Result<Self, VirtualDiskError> {
+        let disk_size = source.disk_size_bytes();
         let base_offset = partition
             .start_lba
             .checked_mul(sector_size as u64)
@@ -52,6 +53,16 @@ impl<S: PartitionSource> PartitionIo<S> {
             .sector_count
             .checked_mul(sector_size as u64)
             .ok_or_else(|| corrupt("NTFS 파티션 크기 계산이 오버플로되었습니다"))?;
+        let end_offset = base_offset
+            .checked_add(length)
+            .ok_or_else(|| corrupt("NTFS 파티션 끝 위치 계산이 오버플로되었습니다"))?;
+        if end_offset > disk_size {
+            return Err(VirtualDiskError::BoundsViolation {
+                offset: base_offset,
+                length,
+                capacity: disk_size,
+            });
+        }
 
         Ok(Self {
             source,
@@ -190,7 +201,7 @@ impl<S: PartitionSource> NtfsGuestFileSource<S> {
     ) -> Result<ntfs::NtfsFile<'n>, VirtualDiskError> {
         let mut current = ntfs
             .root_directory(fs)
-            .map_err(|error| map_ntfs_error(fs, error, IoOperation::Read))?;
+            .map_err(|error| map_ntfs_error(fs, error, IoOperation::Read).with_guest_path(path))?;
 
         for component in path
             .as_str()
@@ -203,16 +214,18 @@ impl<S: PartitionSource> NtfsGuestFileSource<S> {
                 )));
             }
             let next = {
-                let index = current
-                    .directory_index(fs)
-                    .map_err(|error| map_ntfs_error(fs, error, IoOperation::ListDirectory))?;
+                let index = current.directory_index(fs).map_err(|error| {
+                    map_ntfs_error(fs, error, IoOperation::ListDirectory).with_guest_path(path)
+                })?;
                 let mut finder = index.finder();
                 let entry = NtfsFileNameIndex::find(&mut finder, ntfs, fs, component)
                     .ok_or_else(|| VirtualDiskError::InvalidGuestPath(path.to_string()))?
-                    .map_err(|error| map_ntfs_error(fs, error, IoOperation::ListDirectory))?;
-                entry
-                    .to_file(ntfs, fs)
-                    .map_err(|error| map_ntfs_error(fs, error, IoOperation::Read))?
+                    .map_err(|error| {
+                        map_ntfs_error(fs, error, IoOperation::ListDirectory).with_guest_path(path)
+                    })?;
+                entry.to_file(ntfs, fs).map_err(|error| {
+                    map_ntfs_error(fs, error, IoOperation::Read).with_guest_path(path)
+                })?
             };
             current = next;
         }
@@ -269,18 +282,24 @@ impl<S: PartitionSource> GuestFileSource for NtfsGuestFileSource<S> {
         }
 
         let file = Self::resolve_file(&self.ntfs, &mut self.fs, &directory.path)?;
-        let index = file
-            .directory_index(&mut self.fs)
-            .map_err(|error| map_ntfs_error(&mut self.fs, error, IoOperation::ListDirectory))?;
+        let index = file.directory_index(&mut self.fs).map_err(|error| {
+            map_ntfs_error(&mut self.fs, error, IoOperation::ListDirectory)
+                .with_guest_path(&directory.path)
+        })?;
         let mut entries = Vec::new();
         let mut iterator = index.entries();
         while let Some(entry) = iterator.next(&mut self.fs) {
-            let entry = entry
-                .map_err(|error| map_ntfs_error(&mut self.fs, error, IoOperation::ListDirectory))?;
+            let entry = entry.map_err(|error| {
+                map_ntfs_error(&mut self.fs, error, IoOperation::ListDirectory)
+                    .with_guest_path(&directory.path)
+            })?;
             let file_name = entry
                 .key()
                 .ok_or_else(|| corrupt("NTFS 디렉터리 인덱스 항목에 파일명이 없습니다"))?
-                .map_err(|error| map_ntfs_error(&mut self.fs, error, IoOperation::ListDirectory))?;
+                .map_err(|error| {
+                    map_ntfs_error(&mut self.fs, error, IoOperation::ListDirectory)
+                        .with_guest_path(&directory.path)
+                })?;
             if matches!(file_name.namespace(), NtfsFileNamespace::Dos) {
                 continue;
             }
@@ -288,7 +307,10 @@ impl<S: PartitionSource> GuestFileSource for NtfsGuestFileSource<S> {
             if name == "." || name == ".." {
                 continue;
             }
-            entries.push(Self::entry_from_name(directory, &file_name)?);
+            entries.push(
+                Self::entry_from_name(directory, &file_name)
+                    .map_err(|error| error.with_guest_path(&directory.path))?,
+            );
         }
         Ok(entries)
     }
@@ -305,6 +327,9 @@ impl<S: PartitionSource> GuestFileSource for NtfsGuestFileSource<S> {
                 file.path
             )));
         }
+        if let Some(reason) = unsupported_file_attributes(file.attributes) {
+            return Err(reason.with_guest_path(&file.path));
+        }
         let length = buffer.len() as u64;
         let end = offset
             .checked_add(length)
@@ -314,37 +339,92 @@ impl<S: PartitionSource> GuestFileSource for NtfsGuestFileSource<S> {
                 offset,
                 length,
                 capacity: file.size_bytes,
-            });
+            }
+            .with_guest_path(&file.path));
         }
         if buffer.is_empty() {
             return Ok(0);
         }
 
         let resolved = Self::resolve_file(&self.ntfs, &mut self.fs, &file.path)?;
+        let standard_attributes = resolved
+            .info()
+            .map_err(|error| {
+                map_ntfs_error(&mut self.fs, error, IoOperation::Read).with_guest_path(&file.path)
+            })?
+            .file_attributes();
+        if let Some(reason) = unsupported_file_attributes(GuestFileAttributes::from_bits(
+            standard_attributes.bits() & NTFS_ATTRIBUTE_MASK,
+        )) {
+            return Err(reason.with_guest_path(&file.path));
+        }
         let item = resolved
             .data(&mut self.fs, "")
-            .ok_or_else(|| unsupported_stream(&file.path))?
-            .map_err(|error| map_ntfs_error(&mut self.fs, error, IoOperation::Read))?;
-        let attribute = item
-            .to_attribute()
-            .map_err(|error| map_ntfs_error(&mut self.fs, error, IoOperation::Read))?;
-        let mut value = attribute
-            .value(&mut self.fs)
-            .map_err(|error| map_ntfs_error(&mut self.fs, error, IoOperation::Read))?;
+            .ok_or_else(|| unsupported_stream(&file.path).with_guest_path(&file.path))?
+            .map_err(|error| {
+                map_ntfs_error(&mut self.fs, error, IoOperation::Read).with_guest_path(&file.path)
+            })?;
+        let attribute = item.to_attribute().map_err(|error| {
+            map_ntfs_error(&mut self.fs, error, IoOperation::Read).with_guest_path(&file.path)
+        })?;
+        let data_flags = attribute.flags();
+        if data_flags.contains(ntfs::NtfsAttributeFlags::COMPRESSED) {
+            return Err(
+                unsupported_file_stream("압축된 NTFS 파일 스트림", &file.path)
+                    .with_guest_path(&file.path),
+            );
+        }
+        if data_flags.contains(ntfs::NtfsAttributeFlags::ENCRYPTED) {
+            return Err(
+                unsupported_file_stream("암호화된 NTFS 파일 스트림", &file.path)
+                    .with_guest_path(&file.path),
+            );
+        }
+        let mut value = attribute.value(&mut self.fs).map_err(|error| {
+            map_ntfs_error(&mut self.fs, error, IoOperation::Read).with_guest_path(&file.path)
+        })?;
+        if end > value.len() {
+            return Err(VirtualDiskError::BoundsViolation {
+                offset,
+                length,
+                capacity: value.len(),
+            }
+            .with_guest_path(&file.path));
+        }
         value
             .seek(&mut self.fs, SeekFrom::Start(offset))
-            .map_err(|error| map_ntfs_error(&mut self.fs, error, IoOperation::Seek))?;
-        value
-            .read(&mut self.fs, buffer)
-            .map_err(|error| map_ntfs_error(&mut self.fs, error, IoOperation::Read))
+            .map_err(|error| {
+                map_ntfs_error(&mut self.fs, error, IoOperation::Seek).with_guest_path(&file.path)
+            })?;
+        value.read(&mut self.fs, buffer).map_err(|error| {
+            map_ntfs_error(&mut self.fs, error, IoOperation::Read).with_guest_path(&file.path)
+        })
     }
 }
 
 fn unsupported_stream(path: &GuestPath) -> VirtualDiskError {
+    unsupported_file_stream("기본 데이터 스트림이 없는 NTFS 파일", path)
+}
+
+fn unsupported_file_stream(detail: &str, path: &GuestPath) -> VirtualDiskError {
     VirtualDiskError::UnsupportedFormat {
         kind: UnsupportedFormatKind::FileStream,
-        detail: format!("기본 데이터 스트림을 찾을 수 없습니다: {path}"),
+        detail: format!("{detail}: {path}"),
     }
+}
+
+fn unsupported_file_attributes(attributes: GuestFileAttributes) -> Option<VirtualDiskError> {
+    let unsupported = [
+        (GuestFileAttributes::COMPRESSED, "압축된 NTFS 파일 스트림"),
+        (GuestFileAttributes::ENCRYPTED, "암호화된 NTFS 파일 스트림"),
+    ];
+    unsupported
+        .into_iter()
+        .find(|(flag, _)| attributes.contains(*flag))
+        .map(|(_, detail)| VirtualDiskError::UnsupportedFormat {
+            kind: UnsupportedFormatKind::FileStream,
+            detail: format!("{detail}은 현재 오프라인 복사 경로에서 지원하지 않습니다"),
+        })
 }
 
 fn map_ntfs_error<S: PartitionSource>(
@@ -430,6 +510,25 @@ mod tests {
         }
     }
 
+    #[derive(Debug)]
+    struct FailingSource;
+
+    impl PartitionSource for FailingSource {
+        fn disk_size_bytes(&self) -> u64 {
+            8 * 512
+        }
+
+        fn sector_size(&self) -> u32 {
+            512
+        }
+
+        fn read_at(&mut self, _offset: u64, _buffer: &mut [u8]) -> Result<usize, VirtualDiskError> {
+            Err(VirtualDiskError::SourceChanged(
+                "test source changed".to_string(),
+            ))
+        }
+    }
+
     fn partition() -> VdiPartition {
         VdiPartition {
             number: 1,
@@ -464,6 +563,38 @@ mod tests {
     }
 
     #[test]
+    fn partition_io_rejects_a_partition_beyond_the_source() {
+        let source = MemorySource {
+            bytes: vec![0; 4 * 512],
+            sector_size: 512,
+        };
+        let partition = VdiPartition {
+            number: 1,
+            table: super::super::PartitionTableKind::Gpt,
+            start_lba: 3,
+            sector_count: 2,
+            filesystem: Some(GuestFileSystem::ntfs_3_1()),
+        };
+
+        assert!(matches!(
+            PartitionIo::new(source, &partition, 512),
+            Err(VirtualDiskError::BoundsViolation { .. })
+        ));
+    }
+
+    #[test]
+    fn partition_source_errors_are_preserved_for_the_caller() {
+        let mut io = PartitionIo::new(FailingSource, &partition(), 512).unwrap();
+        let mut buffer = [0; 1];
+
+        assert!(io.read(&mut buffer).is_err());
+        assert!(matches!(
+            io.take_source_error(),
+            Some(VirtualDiskError::SourceChanged(_))
+        ));
+    }
+
+    #[test]
     fn ntfs_attributes_keep_explorer_relevant_bits() {
         let source_bits = 0x0002 | 0x0004 | 0x0001 | 0x8000_0000;
         let attributes = GuestFileAttributes::from_bits(source_bits & NTFS_ATTRIBUTE_MASK);
@@ -472,6 +603,38 @@ mod tests {
         assert!(attributes.contains(GuestFileAttributes::SYSTEM));
         assert!(attributes.contains(GuestFileAttributes::READ_ONLY));
         assert_eq!(attributes.bits() & 0x8000_0000, 0);
+    }
+
+    #[test]
+    fn compressed_and_encrypted_attributes_become_file_stream_errors() {
+        for attributes in [
+            GuestFileAttributes::COMPRESSED,
+            GuestFileAttributes::ENCRYPTED,
+        ] {
+            assert!(matches!(
+                unsupported_file_attributes(attributes),
+                Some(VirtualDiskError::UnsupportedFormat {
+                    kind: UnsupportedFormatKind::FileStream,
+                    ..
+                })
+            ));
+        }
+    }
+
+    #[test]
+    fn entry_errors_keep_the_guest_path() {
+        let path = GuestPath::new("Windows/System32").unwrap();
+        let error = VirtualDiskError::BoundsViolation {
+            offset: 4,
+            length: 8,
+            capacity: 4,
+        }
+        .with_guest_path(&path);
+
+        assert!(
+            matches!(error, VirtualDiskError::GuestEntry { ref path, .. } if path == "Windows/System32")
+        );
+        assert!(error.to_string().contains("Windows/System32"));
     }
 
     #[test]
@@ -503,5 +666,27 @@ mod tests {
             let mut buffer = vec![0; read_length];
             assert_eq!(source.read_at(file, 0, &mut buffer).unwrap(), read_length);
         }
+    }
+
+    #[test]
+    #[ignore = "손상 NTFS 이미지는 GPUI_CONVENIENCE_TOOLS_NTFS_CORRUPT_TEST_IMAGE로 주입한다"]
+    fn rejects_configured_corrupt_ntfs_image() {
+        let Some(path) = std::env::var_os("GPUI_CONVENIENCE_TOOLS_NTFS_CORRUPT_TEST_IMAGE") else {
+            return;
+        };
+        let file = File::open(path).unwrap();
+        let size = file.metadata().unwrap().len();
+        let partition = VdiPartition {
+            number: 1,
+            table: super::super::PartitionTableKind::Gpt,
+            start_lba: 0,
+            sector_count: size / 512,
+            filesystem: Some(GuestFileSystem::ntfs_3_1()),
+        };
+
+        assert!(matches!(
+            NtfsGuestFileSource::open(FileSource { file, size }, partition),
+            Err(VirtualDiskError::CorruptImage(_))
+        ));
     }
 }

@@ -529,6 +529,27 @@ GPT 서명·헤더·CRC·배열 범위 기준은 [UEFI GPT 디스크 레이아�
 API 선택 근거는 [`ntfs` 0.4.0 문서](https://docs.rs/ntfs/0.4.0/ntfs/)와
 [공식 저장소](https://github.com/ColinFinck/ntfs)를 참조했다.
 
+### Phase O-7 — VDE-008 NTFS 오류 경계 완료 ✅
+
+VDE-007의 읽기 경계를 확장해 손상·지원 불가·범위 초과 오류가 게스트 항목 단위로 전달되도록
+정리했다.
+
+- `VirtualDiskError::GuestEntry`가 게스트 경로와 원인 오류를 함께 보존한다. `SourceChanged`는
+  원본 전체를 중단해야 하므로 전역 오류로 유지하고, 파일 스트림·메타데이터·범위 오류에는
+  항목 경로를 붙인다.
+- 파티션 시작·길이의 checked arithmetic와 원본 디스크 용량을 `PartitionIo::new`에서 다시
+  검증한다. 범위를 벗어나면 NTFS를 열기 전에 `BoundsViolation`으로 거부한다.
+- NTFS 파일 속성과 실제 `$DATA` attribute flags에서 압축·암호화를 각각 확인하고,
+  지원하지 않는 스트림은 읽기 전에 `UnsupportedFormat::FileStream`으로 중단한다. 읽기
+  범위와 실제 스트림 길이도 다시 대조한다.
+- NTFS 파서 오류는 `CorruptImage`, 원본 리더 오류는 `SourceChanged`/`Io`로 보존하며,
+  디렉터리 인덱스 손상은 부분 결과를 계속 사용하지 않고 해당 탐색을 안전하게 중단한다.
+
+검증은 파티션 범위·원본 변경 보존·압축/암호화 분류·항목 경로 보존 단위 테스트 7개,
+전체 Rust 테스트, 환경변수 주입 실제 NTFS 이미지 테스트, 부트 섹터 서명을 손상한 임시
+이미지의 `CorruptImage` 테스트로 수행했다. 잠금 표식 거부는 VDE-005의 기존 VDI 테스트를
+통해 같은 read-only 진입 경계를 재사용한다.
+
 ## 진행 예정 단계
 
 세부 체크리스트는 `TODO.md`를 정본으로 한다.
