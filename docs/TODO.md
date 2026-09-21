@@ -60,7 +60,7 @@
 
 ### O-5. 검증·후속 백엔드
 
-- [ ] VDE-019 | 70% | GPUI 자체 테스트로 실제 파일 목록·숨김/시스템 항목·키보드 조작·복사 진행/실패 요약 상태를 검증 완료; 실제 VirtualBox 패널 창 캡처와 독립 Visual Reviewer 확인, 복사 대상 E2E는 후속
+- [ ] VDE-019 | 90% | GPUI 자체 테스트와 격리 합성 VDI 릴리스 실행으로 실제 파일 목록·숨김/시스템 항목·복사 진행/실패 요약·대상 폴더 복사를 확인; 실제 VBox 생성 VDI와 독립 Visual Reviewer 확인은 후속
 - [ ] VDE-021 | 70% | 공식 `VBoxManage guestcontrol` 명령 계약·read-only 안전 경계·`GuestFileSource` 분리 설계를 `VIRTUAL_DISK_BACKENDS.md`에 기록 완료; VDE-019 실제 패널/복사 E2E, 격리 VM·Guest Additions 준비 전에는 구현·완료 처리하지 않음
 
 > VDE-021은 필수 오프라인 경로의 선행 작업이다. Guest Control이 추가되더라도 실행 중 VDI

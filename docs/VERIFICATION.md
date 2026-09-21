@@ -117,7 +117,7 @@ SHA-256을 기록한다. 다른 검증자의 독립 검토가 요구되는 UI �
 | VDE-015 | GPUI | [x] | [x] | [ ] | [x] | [x] | [x] | `cargo check -p gpui-convenience-tools --locked`; `cargo test --all-targets --all-features` (125 passed, 4 ignored); 새 `virtual_disk_copy` 백그라운드 이벤트·대상 입력·진행/중지/완료 카드 GPUI 경계 테스트; 릴리즈 `CLAUDE_LOCAL` 1000×700·920×700·1280×700 캡처 `target/visual-validation/captures/vde015-copy-card-1000-113840-203852.png`, `vde015-copy-card-920-113852-203905.png`, `vde015-copy-card-1280-113852-203905.png`; 시각 세션 정리 후 프로세스 0·세션 루트 삭제; 실제 VDI 복사 성공·중지 E2E는 VDE-018~019 후속 |
 | VDE-016 | GPUI | [x] | [x] | [x] | [x] | [x] | [ ] | `cargo check -p gpui-convenience-tools --locked`; `cargo test --all-targets --all-features` (128 passed, 4 ignored); `virtual_disk_panel_dispatches_explorer_shortcuts_when_directory_is_focused`와 선택 집합·단일 폴더 진입 단위 테스트; 릴리즈 `CLAUDE_LOCAL` 920×700·1000×700·1280×700 캡처 `target/visual-validation/captures/vde016-fixed-920-205304.png`, `vde016-fixed-1000-205250.png`, `vde016-fixed-1280-205319.png`; 시각 세션 정리 후 프로세스 0·세션 루트 0; 실제 VDI 파일 행을 대상으로 한 키보드 E2E와 독립 Visual Reviewer는 VDE-018~019 후속 |
 | VDE-017 | GPUI | [x] | [x] | [x] | [x] | [x] | [ ] | `cargo check -p gpui-convenience-tools --locked`; `cargo test --all-targets --all-features` (131 passed, 4 ignored); 실행 중 VM 오류·미지원 파일시스템 메시지 단위 테스트와 `virtual_disk_panel_explains_unsupported_partition_state` GPUI 렌더 테스트; 릴리즈 `CLAUDE_LOCAL` 920×700·1000×700·1280×700 캡처 `target/visual-validation/captures/vde017-920-210410.png`, `vde017-1000-210355.png`, `vde017-1280-210423.png`; 시각 세션 정리 후 프로세스 0·세션 루트 0; 실제 VBoxManage 실행 중 VM 및 실제 미지원 파티션 E2E는 VDE-018~019 후속 |
-| VDE-019 | E2E | [x] | [x] | [x] | [ ] | [x] | [x] | `cargo check -p gpui-convenience-tools --locked`; `cargo test --all-targets --all-features` (137 passed, 4 ignored); GPUI 테스트 `virtual_disk_panel_renders_loaded_hidden_entries_and_selects_all_with_ctrl_a`, `virtual_disk_panel_renders_copy_progress_and_issue_summary`, 기존 키 디스패치 테스트 포함; `Verify-Workspace.ps1` 필수 GPUI 17개 및 전체 테스트 통과; release `CLAUDE_LOCAL` 기본 창 캡처 `target/visual-validation/captures/vde019-default-1000-212738.png`, VirtualBox 패널 전환 Click은 foreground=0으로 안전 차단되어 대상 패널 캡처 미완료; session 정리 processCount=0·sessionCount=0; partial commit `c7b1e17` push 완료 |
+| VDE-019 | E2E | [x] | [x] | [x] | [ ] | [x] | [x] | `cargo check -p gpui-convenience-tools --locked`; `cargo test --all-targets --all-features` 전체 152 passed·4 ignored, VDI 집중 59 passed·2 ignored; GPUI 목록·Ctrl+A·복사 진행/실패·키 디스패치 테스트 통과; 검증 전용 `-SeedVdi`·`-AutoCopyVdi`·`-InitialPanel VirtualDisk`로 합성 NTFS VDI를 격리 릴리스 앱에 주입하고 숨김/시스템 항목 17개를 대상 폴더에 복사, 937,234바이트와 `many_subdirs` 손상 사유를 확인; 캡처 `target/visual-validation/captures/vde019-loaded-vdi-021115.png`, `vde019-copy-summary-visible-021528.png`; 세션 종료 후 processCount=0·sessionCount=0·대상 루트 삭제 확인; 실제 VBox 생성 VDI와 독립 Visual Reviewer는 잔여; commit `87937dc` |
 | VDE-021 | DOCS | — | — | — | — | [x] | [x] | `VIRTUAL_DISK_BACKENDS.md`에 Oracle 공식 `guestcontrol` 계약, 오프라인/실행 중 VM 분리, credential 비저장, 취소·시간 제한·출력 제한·심볼릭 링크 경계를 기록; `VBoxManage.exe` PATH 미발견으로 실제 실행 VM E2E는 미수행; VDE-019 실제 E2E와 후속 구현 순서를 명시; commit `28dc516` push 완료 |
 | D-006 | RUST | [ ] | [ ] | — | — | [ ] | [ ] | — |
 | D-007 | RUST | [ ] | [ ] | — | — | [ ] | [ ] | — |
@@ -175,6 +175,28 @@ SHA-256을 기록한다. 다른 검증자의 독립 검토가 요구되는 UI �
 | D-011 | RUST | [x] | [x] | — | — | [x] | [x] | `app/src/app/watch.rs`에 `notify` 재귀 감시·작업별 2초 quiet debounce·변경 이벤트 기반 실행 예약을 구현; `debounce_coalesces_changes_until_two_seconds_are_quiet`, `realtime_watcher_reports_a_changed_file_after_polling`; 실제 임시 폴더 파일 변경 통합 테스트 포함; `cargo check -p gpui-convenience-tools --locked`; 전체 151 passed·4 ignored; Clippy exit 0(기존 경고 7건); commit `e68a3f6` push 완료 |
 | D-012 | RUST | [x] | [x] | — | — | [x] | [x] | watcher 생성·경로 감시 실패를 작업별 한 번만 보고하고 `SyncWatchFallback` 이벤트로 주기 모드 강등·로그·경고 토스트를 처리; `watch_failure_is_reported_once_until_the_job_mode_changes`, `file_sync_watch_fallback_downgrades_and_logs`; 전체 151 passed·4 ignored; Clippy exit 0(기존 경고 7건); commit `e68a3f6` push 완료 |
 | D-013 | E2E | [x] | [x] | [x] | [x] | [x] | [x] | 파일 동기화 설정에 `실시간 감시` 토글을 추가하고 실시간 모드에서는 주기 선택을 숨김; `file_sync_watch_mode_toggle_updates_selected_job`, `Verify-Workspace.ps1` 필수 GPUI 20개; 릴리스 `CLAUDE_LOCAL` 캡처 `target/visual-validation/captures/d011-realtime-panel-015924.png`에서 작업 카드의 `실시간` 상태·토글·2초 안내 확인; 종료 후 processCount=0·sessionCount=0; commit `e68a3f6` push 완료 |
+
+### 합성 VDI 릴리스 E2E
+
+실제 사용자 VDI와 사용자 데이터는 검증에 사용하지 않는다. 먼저 환경 변수로 합성 VDI를
+export하고, 하네스가 세션 전용 `source\seed.vdi`와 `target`을 만든 뒤 실제 release 앱에
+주입한다.
+
+```powershell
+$env:GPUI_CONVENIENCE_TOOLS_EXPORT_VDI_FIXTURE = "D:\검증\vde019-synthetic-ntfs.vdi"
+cargo test -p gpui-convenience-tools virtual_disk::vdi::tests::exports_ntfs_vdi_fixture_when_requested -- --nocapture
+
+scripts\Invoke-ClaudeVisualCheck.ps1 -Action Start `
+  -SeedVdi target\visual-validation\vde019-synthetic-ntfs.vdi `
+  -AutoCopyVdi -InitialPanel VirtualDisk -Width 1200 -Height 1000
+scripts\Invoke-ClaudeVisualCheck.ps1 -Action Capture -Name vde019-copy-summary
+scripts\Invoke-ClaudeVisualCheck.ps1 -Action Stop
+```
+
+`-AutoCopyVdi`는 검증 전용 환경 변수로만 선택 항목을 임시 대상에 복사한다. 캡처 후에는
+`processCount=0`, `sessionCount=0`, 임시 대상 루트 삭제를 확인한다. 이 경로는 합성 VDI와
+실제 release 앱의 통합 증거이며, VirtualBox가 직접 생성한 사용자 VDI와 독립 Visual Reviewer
+검토를 대신하지 않는다.
 
 ### 증거 기록 형식
 

@@ -30,7 +30,7 @@
 안전 경계: 원본 VDI는 read-only로만 열고, 실행 중 VM의 VDI 직접 읽기는 구현하지 않는다.
 실행 중 VM 지원은 후속 `GuestFileSource` 구현으로만 추가한다(VDE-021).
 
-**최종 측정**: 2026-09-22 · `app/src` 총 53개 파일 · 20,606줄
+**최종 측정**: 2026-09-22 · `app/src` 총 53개 파일 · 20,690줄
 
 ## 크기 기준 — 줄 수는 증상이다
 
@@ -44,7 +44,7 @@
 | 800~1,000 | 🟡 경고 | 다음 작업 전에 구조 리팩터링 |
 | 1,000 초과 | 🔴 위반 | **즉시 리팩터링.** 다른 작업보다 우선 |
 
-현재 🔴 위반 **없음**, 🟡 경고 **5개**. 최대 파일은 868줄(`virtual_disk/vdi.rs`)이며, 다음 VirtualBox UI 작업 전에 책임 단위 분할을 검토한다.
+현재 🔴 위반 **없음**, 🟡 경고 **5개**. 최대 파일은 883줄(`virtual_disk/vdi.rs`)이며, 다음 VirtualBox UI 작업 전에 책임 단위 분할을 검토한다.
 줄 수와 무관하게 처리하는 중복 헬퍼는 아래 「중복 헬퍼 추적」에서 관리한다.
 
 ### 줄 수 측정 명령
@@ -74,12 +74,12 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `sync_history.rs` | 223 | 동기화 완료 이력의 JSON 배열 저장·순서 보장·손상 파일 보존·개수/기간 보존·최신 목록 로드·소요 시간 계산 |
 | `util.rs` | 139 | 도메인 주인이 없는 순수 헬퍼 — `format_interval`·`interval_to_secs`·`TimeUnit` |
 
-### VirtualBox 도메인 (`app/src/virtual_disk/`) — 4,634줄 / 8파일
+### VirtualBox 도메인 (`app/src/virtual_disk/`) — 4,649줄 / 8파일
 
 | 파일 | 줄 | 책임 |
 | --- | ---: | --- |
 | `mod.rs` | 456 | VDI·파티션·게스트 파일 항목 모델, 정규화된 게스트 경로·시간 메타데이터, `GuestFileSource`, 플랫폼 비의존 오류 계약 |
-| `vdi.rs` | 868 | VDI 1.1 read-only 헤더·블록 맵·동적/고정 블록 읽기, 잠금·VM 사용·크기/mtime 안정성 가드, 합성 NTFS VDI 통합 픽스처 |
+| `vdi.rs` | 883 | VDI 1.1 read-only 헤더·블록 맵·동적/고정 블록 읽기, 잠금·VM 사용·크기/mtime 안정성 가드, 합성 NTFS VDI 통합 픽스처·검증 시드 export |
 | `partition.rs` | 791 | read-only `PartitionSource` 경계, MBR·EBR·protective MBR·GPT 검색, 양쪽 CRC·LBA 범위 검증, NTFS 3.1 부트 섹터 판정 |
 | `ntfs.rs` | 801 | 파티션 범위 `Read + Seek` 어댑터, NTFS 3.1 디렉터리·기본 데이터 스트림 읽기, 압축·암호화·범위·손상 오류와 속성·시간 보존, 고정/손상 픽스처 테스트 |
 | `path_policy.rs` | 335 | 절대 대상 루트 기준 게스트 경로 매핑, Windows 예약 이름·경로 길이 검증, 게스트·호스트 리파스 포인트/심볼릭 링크 추적 차단 |
@@ -96,13 +96,13 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `mod.rs` | 649 | 폴더 동기화 엔진 (UI 비의존 순수 로직) — 진행 보고·중지·이어서 시작·제외 glob·심볼릭 링크 안전 건너뜀 포함 |
 | `tests.rs` | 648 | 복사·건너뜀·심볼릭 링크 안전 건너뜀·읽기 전용 대상 덮어쓰기·미러 삭제·실패 사유·진행 보고·중지·이어서 시작·제외 glob 단위 테스트 |
 
-### 앱 루트 (`app/src/app/`) — 4,273줄 / 12파일
+### 앱 루트 (`app/src/app/`) — 4,336줄 / 12파일
 
 `app.rs`(1,798줄)를 책임별로 분할한 결과다.
 
 | 파일 | 줄 | 책임 |
 | --- | ---: | --- |
-| `mod.rs` | 758 | `AppRoot` 정의·생성자·검증 전용 초기 패널·동기화 이력 초기 로드·백그라운드 UI wake·사이드바(전역 스위치 2개 포함)·폭/VDI 억제 설정 복원·최상위 레이아웃 |
+| `mod.rs` | 790 | `AppRoot` 정의·생성자·검증 전용 초기 패널·VDI 시드 초기화·동기화 이력 초기 로드·백그라운드 UI wake·사이드바(전역 스위치 2개 포함)·폭/VDI 억제 설정 복원·최상위 레이아웃 |
 | `sync_ops.rs` | 457 | 파일 동기화 작업 조작 (추가·삭제·선택·이름·경로·제외 패턴 입력 저장·수동 실행 큐·중지·전역 스위치·커서 무효화) |
 | `interval.rs` | 313 | 주기 선택 상태(`IntervalPicker`)와 조작 — 프리셋 추가·삭제·드롭다운 동기화 |
 | `events.rs` | 326 | `PlatformEvent` 채널 소비, 진행 상태·동기화 이력·감시 실패 강등 반영, 로그·토스트 유틸 |
@@ -111,8 +111,8 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `ops.rs` | 195 | 광고 차단·서비스 관리·로그 설정 조작 |
 | `inputs.rs` | 136 | 입력 위젯(`InputState`) 지연 생성과 값 동기화 — 파일 동기화 제외 패턴 멀티라인 편집기 포함 |
 | `ui_state.rs` | 79 | `ServiceState`·`SyncState`·`AdBlockState`와 최근 동기화 이력 — 단일 `AppRoot` 엔티티가 소유하는 기능별 UI 상태 묶음 |
-| `virtual_disk_ops.rs` | 522 | VDI 경로 입력·read-only 열기·파티션 검색/선택·게스트 목록 새로고침·폴더 이동·다중 선택·포커스·안전 오류 안내·항목별 반복 알림 억제 저장, `GuestFileSource` 테스트 경계 |
-| `virtual_disk_copy.rs` | 463 | VDI 대상 폴더 입력·선택, 백그라운드 read-only 복사, 진행·중지·완료 요약·항목별 오류 로그·미억제 토스트 게이트·탐색기 keymap |
+| `virtual_disk_ops.rs` | 524 | VDI 경로 입력·read-only 열기·파티션 검색/선택·게스트 목록 새로고침·폴더 이동·다중 선택·포커스·안전 오류 안내·항목별 반복 알림 억제 저장·검증 시드 상태 |
+| `virtual_disk_copy.rs` | 492 | VDI 대상 폴더 입력·선택, 백그라운드 read-only 복사, 진행·중지·완료 요약·항목별 오류 로그·미억제 토스트 게이트·탐색기 keymap·검증 자동 복사 |
 | `watch.rs` | 303 | `notify` 재귀 watcher 소유·작업별 변경 이벤트 전달·2초 quiet debounce·감시 실패 중복 억제·작업 변경 시 정리 |
 
 ### GPUI 회귀 테스트 (`app/src/app/tests/`) — 1,970줄 / 6파일
@@ -129,7 +129,7 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `theme.rs` | 85 | 테마 전환과 스위치 가시성 |
 | `virtual_disk.rs` | 277 | VirtualBox 탐색 네비게이션·VDI 입력·파티션 카드·현재 경로·상위 이동·실제 목록·숨김/시스템 전체 선택·복사 진행/실패 요약·오류 억제 상태·키보드 단축키·안전/미지원 상태·새로고침 렌더 경계 |
 
-### 패널 (`app/src/window/`) — 4,118줄 / 11파일
+### 패널 (`app/src/window/`) — 4,146줄 / 11파일
 
 | 파일 | 줄 | 책임 |
 | --- | ---: | --- |
@@ -143,7 +143,7 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `interval.rs` | 154 | 주기 선택 렌더 — 드롭다운 + (값·단위·추가) 행 + 등록된 프리셋 목록 |
 | `log_view.rs` | 110 | 시스템 — 화면 로그 가상 리스트와 로그 파일 현황 |
 | `mod.rs` | 107 | 패널 모듈 선언 + `balanced_split`·`scroll_pane` 레이아웃 헬퍼 |
-| `virtual_disk.rs` | 621 | 편의 기능 — VDI 경로 입력·파티션 선택·게스트 현재 경로·행 선택·폴더/상위 이동·단축키 포커스·안전/미지원 상태·대상 폴더·복사 진행·오류 요약 억제/재표시·목록 새로고침 |
+| `virtual_disk.rs` | 627 | 편의 기능 — VDI 경로 입력·파티션 선택·게스트 현재 경로·행 선택·폴더/상위 이동·단축키 포커스·안전/미지원 상태·대상 폴더·복사 진행·오류 요약 억제/재표시·목록 새로고침·검증 자동 스크롤 |
 
 ### 플랫폼 (`app/src/platform/`) — 2,390줄 / 8파일
 
@@ -323,6 +323,7 @@ G-001 판단: `muted`는 비활성 의미이므로 테두리와 hover를 추가�
 | 2026-09-21 | `app/virtual_disk_ops.rs`·`window/virtual_disk.rs`·`app/tests/virtual_disk.rs` | VDE-017 안전·지원 상태 안내 | 실행 중 VM·잠금·미지원 파일시스템이 일반 읽기 실패와 구분되지 않음 | read-only 안전 경계 카드, 실행 중 VM/잠금 전용 오류, NTFS 3.1 지원 범위 안내, 미지원 파티션 경고, GPUI 상태 렌더 테스트와 920/1000/1280px 실제 캡처 | 실제 VBoxManage 실행 중 VM·미지원 이미지 E2E는 VDE-019에서 검증 |
 | 2026-09-21 | `virtual_disk/partition.rs`·`virtual_disk/vdi.rs`·`virtual_disk/ntfs.rs`·`app/testdata/ntfs-testfs1.img` | VDE-018 고정 NTFS/합성 VDI 검증 | 실제 이미지에 연결된 파티션의 파일시스템 판정과 원본 불변성 통합 증거 없음 | MBR 파티션의 NTFS 3.1 부트 섹터 판정, 고정 NTFS read-only 열거, 손상 복사본 거부, 합성 동적 VDI에서 파티션·루트·파일 읽기 및 VDI 바이트 불변성 테스트 | GPUI 파일 행·키보드·복사 UI E2E는 VDE-019에서 검증 |
 | 2026-09-21 | `app/virtual_disk_ops.rs`·`app/tests/virtual_disk.rs` | VDE-019 GPUI 목록·복사 상태 수용 테스트 착수 | 실제 파일 목록을 주입할 UI 테스트 seam과 복사 상태 렌더 검증이 없음 | `GuestFileSource` trait object 테스트 경계, 숨김·시스템 항목 포함 목록 렌더와 Ctrl+A 선택, 복사 진행·중지·실패 요약 카드 GPUI 테스트 2개 추가; 전체 137 passed·4 ignored | 실제 VirtualBox 패널 캡처·foreground 입력·복사 대상 E2E는 VDE-019 잔여 |
+| 2026-09-22 | `app/src/app/mod.rs`·`app/src/app/virtual_disk_ops.rs`·`app/src/app/virtual_disk_copy.rs`·`app/src/virtual_disk/vdi.rs`·`app/src/window/virtual_disk.rs`·`scripts/Invoke-ClaudeVisualCheck.ps1` | VDE-019 격리 합성 VDI 릴리스 E2E 보강 | 기존 하네스가 VirtualDisk 초기 패널과 실제 VDI 시드·복사 대상 검증을 지원하지 않음 | `-SeedVdi`·`-AutoCopyVdi`·`-InitialPanel VirtualDisk`와 검증 전용 환경 변수를 추가하고, 합성 NTFS VDI를 실제 release 앱에서 열어 숨김/시스템 항목 17개·937,234바이트 복사와 손상 항목 사유를 확인; 캡처 2건·전체 152 passed·4 ignored·Clippy 기존 경고 7건·53개 파일·20,690줄 기준 지도 갱신 | 실제 VBox 생성 VDI와 독립 Visual Reviewer는 VDE-019 잔여; 구현 commit `87937dc` push 완료 |
 | 2026-09-21 | `docs/VIRTUAL_DISK_BACKENDS.md` | VDE-021 실행 중 VM 백엔드 설계 검토 | `guestcontrol`을 오프라인 VDI 경로와 혼용할 위험과 실제 명령·자격 증명 경계 미정 | Oracle 공식 명령 계약, `GuestFileSource`/전송 capability 분리, read-only 명령 목록, credential 비저장, 취소·시간 제한·출력 제한, 격리 VM 선행 조건 기록 | `VBoxManage.exe` 미설치로 실제 Guest Control E2E는 후속; VDE-019 완료 전 구현 금지 |
 | 2026-09-22 | `app/src/sync/tests.rs`·`app/src/config.rs`·`docs/PROJECT_MAP.md` | T-001·T-002 회귀 테스트와 구조 지도 실측 갱신 | 읽기 전용 대상 덮어쓰기와 `update_config` 필드 보존을 전체 테스트에서 보장하지 않음; 일부 모듈 줄 수가 이전 기록과 불일치 | 두 회귀 테스트 추가, 격리 설정 경로 검증, 전체 139 passed·4 ignored·Clippy 기존 경고 7건, 50개 파일·19,486줄 기준으로 지도 갱신 | 전체 `cargo fmt --check`는 기존 baseline 불일치로 별도 보류; 기능 변경 없이 테스트·문서만 반영 |
 | 2026-09-22 | `app/src/window/ui.rs`·`file_sync.rs`·`interval.rs`·`service_mgr.rs`·`service_view.rs`·`app/mod.rs`·`scripts/Invoke-ClaudeVisualCheck.ps1` | G-001 버튼 스타일 덮어쓰기 정리 | 패널별 `border`·`hover`·`no_hover` 덮어쓰기로 공용 버튼 의미가 화면마다 달랐고 확장 메서드가 dead-code가 됨; foreground 안전 차단으로 패널 전환 캡처가 불가능했음 | 세 패널을 생성자 기본값으로 통일하고 확장 메서드 제거, 검증 전용 `-InitialPanel FileSync`·`-InitialPanel AutoStart` 경로 추가, 관련 GPUI 테스트·전체 145 passed·4 ignored·Clippy 기존 경고 7건, 52개 파일·20,101줄 기준 지도 갱신 | 격리 release 파일 동기화 캡처 `g001-file-sync-013019.png`·자동 시작 캡처 `g001-auto-start-013004.png` 성공, processCount=0·sessionCount=0; 독립 Visual Reviewer는 후속 |
@@ -393,7 +394,7 @@ G-001 판단: `muted`는 비활성 의미이므로 테두리와 hover를 추가�
 
 ### 2순위 — 책임 재배치·분할 (중복 제거 후에도 크면)
 
-- **`app/mod.rs` (758)** — 최대 파일이며 800줄 경고까지 42줄 남았다. `AppRoot` 필드가 30개에
+- **`app/mod.rs` (790)** — 800줄 경고까지 10줄 남았다. `AppRoot` 필드가 30개에
   가깝다. `TODO.md`의 「`AppRoot` 분할 검토」와 같은 항목이다. 다음에 커지면 사이드바 렌더를
   `app/sidebar.rs`로 떼는 것이 가장 자연스럽다.
 - **`app/tests/file_sync.rs` (794)** — 시나리오가 늘어 800줄 경고에 근접했다. 다음 감시·이력 시나리오가 추가되면
