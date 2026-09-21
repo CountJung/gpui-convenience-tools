@@ -13,6 +13,7 @@ use super::{
     GuestFileEntry, GuestFileKind, GuestFileSource, GuestPath, IoOperation, VirtualDiskError,
 };
 
+pub use super::metadata::{MetadataFailure, MetadataPolicy};
 pub use super::path_policy::HostPathPolicy;
 
 /// 대상 파일이 이미 있을 때 적용하는 복사 정책.
@@ -35,6 +36,7 @@ pub struct CopyReport {
     pub skipped_entries: u64,
     pub renamed_entries: u64,
     pub created_directories: u64,
+    pub metadata_failures: Vec<MetadataFailure>,
 }
 
 impl CopyReport {
@@ -44,6 +46,7 @@ impl CopyReport {
         self.skipped_entries += other.skipped_entries;
         self.renamed_entries += other.renamed_entries;
         self.created_directories += other.created_directories;
+        self.metadata_failures.extend(other.metadata_failures);
     }
 }
 
@@ -53,6 +56,7 @@ pub struct GuestCopyEngine {
     path_policy: HostPathPolicy,
     collision_policy: CollisionPolicy,
     chunk_bytes: usize,
+    metadata_policy: MetadataPolicy,
 }
 
 impl GuestCopyEngine {
@@ -71,6 +75,7 @@ impl GuestCopyEngine {
             path_policy,
             collision_policy,
             chunk_bytes,
+            metadata_policy: MetadataPolicy::default(),
         })
     }
 
@@ -84,6 +89,15 @@ impl GuestCopyEngine {
 
     pub const fn chunk_bytes(&self) -> usize {
         self.chunk_bytes
+    }
+
+    pub const fn metadata_policy(&self) -> MetadataPolicy {
+        self.metadata_policy
+    }
+
+    pub const fn with_metadata_policy(mut self, metadata_policy: MetadataPolicy) -> Self {
+        self.metadata_policy = metadata_policy;
+        self
     }
 
     /// 선택한 파일 또는 폴더를 대상 루트 아래에 복사한다.
@@ -129,6 +143,13 @@ impl GuestCopyEngine {
         }
 
         self.path_policy.validate_target_path(&destination)?;
+        report
+            .metadata_failures
+            .extend(super::metadata::apply_metadata(
+                &destination,
+                entry,
+                self.metadata_policy,
+            ));
         Ok(report)
     }
 
@@ -221,6 +242,14 @@ impl GuestCopyEngine {
             operation: IoOperation::Write,
             source,
         })?;
+        drop(output);
+        report
+            .metadata_failures
+            .extend(super::metadata::apply_metadata(
+                &destination,
+                entry,
+                self.metadata_policy,
+            ));
         report.copied_files = 1;
         report.copied_bytes = entry.size_bytes;
         Ok(report)
@@ -455,6 +484,7 @@ mod tests {
             kind: GuestFileKind::Directory,
             size_bytes: 0,
             attributes: GuestFileAttributes::default(),
+            times: crate::virtual_disk::GuestFileTimes::default(),
         }
     }
 
@@ -464,6 +494,7 @@ mod tests {
             kind: GuestFileKind::File,
             size_bytes: size_bytes as u64,
             attributes: GuestFileAttributes::default(),
+            times: crate::virtual_disk::GuestFileTimes::default(),
         }
     }
 

@@ -5,14 +5,17 @@
 //! 데이터 스트림은 모두 원본에 쓰지 않으며, 숨김·시스템·읽기 전용 속성은
 //! 필터링하지 않고 항목에 보존한다.
 
-use std::io::{self, Read, Seek, SeekFrom};
+use std::{
+    io::{self, Read, Seek, SeekFrom},
+    time::{Duration, SystemTime},
+};
 
 use ntfs::{indexes::NtfsFileNameIndex, structured_values::NtfsFileNamespace, Ntfs, NtfsReadSeek};
 
 use super::{
     partition::PartitionSource, GuestFileAttributes, GuestFileEntry, GuestFileKind,
-    GuestFileSource, GuestFileSystem, GuestPath, IoOperation, UnsupportedFormatKind, VdiPartition,
-    VirtualDiskError,
+    GuestFileSource, GuestFileSystem, GuestFileTimes, GuestPath, IoOperation,
+    UnsupportedFormatKind, VdiPartition, VirtualDiskError,
 };
 
 const NTFS_ATTRIBUTE_MASK: u32 = 0x0001
@@ -255,12 +258,18 @@ impl<S: PartitionSource> NtfsGuestFileSource<S> {
         let attributes = GuestFileAttributes::from_bits(
             file_name.file_attributes().bits() & NTFS_ATTRIBUTE_MASK,
         );
+        let times = GuestFileTimes {
+            created: ntfs_time_to_system_time(file_name.creation_time().nt_timestamp()),
+            modified: ntfs_time_to_system_time(file_name.modification_time().nt_timestamp()),
+            accessed: ntfs_time_to_system_time(file_name.access_time().nt_timestamp()),
+        };
 
         Ok(GuestFileEntry {
             path,
             kind,
             size_bytes,
             attributes,
+            times,
         })
     }
 }
@@ -307,10 +316,22 @@ impl<S: PartitionSource> GuestFileSource for NtfsGuestFileSource<S> {
             if name == "." || name == ".." {
                 continue;
             }
-            entries.push(
-                Self::entry_from_name(directory, &file_name)
-                    .map_err(|error| error.with_guest_path(&directory.path))?,
-            );
+            let mut guest_entry = Self::entry_from_name(directory, &file_name)
+                .map_err(|error| error.with_guest_path(&directory.path))?;
+            let file = entry.to_file(&self.ntfs, &mut self.fs).map_err(|error| {
+                map_ntfs_error(&mut self.fs, error, IoOperation::Read)
+                    .with_guest_path(&guest_entry.path)
+            })?;
+            let info = file.info().map_err(|error| {
+                map_ntfs_error(&mut self.fs, error, IoOperation::Read)
+                    .with_guest_path(&guest_entry.path)
+            })?;
+            guest_entry.times = GuestFileTimes {
+                created: ntfs_time_to_system_time(info.creation_time().nt_timestamp()),
+                modified: ntfs_time_to_system_time(info.modification_time().nt_timestamp()),
+                accessed: ntfs_time_to_system_time(info.access_time().nt_timestamp()),
+            };
+            entries.push(guest_entry);
         }
         Ok(entries)
     }
@@ -399,6 +420,23 @@ impl<S: PartitionSource> GuestFileSource for NtfsGuestFileSource<S> {
         value.read(&mut self.fs, buffer).map_err(|error| {
             map_ntfs_error(&mut self.fs, error, IoOperation::Read).with_guest_path(&file.path)
         })
+    }
+}
+
+fn ntfs_time_to_system_time(timestamp: u64) -> Option<SystemTime> {
+    const NTFS_EPOCH_IN_100NS: i128 = 116_444_736_000_000_000;
+    const HUNDRED_NANOS_PER_SECOND: i128 = 10_000_000;
+
+    let unix_intervals = timestamp as i128 - NTFS_EPOCH_IN_100NS;
+    if unix_intervals >= 0 {
+        let seconds = unix_intervals / HUNDRED_NANOS_PER_SECOND;
+        let nanos = (unix_intervals % HUNDRED_NANOS_PER_SECOND) * 100;
+        Some(SystemTime::UNIX_EPOCH + Duration::new(seconds as u64, nanos as u32))
+    } else {
+        let magnitude = -unix_intervals;
+        let seconds = magnitude / HUNDRED_NANOS_PER_SECOND;
+        let nanos = (magnitude % HUNDRED_NANOS_PER_SECOND) * 100;
+        Some(SystemTime::UNIX_EPOCH - Duration::new(seconds as u64, nanos as u32))
     }
 }
 
@@ -603,6 +641,14 @@ mod tests {
         assert!(attributes.contains(GuestFileAttributes::SYSTEM));
         assert!(attributes.contains(GuestFileAttributes::READ_ONLY));
         assert_eq!(attributes.bits() & 0x8000_0000, 0);
+    }
+
+    #[test]
+    fn ntfs_timestamp_conversion_preserves_unix_time() {
+        let expected = SystemTime::UNIX_EPOCH + Duration::from_secs(1_600_000_000);
+        let ntfs_timestamp = 116_444_736_000_000_000u64 + 1_600_000_000u64 * 10_000_000;
+
+        assert_eq!(ntfs_time_to_system_time(ntfs_timestamp), Some(expected));
     }
 
     #[test]

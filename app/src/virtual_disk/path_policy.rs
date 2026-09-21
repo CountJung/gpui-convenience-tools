@@ -252,6 +252,7 @@ mod tests {
             kind: super::super::GuestFileKind::File,
             size_bytes: 1,
             attributes,
+            times: super::super::GuestFileTimes::default(),
         }
     }
 

@@ -7,12 +7,13 @@
 #![allow(dead_code)]
 
 pub mod copy;
+pub mod metadata;
 pub mod ntfs;
 pub mod partition;
 pub mod path_policy;
 pub mod vdi;
 
-use std::{fmt, io, path::PathBuf};
+use std::{fmt, io, path::PathBuf, time::SystemTime};
 
 use thiserror::Error;
 
@@ -226,6 +227,15 @@ pub struct GuestFileEntry {
     pub kind: GuestFileKind,
     pub size_bytes: u64,
     pub attributes: GuestFileAttributes,
+    pub times: GuestFileTimes,
+}
+
+/// 게스트 파일 항목에서 호스트로 전달할 수 있는 시간 메타데이터.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct GuestFileTimes {
+    pub created: Option<SystemTime>,
+    pub modified: Option<SystemTime>,
+    pub accessed: Option<SystemTime>,
 }
 
 impl GuestFileEntry {
@@ -235,6 +245,7 @@ impl GuestFileEntry {
             kind: GuestFileKind::Directory,
             size_bytes: 0,
             attributes: GuestFileAttributes::default(),
+            times: GuestFileTimes::default(),
         }
     }
 
