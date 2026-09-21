@@ -208,7 +208,7 @@ fn virtual_disk_panel_renders_copy_progress_and_issue_summary(cx: &mut TestAppCo
         root
     });
 
-    cx.simulate_resize(size(px(DEFAULT_WINDOW_WIDTH), px(DEFAULT_WINDOW_HEIGHT)));
+    cx.simulate_resize(size(px(1200.0), px(1000.0)));
     refresh(cx);
     assert!(cx.debug_bounds("virtual-disk-copy-progress").is_some());
     assert!(cx.debug_bounds("virtual-disk-copy-stop").is_some());
@@ -237,19 +237,30 @@ fn virtual_disk_panel_renders_copy_progress_and_issue_summary(cx: &mut TestAppCo
         "each copy issue should expose a repeat-notification suppression action"
     );
 
-    cx.update(|window, app| {
-        view.update(app, |root, cx| {
-            root.toggle_virtual_disk_issue_suppression("지원 불가:.hidden.sys", window, cx);
-        });
-    });
-    refresh(cx);
+    click_debug_element(cx, "virtual-disk-issue-suppress-0");
     let suppressed = cx.update(|_, app| {
         view.read(app)
             .virtual_disk
             .suppressed_issue_keys
             .contains("지원 불가:.hidden.sys")
     });
-    assert!(suppressed, "confirming an issue should suppress repeat notifications");
+    assert!(
+        suppressed,
+        "clicking the issue action should suppress repeat notifications"
+    );
+
+    click_debug_element(cx, "virtual-disk-issue-suppress-0");
+    let unsuppressed = cx.update(|_, app| {
+        !view
+            .read(app)
+            .virtual_disk
+            .suppressed_issue_keys
+            .contains("지원 불가:.hidden.sys")
+    });
+    assert!(
+        unsuppressed,
+        "clicking the issue action again should restore repeat notifications"
+    );
 }
 
 #[gpui::test]

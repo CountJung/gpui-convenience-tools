@@ -636,6 +636,12 @@ VDE-011에서 분리된 메타데이터 실패와 복사 중 원본 변경·대�
 121 passed·4 ignored, 일반 Clippy 통과로 수행했다. `-D warnings`는 기존 경고 7건 때문에
 적용하지 않았다.
 
+후속 UI 연결에서는 오류 요약 카드의 억제 버튼을 상태 메서드 직접 호출이 아니라 GPUI
+`simulate_click`로 눌러 억제·재표시 양방향 dispatch를 확인했다. 테스트 창은 1200×1000으로
+고정해 카드가 표시 영역 밖으로 밀리지 않도록 했으며, 전체 155 passed·4 ignored와 Clippy
+exit 0(기존 경고 7건)을 다시 확인했다. 실제 릴리스 버튼 조작과 독립 Visual Reviewer는
+VDE-012의 잔여 게이트다.
+
 ### Phase O-12 — VDE-013 오프라인 VDI 탐색기 셸 착수
 
 VirtualBox 오프라인 도메인을 GPUI에서 안전하게 시작할 수 있는 첫 화면과 상태 경계를
