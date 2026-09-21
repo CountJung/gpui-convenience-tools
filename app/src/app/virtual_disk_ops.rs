@@ -30,7 +30,7 @@ pub(crate) struct VirtualDiskSession {
     pub(crate) selected_paths: HashSet<GuestPath>,
     pub(crate) focus_handle: Option<FocusHandle>,
     pub(crate) copy: VirtualDiskCopyState,
-    pub(crate) source: Option<NtfsGuestFileSource<VdiReader>>,
+    pub(crate) source: Option<Box<dyn GuestFileSource>>,
     pub(crate) error: Option<String>,
 }
 
@@ -151,7 +151,7 @@ impl AppRoot {
         })();
         match result {
             Ok(source) => {
-                self.virtual_disk.source = Some(source);
+                self.virtual_disk.source = Some(Box::new(source));
                 self.virtual_disk.selected_partition = Some(index);
                 self.virtual_disk.current_path = GuestPath::root();
                 self.virtual_disk.selected_paths.clear();

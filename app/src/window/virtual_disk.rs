@@ -1,8 +1,8 @@
 //! VirtualBox 오프라인 VDI 탐색 패널.
 //!
-//! VDE-013~017 범위는 VDI 경로 입력, 파티션 선택, 현재 게스트 경로, 목록 표시,
+//! VDE-013~019 범위는 VDI 경로 입력, 파티션 선택, 현재 게스트 경로, 목록 표시,
 //! 폴더 이동·복사·키보드 단축키와 안전/지원 상태 안내를 제공한다. 실제 이미지 E2E는
-//! VDE-018~019에서 검증한다.
+//! VDE-019에서 검증한다.
 
 use gpui::{
     div, px, AnyElement, ClickEvent, Context, InteractiveElement, IntoElement, ParentElement,

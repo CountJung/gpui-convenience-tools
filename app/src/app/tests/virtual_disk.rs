@@ -1,6 +1,77 @@
 //! VirtualBox 탐색기 VDE-013~014 UI 회귀 테스트.
 
 use super::*;
+use crate::app::virtual_disk_copy::{VirtualDiskCopyProgress, VirtualDiskCopySummary};
+use crate::virtual_disk::{
+    copy::CopyIssue, issues::CopyIssueKind, GuestFileEntry, GuestFileKind, GuestFileSource,
+    GuestFileSystem, VdiPartition, VirtualDiskError,
+};
+
+struct TestGuestSource {
+    entries: Vec<GuestFileEntry>,
+}
+
+impl GuestFileSource for TestGuestSource {
+    fn filesystem(&self) -> GuestFileSystem {
+        GuestFileSystem::ntfs_3_1()
+    }
+
+    fn list_directory(
+        &mut self,
+        _directory: &GuestFileEntry,
+    ) -> Result<Vec<GuestFileEntry>, VirtualDiskError> {
+        Ok(self.entries.clone())
+    }
+
+    fn read_at(
+        &mut self,
+        _file: &GuestFileEntry,
+        _offset: u64,
+        buffer: &mut [u8],
+    ) -> Result<usize, VirtualDiskError> {
+        buffer.fill(0);
+        Ok(buffer.len())
+    }
+}
+
+fn loaded_entries() -> Vec<GuestFileEntry> {
+    vec![
+        GuestFileEntry {
+            path: crate::virtual_disk::GuestPath::new(".hidden.sys").unwrap(),
+            kind: GuestFileKind::File,
+            size_bytes: 12,
+            attributes: crate::virtual_disk::GuestFileAttributes::from_bits(
+                crate::virtual_disk::GuestFileAttributes::HIDDEN.bits()
+                    | crate::virtual_disk::GuestFileAttributes::SYSTEM.bits(),
+            ),
+            times: Default::default(),
+        },
+        GuestFileEntry {
+            path: crate::virtual_disk::GuestPath::new("visible.txt").unwrap(),
+            kind: GuestFileKind::File,
+            size_bytes: 24,
+            attributes: Default::default(),
+            times: Default::default(),
+        },
+    ]
+}
+
+fn loaded_virtual_disk_root() -> AppRoot {
+    let mut root = test_app_root(ActivePanel::VirtualDisk);
+    let entries = loaded_entries();
+    root.virtual_disk.vdi_path = Some(std::path::PathBuf::from("fixture.vdi"));
+    root.virtual_disk.partitions.push(VdiPartition {
+        number: 1,
+        table: crate::virtual_disk::PartitionTableKind::Mbr,
+        start_lba: 1,
+        sector_count: 4096,
+        filesystem: Some(GuestFileSystem::ntfs_3_1()),
+    });
+    root.virtual_disk.selected_partition = Some(0);
+    root.virtual_disk.entries = entries.clone();
+    root.virtual_disk.source = Some(Box::new(TestGuestSource { entries }));
+    root
+}
 
 #[gpui::test]
 fn virtual_disk_panel_registers_navigation_and_renders_read_only_shell(cx: &mut TestAppContext) {
@@ -93,6 +164,74 @@ fn virtual_disk_panel_explains_unsupported_partition_state(cx: &mut TestAppConte
             .is_some(),
         "unsupported filesystem guidance should be visible"
     );
+}
+
+#[gpui::test]
+fn virtual_disk_panel_renders_loaded_hidden_entries_and_selects_all_with_ctrl_a(
+    cx: &mut TestAppContext,
+) {
+    initialize_components(cx);
+    let (view, cx) = cx.add_window_view(|_, _| loaded_virtual_disk_root());
+
+    cx.simulate_resize(size(px(DEFAULT_WINDOW_WIDTH), px(DEFAULT_WINDOW_HEIGHT)));
+    refresh(cx);
+
+    assert!(cx.debug_bounds("virtual-disk-entry-0").is_some());
+    assert!(cx.debug_bounds("virtual-disk-entry-1").is_some());
+
+    click_debug_element(cx, "virtual-disk-directory-card");
+    cx.simulate_keystrokes("ctrl-a");
+    refresh(cx);
+
+    let selected_count = cx.update(|_, app| view.read(app).virtual_disk.selected_paths.len());
+    assert_eq!(
+        selected_count, 2,
+        "Ctrl+A should include hidden/system entries"
+    );
+}
+
+#[gpui::test]
+fn virtual_disk_panel_renders_copy_progress_and_issue_summary(cx: &mut TestAppContext) {
+    initialize_components(cx);
+    let (view, cx) = cx.add_window_view(|_, _| {
+        let mut root = loaded_virtual_disk_root();
+        root.virtual_disk.copy.progress = Some(VirtualDiskCopyProgress {
+            total_entries: 2,
+            completed_entries: 1,
+            current_path: ".hidden.sys".to_string(),
+            copied_files: 1,
+            copied_bytes: 12,
+            skipped_entries: 0,
+            failed_entries: 0,
+            stopping: true,
+        });
+        root
+    });
+
+    cx.simulate_resize(size(px(DEFAULT_WINDOW_WIDTH), px(DEFAULT_WINDOW_HEIGHT)));
+    refresh(cx);
+    assert!(cx.debug_bounds("virtual-disk-copy-progress").is_some());
+    assert!(cx.debug_bounds("virtual-disk-copy-stop").is_some());
+
+    cx.update(|_, app| {
+        view.update(app, |root, cx| {
+            root.virtual_disk.copy.progress = None;
+            root.virtual_disk.copy.summary = Some(VirtualDiskCopySummary {
+                failed_entries: 1,
+                issues: vec![CopyIssue {
+                    path: ".hidden.sys".to_string(),
+                    kind: CopyIssueKind::Unsupported,
+                    detail: "압축된 스트림".to_string(),
+                }],
+                ..VirtualDiskCopySummary::default()
+            });
+            cx.notify();
+        });
+    });
+    refresh(cx);
+
+    assert!(cx.debug_bounds("virtual-disk-copy-summary").is_some());
+    assert!(cx.debug_bounds("virtual-disk-copy-start").is_some());
 }
 
 #[gpui::test]

@@ -67,7 +67,7 @@
 
 ### O-5. 검증·후속 백엔드
 
-- [ ] VDE-019 | 0% | GPUI 자체 테스트로 파일 목록·숨김 항목·키보드 조작·복사 상태·오류 억제를 검증하고 실제 창 캡처를 남김
+- [ ] VDE-019 | 70% | GPUI 자체 테스트로 실제 파일 목록·숨김/시스템 항목·키보드 조작·복사 진행/실패 요약 상태를 검증 완료; 실제 VirtualBox 패널 창 캡처와 독립 Visual Reviewer 확인, 복사 대상 E2E는 후속
 - [ ] VDE-020 | 0% | `PROJECT_MAP.md`에 모듈별 줄 수·책임·공용 유틸을 갱신하고 `MASTER_PLAN.md`에 Phase O 완료 이력 기록
 - [ ] VDE-021 | 0% | 오프라인 기능 안정화 후에만 실행 중 VM용 `VBoxManage guestcontrol` `GuestFileSource` 백엔드의 별도 설계 검토
 
