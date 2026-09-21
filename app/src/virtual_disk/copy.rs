@@ -7,6 +7,7 @@ use std::{
     fs,
     io::{self, Write},
     path::{Path, PathBuf},
+    sync::atomic::{AtomicBool, Ordering},
 };
 
 use super::{
@@ -32,6 +33,7 @@ pub enum CollisionPolicy {
 /// 한 번의 게스트 파일·폴더 복사 결과.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct CopyReport {
+    pub cancelled: bool,
     pub copied_files: u64,
     pub copied_bytes: u64,
     pub skipped_entries: u64,
@@ -43,6 +45,7 @@ pub struct CopyReport {
 
 impl CopyReport {
     pub(crate) fn merge(&mut self, other: Self) {
+        self.cancelled |= other.cancelled;
         self.copied_files += other.copied_files;
         self.copied_bytes += other.copied_bytes;
         self.skipped_entries += other.skipped_entries;
@@ -112,8 +115,8 @@ impl GuestCopyEngine {
         let destination = self.path_policy.map_entry(entry)?;
 
         match entry.kind {
-            GuestFileKind::File => self.copy_file(source, entry, &destination),
-            GuestFileKind::Directory => self.copy_directory(source, entry, &destination),
+            GuestFileKind::File => self.copy_file(source, entry, &destination, None),
+            GuestFileKind::Directory => self.copy_directory(source, entry, &destination, None),
         }
     }
 
@@ -127,7 +130,35 @@ impl GuestCopyEngine {
         entry: &GuestFileEntry,
         issue_log: &mut CopyIssueLog,
     ) -> CopyReport {
+        self.copy_entry_collecting_controlled(source, entry, issue_log, None)
+    }
+
+    /// 복사 중 청크 단위 중지를 지원하면서 항목별 오류를 수집한다.
+    ///
+    /// `cancel`이 설정되면 현재 파일의 부분 결과를 제거하고, 상위 디렉터리와
+    /// 형제 항목 순회를 더 진행하지 않는다. 이미 완료된 항목의 결과는 유지한다.
+    pub fn copy_entry_collecting_with_cancel<S: GuestFileSource>(
+        &self,
+        source: &mut S,
+        entry: &GuestFileEntry,
+        issue_log: &mut CopyIssueLog,
+        cancel: &AtomicBool,
+    ) -> CopyReport {
+        self.copy_entry_collecting_controlled(source, entry, issue_log, Some(cancel))
+    }
+
+    fn copy_entry_collecting_controlled<S: GuestFileSource>(
+        &self,
+        source: &mut S,
+        entry: &GuestFileEntry,
+        issue_log: &mut CopyIssueLog,
+        cancel: Option<&AtomicBool>,
+    ) -> CopyReport {
         let mut report = CopyReport::default();
+        if is_cancelled(cancel) {
+            report.cancelled = true;
+            return report;
+        }
         let destination = match self.path_policy.map_entry(entry) {
             Ok(destination) => destination,
             Err(error) => {
@@ -137,15 +168,20 @@ impl GuestCopyEngine {
         };
 
         match entry.kind {
-            GuestFileKind::File => match self.copy_file(source, entry, &destination) {
+            GuestFileKind::File => match self.copy_file(source, entry, &destination, cancel) {
                 Ok(child_report) => {
                     self.merge_collected_report(&mut report, child_report, issue_log)
                 }
                 Err(error) => self.record_issue(&mut report, issue_log, &entry.path, &error),
             },
-            GuestFileKind::Directory => {
-                self.copy_directory_collecting(source, entry, &destination, &mut report, issue_log)
-            }
+            GuestFileKind::Directory => self.copy_directory_collecting(
+                source,
+                entry,
+                &destination,
+                &mut report,
+                issue_log,
+                cancel,
+            ),
         }
         report
     }
@@ -157,7 +193,12 @@ impl GuestCopyEngine {
         destination: &Path,
         report: &mut CopyReport,
         issue_log: &mut CopyIssueLog,
+        cancel: Option<&AtomicBool>,
     ) {
+        if is_cancelled(cancel) {
+            report.cancelled = true;
+            return;
+        }
         let destination = match self.prepare_directory(destination, report) {
             Ok(Some(destination)) => destination,
             Ok(None) => return,
@@ -175,6 +216,10 @@ impl GuestCopyEngine {
         };
 
         for child in children {
+            if is_cancelled(cancel) {
+                report.cancelled = true;
+                return;
+            }
             if let Err(error) = self.path_policy.map_entry(&child) {
                 self.record_issue(report, issue_log, &child.path, &error);
                 continue;
@@ -188,19 +233,31 @@ impl GuestCopyEngine {
                 }
             };
             match child.kind {
-                GuestFileKind::File => match self.copy_file(source, &child, &child_destination) {
-                    Ok(child_report) => {
-                        self.merge_collected_report(report, child_report, issue_log)
+                GuestFileKind::File => {
+                    match self.copy_file(source, &child, &child_destination, cancel) {
+                        Ok(child_report) => {
+                            let cancelled = child_report.cancelled;
+                            self.merge_collected_report(report, child_report, issue_log);
+                            if cancelled {
+                                return;
+                            }
+                        }
+                        Err(error) => self.record_issue(report, issue_log, &child.path, &error),
                     }
-                    Err(error) => self.record_issue(report, issue_log, &child.path, &error),
-                },
-                GuestFileKind::Directory => self.copy_directory_collecting(
-                    source,
-                    &child,
-                    &child_destination,
-                    report,
-                    issue_log,
-                ),
+                }
+                GuestFileKind::Directory => {
+                    self.copy_directory_collecting(
+                        source,
+                        &child,
+                        &child_destination,
+                        report,
+                        issue_log,
+                        cancel,
+                    );
+                    if report.cancelled {
+                        return;
+                    }
+                }
             }
         }
 
@@ -254,8 +311,13 @@ impl GuestCopyEngine {
         source: &mut S,
         entry: &GuestFileEntry,
         destination: &Path,
+        cancel: Option<&AtomicBool>,
     ) -> Result<CopyReport, VirtualDiskError> {
         let mut report = CopyReport::default();
+        if is_cancelled(cancel) {
+            report.cancelled = true;
+            return Ok(report);
+        }
         let Some(destination) = self.prepare_directory(destination, &mut report)? else {
             return Ok(report);
         };
@@ -264,17 +326,27 @@ impl GuestCopyEngine {
             .list_directory(entry)
             .map_err(|error| error.with_guest_path(&entry.path))?;
         for child in children {
+            if is_cancelled(cancel) {
+                report.cancelled = true;
+                return Ok(report);
+            }
             // 먼저 원래 게스트 경로의 안전성을 검사한 다음, 부모 디렉터리가 충돌로
             // 이름을 바꿨다면 자식도 그 새 대상 아래에 배치한다.
             self.path_policy.map_entry(&child)?;
             let child_destination = self.child_destination(&destination, &entry.path, &child)?;
             let child_report = match child.kind {
-                GuestFileKind::File => self.copy_file(source, &child, &child_destination)?,
+                GuestFileKind::File => {
+                    self.copy_file(source, &child, &child_destination, cancel)?
+                }
                 GuestFileKind::Directory => {
-                    self.copy_directory(source, &child, &child_destination)?
+                    self.copy_directory(source, &child, &child_destination, cancel)?
                 }
             };
+            let cancelled = child_report.cancelled;
             report.merge(child_report);
+            if cancelled {
+                return Ok(report);
+            }
         }
 
         self.path_policy.validate_target_path(&destination)?;
@@ -321,8 +393,13 @@ impl GuestCopyEngine {
         source: &mut S,
         entry: &GuestFileEntry,
         destination: &Path,
+        cancel: Option<&AtomicBool>,
     ) -> Result<CopyReport, VirtualDiskError> {
         let mut report = CopyReport::default();
+        if is_cancelled(cancel) {
+            report.cancelled = true;
+            return Ok(report);
+        }
         let Some(destination) = self.prepare_file(destination, &mut report)? else {
             return Ok(report);
         };
@@ -340,6 +417,12 @@ impl GuestCopyEngine {
         let mut offset = 0u64;
         let mut buffer = vec![0u8; self.chunk_bytes];
         while offset < entry.size_bytes {
+            if is_cancelled(cancel) {
+                drop(output);
+                Self::remove_cancelled_file(&destination)?;
+                report.cancelled = true;
+                return Ok(report);
+            }
             let remaining = entry.size_bytes - offset;
             let requested = remaining.min(buffer.len() as u64) as usize;
             let read = source
@@ -350,6 +433,13 @@ impl GuestCopyEngine {
                     "게스트 파일 '{}'을 읽는 중 예상보다 일찍 끝났습니다 (offset={}, requested={}, read={})",
                     entry.path, offset, requested, read
                 )));
+            }
+
+            if is_cancelled(cancel) {
+                drop(output);
+                Self::remove_cancelled_file(&destination)?;
+                report.cancelled = true;
+                return Ok(report);
             }
 
             output
@@ -376,6 +466,13 @@ impl GuestCopyEngine {
         report.copied_files = 1;
         report.copied_bytes = entry.size_bytes;
         Ok(report)
+    }
+
+    fn remove_cancelled_file(path: &Path) -> Result<(), VirtualDiskError> {
+        fs::remove_file(path).map_err(|source| VirtualDiskError::Io {
+            operation: IoOperation::RemoveFile,
+            source,
+        })
     }
 
     fn ensure_parent_directory(
@@ -513,6 +610,10 @@ impl GuestCopyEngine {
     }
 }
 
+fn is_cancelled(cancel: Option<&AtomicBool>) -> bool {
+    cancel.is_some_and(|flag| flag.load(Ordering::Relaxed))
+}
+
 fn existing_metadata(path: &Path) -> Result<Option<fs::Metadata>, VirtualDiskError> {
     match fs::symlink_metadata(path) {
         Ok(metadata) => Ok(Some(metadata)),
@@ -543,6 +644,10 @@ fn collision_path(destination: &Path, index: u64) -> PathBuf {
 mod tests {
     use std::{
         collections::HashMap,
+        sync::{
+            atomic::{AtomicBool, Ordering},
+            Arc,
+        },
         time::{SystemTime, UNIX_EPOCH},
     };
 
@@ -554,6 +659,8 @@ mod tests {
         files: HashMap<String, Vec<u8>>,
         directories: HashMap<String, Vec<GuestFileEntry>>,
         requested_chunks: Vec<usize>,
+        cancel_after_chunks: Option<usize>,
+        cancel: Option<Arc<AtomicBool>>,
     }
 
     impl GuestFileSource for FixtureSource {
@@ -578,6 +685,11 @@ mod tests {
             buffer: &mut [u8],
         ) -> Result<usize, VirtualDiskError> {
             self.requested_chunks.push(buffer.len());
+            if self.cancel_after_chunks == Some(self.requested_chunks.len()) {
+                if let Some(cancel) = &self.cancel {
+                    cancel.store(true, Ordering::Relaxed);
+                }
+            }
             let contents = self
                 .files
                 .get(file.path.as_str())
@@ -629,6 +741,8 @@ mod tests {
             files: HashMap::from([(file.path.to_string(), b"0123456789".to_vec())]),
             directories: HashMap::from([("folder".to_string(), vec![file.clone()])]),
             requested_chunks: Vec::new(),
+            cancel_after_chunks: None,
+            cancel: None,
         };
         (source, directory, file)
     }
@@ -671,6 +785,30 @@ mod tests {
             fs::read(destination.join("folder/data.txt")).unwrap(),
             b"0123456789"
         );
+        fs::remove_dir_all(destination).unwrap();
+    }
+
+    #[test]
+    fn cancellation_stops_between_chunks_and_removes_partial_file() {
+        let destination = test_destination("cancel-chunks");
+        let (mut source, _, file) = fixture_source();
+        let cancel = Arc::new(AtomicBool::new(false));
+        source.cancel_after_chunks = Some(2);
+        source.cancel = Some(Arc::clone(&cancel));
+        let mut issue_log = CopyIssueLog::default();
+
+        let report = engine(&destination, CollisionPolicy::Skip).copy_entry_collecting_with_cancel(
+            &mut source,
+            &file,
+            &mut issue_log,
+            &cancel,
+        );
+
+        assert!(report.cancelled);
+        assert_eq!(report.copied_files, 0);
+        assert_eq!(source.requested_chunks, vec![3, 3]);
+        assert!(!destination.join("folder/data.txt").exists());
+        assert!(issue_log.issues().is_empty());
         fs::remove_dir_all(destination).unwrap();
     }
 

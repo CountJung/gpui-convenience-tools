@@ -372,7 +372,12 @@ impl AppRoot {
         let unsuppressed_issue_count = summary
             .issues
             .iter()
-            .filter(|issue| !self.virtual_disk.suppressed_issue_keys.contains(&issue.key()))
+            .filter(|issue| {
+                !self
+                    .virtual_disk
+                    .suppressed_issue_keys
+                    .contains(&issue.key())
+            })
             .count();
         self.virtual_disk.copy.progress = None;
         self.virtual_disk.copy.summary = Some(summary);
@@ -451,14 +456,23 @@ fn copy_selected_entries(
             if cancel.load(Ordering::Relaxed) {
                 return Ok((report, true));
             }
-            let item_report = engine.copy_entry_collecting(&mut source, entry, &mut issue_log);
+            let item_report = engine.copy_entry_collecting_with_cancel(
+                &mut source,
+                entry,
+                &mut issue_log,
+                &cancel,
+            );
+            let item_cancelled = item_report.cancelled;
             report.merge(item_report);
             let _ = event_tx.send(PlatformEvent::VirtualDiskCopyProgress {
-                completed_entries: index + 1,
+                completed_entries: if item_cancelled { index } else { index + 1 },
                 total_entries,
                 current_path: entry.path.to_string(),
                 report: report.clone(),
             });
+            if item_cancelled {
+                return Ok((report, true));
+            }
         }
         Ok((report, false))
     })();

@@ -19,7 +19,7 @@
 | `app/src/virtual_disk/partition.rs` | **구현됨** — MBR·EBR·protective MBR·GPT 검색과 CRC·범위 검증 | VDE-006 |
 | `app/src/virtual_disk/ntfs.rs` | **구현됨** — NTFS 디렉터리 열거·기본 데이터 스트림 읽기·속성 보존·항목별 오류 경계 | VDE-007~008 |
 | `app/src/virtual_disk/path_policy.rs` | **구현됨** — 게스트 경로의 호스트 매핑, 예약 이름·길이·링크 추적 안전 정책 | VDE-009 |
-| `app/src/virtual_disk/copy.rs` | **구현됨** — 선택 파일·폴더의 청크 복사와 건너뜀·덮어쓰기·새 이름 충돌 정책, 메타데이터 결과 집계 | VDE-010~011 |
+| `app/src/virtual_disk/copy.rs` | **구현됨** — 선택 파일·폴더의 청크 복사와 건너뜀·덮어쓰기·새 이름 충돌 정책, 메타데이터 결과 집계, 청크 단위 중지와 부분 파일 정리 | VDE-010~011·015 |
 | `app/src/virtual_disk/issues.rs` | **구현됨** — 원본 변경·대상 쓰기·지원 불가·메타데이터 오류 분류, 부분 복사 결과와 항목별 억제 키 | VDE-012 |
 | `app/src/virtual_disk/metadata.rs` | **구현됨** — 호스트 파일 속성·타임스탬프 적용과 구조화된 적용 실패 결과 | VDE-011 |
 | `app/src/window/virtual_disk.rs` | VDI 선택·파티션·탐색·파일 행 선택·상위 이동·단축키·진행 UI | VDE-013~017 |
@@ -30,7 +30,7 @@
 안전 경계: 원본 VDI는 read-only로만 열고, 실행 중 VM의 VDI 직접 읽기는 구현하지 않는다.
 실행 중 VM 지원은 후속 `GuestFileSource` 구현으로만 추가한다(VDE-021).
 
-**최종 측정**: 2026-09-22 · `app/src` 총 55개 파일 · 21,008줄
+**최종 측정**: 2026-09-22 · `app/src` 총 55개 파일 · 21,162줄
 
 ## 크기 기준 — 줄 수는 증상이다
 
@@ -44,7 +44,7 @@
 | 800~1,000 | 🟡 경고 | 다음 작업 전에 구조 리팩터링 |
 | 1,000 초과 | 🔴 위반 | **즉시 리팩터링.** 다른 작업보다 우선 |
 
-현재 🔴 위반 **없음**, 🟡 경고 **3개**. 최대 파일은 834줄(`virtual_disk/copy.rs`)이며, 다음 VirtualBox UI 작업 전에 책임 단위 분할을 검토한다.
+현재 🔴 위반 **없음**, 🟡 경고 **3개**. 최대 파일은 972줄(`virtual_disk/copy.rs`)이며, 1,000줄에 도달하기 전에 복사 테스트 책임 분할을 검토한다.
 줄 수와 무관하게 처리하는 중복 헬퍼는 아래 「중복 헬퍼 추적」에서 관리한다.
 
 `scripts/Assert-ProjectStructure.ps1`가 이 측정값을 자동 대조한다. 소스 파일을 추가·삭제·
@@ -77,7 +77,7 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `sync_history.rs` | 223 | 동기화 완료 이력의 JSON 배열 저장·순서 보장·손상 파일 보존·개수/기간 보존·최신 목록 로드·소요 시간 계산 |
 | `util.rs` | 139 | 도메인 주인이 없는 순수 헬퍼 — `format_interval`·`interval_to_secs`·`TimeUnit` |
 
-### VirtualBox 도메인 (`app/src/virtual_disk/`) — 4,743줄 / 9파일
+### VirtualBox 도메인 (`app/src/virtual_disk/`) — 4,883줄 / 9파일
 
 | 파일 | 줄 | 책임 |
 | --- | ---: | --- |
@@ -87,7 +87,7 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `partition.rs` | 791 | read-only `PartitionSource` 경계, MBR·EBR·protective MBR·GPT 검색, 양쪽 CRC·LBA 범위 검증, NTFS 3.1 부트 섹터 판정 |
 | `ntfs.rs` | 801 | 파티션 범위 `Read + Seek` 어댑터, NTFS 3.1 디렉터리·기본 데이터 스트림 읽기, 압축·암호화·범위·손상 오류와 속성·시간 보존, 고정/손상 픽스처 테스트 |
 | `path_policy.rs` | 335 | 절대 대상 루트 기준 게스트 경로 매핑, Windows 예약 이름·경로 길이 검증, 게스트·호스트 리파스 포인트/심볼릭 링크 추적 차단 |
-| `copy.rs` | 834 | `GuestFileSource` 선택 파일·폴더의 설정 청크 복사, 대상 부모 생성, 건너뜀·덮어쓰기·새 이름 충돌 정책과 메타데이터 결과 집계 |
+| `copy.rs` | 972 | `GuestFileSource` 선택 파일·폴더의 설정 청크 복사, 대상 부모 생성, 건너뜀·덮어쓰기·새 이름 충돌 정책, 메타데이터 결과 집계, 청크 단위 중지와 부분 파일 제거 |
 | `issues.rs` | 146 | 복사 오류 종류·안정 억제 키·부분 복사 보고서 연결과 항목별 알림 억제 상태 |
 | `metadata.rs` | 403 | Windows 파일 속성·생성/접근/수정 시간과 비지원·권한 오류를 `MetadataFailure`로 수집 |
 
@@ -100,7 +100,7 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `mod.rs` | 673 | 폴더 동기화 엔진 (UI 비의존 순수 로직) — 진행 보고·중지·이어서 시작·제외 glob·심볼릭 링크 모드 경계 포함 |
 | `tests.rs` | 676 | 복사·건너뜀·심볼릭 링크 안전 건너뜀·미구현 모드 실패 경계·읽기 전용 대상 덮어쓰기·미러 삭제·실패 사유·진행 보고·중지·이어서 시작·제외 glob 단위 테스트 |
 
-### 앱 루트 (`app/src/app/`) — 4,374줄 / 13파일
+### 앱 루트 (`app/src/app/`) — 4,388줄 / 13파일
 
 `app.rs`(1,798줄)를 책임별로 분할한 결과다.
 
@@ -116,7 +116,7 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `inputs.rs` | 136 | 입력 위젯(`InputState`) 지연 생성과 값 동기화 — 파일 동기화 제외 패턴 멀티라인 편집기 포함 |
 | `ui_state.rs` | 79 | `ServiceState`·`SyncState`·`AdBlockState`와 최근 동기화 이력 — 단일 `AppRoot` 엔티티가 소유하는 기능별 UI 상태 묶음 |
 | `virtual_disk_ops.rs` | 536 | VDI 경로 입력·read-only 열기·파티션 검색/선택·게스트 목록 새로고침·폴더 이동·다중 선택·포커스·stale 목록 제거를 포함한 안전 오류 안내·항목별 반복 알림 억제 저장 |
-| `virtual_disk_copy.rs` | 492 | VDI 대상 폴더 입력·선택, 백그라운드 read-only 복사, 진행·중지·완료 요약·항목별 오류 로그·미억제 토스트 게이트·탐색기 keymap·검증 자동 복사 |
+| `virtual_disk_copy.rs` | 506 | VDI 대상 폴더 입력·선택, 백그라운드 read-only 복사, 청크 단위 중지 요청, 진행·중지·완료 요약·항목별 오류 로그·미억제 토스트 게이트·탐색기 keymap·검증 자동 복사 |
 | `watch.rs` | 303 | `notify` 재귀 watcher 소유·작업별 변경 이벤트 전달·2초 quiet debounce·감시 실패 중복 억제·작업 변경 시 정리 |
 | `validation.rs` | 68 | 릴리스 화면 검증 전용 초기 패널·VDI·게스트 경로 시드; 사용자 설정에는 저장하지 않는 격리 입력 |
 
@@ -359,6 +359,7 @@ G-001 판단: `muted`는 비활성 의미이므로 테두리와 hover를 추가�
 | 2026-09-22 | `scripts/Assert-ProjectStructure.ps1`·`scripts/Verify-Workspace.ps1`·`docs/DEVELOPMENT_GUIDE.md` | 1,000줄 구조 트리거 자동 게이트 | PROJECT_MAP의 수동 측정값과 실제 소스가 어긋나거나 1,000줄 초과가 다음 작업까지 숨겨질 수 있음 | `app/src/**/*.rs` 파일 수·전체 줄 수·최대 파일·800~1,000줄 경고 수를 PROJECT_MAP과 대조하고, 1,000줄 이상을 실패 처리; `Verify-Workspace.ps1` 선행 단계에 연결 | 구조 리팩터링 자체를 자동 수행하지 않으며, 위반 시 해당 작업에서 책임 분할을 먼저 수행해야 함 |
 | 2026-09-22 | `app/src/app/mod.rs`·`app/src/app/validation.rs`·`app/src/app/virtual_disk_ops.rs`·`app/src/app/tests/virtual_disk.rs`·`scripts/Invoke-ClaudeVisualCheck.ps1` | VDE-014 하위 폴더 진입 재현과 stale 목록 제거 | 포그라운드 Click이 안전 차단되어 실제 손상 하위 폴더 화면을 재현하기 어려웠고, 열거 실패 시 이전 목록이 남을 수 있었음 | 검증 전용 `-InitialGuestPath`와 `GPUI_CONVENIENCE_TOOLS_VALIDATION_VDI_GUEST_PATH`를 추가하고, 시드 책임을 `validation.rs`로 분리했으며 디렉터리 열거 실패 시 행·선택 집합을 비운 뒤 오류를 표시; 전용 GPUI 테스트, 최종 표준 VDI release 캡처 `vde014-initial-guest-path-many-subdirs-final-042633.png`, 세션 정리 process/session 0 확인; 전체 158 passed·4 ignored | 실제 포그라운드 폴더 Click·외부 키보드·범위 선택은 여전히 미검증 |
 | 2026-09-22 | `app/src/app/mod.rs`·`app/src/app/validation.rs`·`docs/PROJECT_MAP.md` | 검증 시드 책임 분리 | `AppRoot`에 검증 전용 초기 패널·VDI·게스트 경로 주입이 누적되어 800줄 경고를 넘김 | 검증 시드 함수를 `validation.rs`로 이동해 `mod.rs`를 748줄로 줄이고, 실제 측정값을 55개 파일·21,008줄로 갱신; cargo check 통과 | 동작 변경 없는 구조 분리이며 800줄 경고는 `copy.rs`·`vdi.rs`·`ntfs.rs` 3개로 유지 |
+| 2026-09-22 | `app/src/virtual_disk/copy.rs`·`app/src/app/virtual_disk_copy.rs`·`app/src/virtual_disk/mod.rs` | VDE-015 대용량 복사 중지 세분화 | 중지 플래그가 선택 항목 사이에서만 확인되어 큰 파일·하위 폴더 복사 중 중지 요청이 지연됨 | 청크 전후 취소 확인, 취소된 부분 파일 제거와 제거 실패의 I/O 사유, 디렉터리 재귀·형제 항목 즉시 중단, `cancellation_stops_between_chunks_and_removes_partial_file` 회귀 테스트 추가; 최신 측정값 55개 파일·21,162줄 | `cargo check --locked`, Clippy `-D warnings`, 전체 테스트 결과와 문서 게이트는 `VERIFICATION.md`에 기록; `copy.rs`가 972줄 경고 구간에 진입했으므로 1,000줄 전 책임 분할 검토 |
 | 2026-09-22 | `app/src/virtual_disk/vdi.rs`·`scripts/Invoke-ClaudeVisualCheck.ps1`·`docs/TODO.md`·`docs/VERIFICATION.md` | VDE-017 실제 미지원 파티션 릴리스 E2E | GPUI 상태 렌더와 단위 fixture만 있어 실제 release 앱에서 미지원 파티션 메시지를 확인하지 못함 | `exports_unsupported_partition_vdi_fixture_when_requested`로 MBR 타입 `0x83`·NTFS 시그니처 없는 VDI를 격리 생성하고, `reads_unsupported_partition_fixture_without_claiming_ntfs`로 NTFS 오인 방지를 확인; release 캡처 `vde017-unsupported-partition-release-fixed-033450.png`에서 오류 카드·파티션 경고 확인, 전체 157 passed·4 ignored·Clippy exit 0, process/session 0 | 실제 실행 중 VM E2E와 독립 Visual Reviewer는 후속 |
 | 2026-09-22 | `app/src/sync_history.rs`·`app/src/app/background.rs`·`app/src/main.rs` | D-018 동기화 실행 이력 저장 | 실행 결과가 화면 로그와 설정 상태에만 남아 앱 재시작 후 이력을 조회할 파일이 없음 | `sync-history.json`에 실행 순서·작업 식별자·시각·결과 건수·중지·요약을 append하고 손상 JSON은 덮어쓰지 않음, 전용 2개 테스트와 전체 143 passed·4 ignored·Clippy 기존 경고 7건, 52개 파일·19,884줄 기준 지도 갱신 | 이력 보존 정책은 로그와 동일하게 D-019에서, UI 목록은 D-020에서 후속; commit `97009c3` push 완료 |
 | 2026-09-22 | `app/src/sync_history.rs` | D-019 동기화 이력 보존 정책 | JSON 이력은 추가만 되어 오래된 실행 결과가 무한히 남을 수 있음 | `LogConfig.max_age_days`·`max_files`로 기간·개수 초과분을 새 append 전에 제거하고 최소 한 건을 유지, 보존 경계 테스트·전체 144 passed·4 ignored·Clippy 기존 경고 7건, 52개 파일·19,946줄 기준 지도 갱신 | 파일 용량 롤링은 JSON 이력에 적용하지 않으며 최근 이력 화면은 D-020 후속; commit `ed71af4` push 완료 |

@@ -382,6 +382,7 @@ pub enum IoOperation {
     ListDirectory,
     CreateDirectory,
     Write,
+    RemoveFile,
 }
 
 impl fmt::Display for IoOperation {
@@ -393,6 +394,7 @@ impl fmt::Display for IoOperation {
             Self::ListDirectory => "디렉터리 열거",
             Self::CreateDirectory => "디렉터리 생성",
             Self::Write => "쓰기",
+            Self::RemoveFile => "부분 파일 제거",
         };
         f.write_str(label)
     }
