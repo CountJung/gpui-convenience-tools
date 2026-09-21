@@ -321,6 +321,7 @@ impl AppRoot {
                     }
 
                     let label = job.label();
+                    let started_at_unix = now_unix();
                     let resume_from = sync_state
                         .lock()
                         .ok()
@@ -393,6 +394,18 @@ impl AppRoot {
                         };
                     }
                     persist_job_progress(&job.id, next_cursor, Some(now_unix()));
+
+                    let finished_at_unix = now_unix();
+                    let history = crate::sync_history::SyncHistoryEntry::from_outcome(
+                        &job.id,
+                        &label,
+                        started_at_unix,
+                        finished_at_unix,
+                        &outcome,
+                    );
+                    if let Err(err) = crate::sync_history::append(&history) {
+                        log::warn!("동기화 이력 저장 실패: {err:#}");
+                    }
 
                     // 파일 단위 기록은 남기지 않는다. 개별 실패 사유는 UI의 실패 목록이
                     // 소유하고, 로그에는 실행 단위의 중요한 결과만 남긴다.

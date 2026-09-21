@@ -11,6 +11,7 @@ mod config;
 mod logging;
 mod platform;
 mod sync;
+mod sync_history;
 mod theme;
 mod util;
 pub(crate) mod virtual_disk;
