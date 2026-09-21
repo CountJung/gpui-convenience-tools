@@ -13,6 +13,10 @@
 | `VERIFICATION.md` | E2E 사용법과 작업 ID별 검증 체크·증거 |
 | `TODO.md` | 고유 작업 ID가 있는 미완료 대기열 |
 
+협업 에이전트 역할 정본은 `.github/agents/`에 있으며, Claude와 Codex 실행 환경은 각각
+`.claude/agents/`와 `.codex/agents/`의 얇은 어댑터를 사용한다. 공통 역할 경계와 호출 흐름은
+`DEVELOPMENT_GUIDE.md`의 「협업 에이전트」를 참조한다.
+
 **Rust + GPUI 기반 다용도 데스크탑 보조 도구 모음.**
 
 하나의 앱 안에 서로 독립적인 편의 기능을 패널 단위로 모아 두는 것이 이 프로젝트의 목적이다.

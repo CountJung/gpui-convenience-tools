@@ -151,6 +151,12 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 
 | 파일 | 줄 | 책임 |
 | --- | ---: | --- |
+| `.github/agents/code-reviewer.agent.md` | 70 | 공통 Code Reviewer 역할 정본 — 읽기 전용 종합 검토·검증 증거·문서 정합성 |
+| `.github/agents/docs-sync.agent.md` | 69 | 공통 Documentation Sync 역할 정본 — `docs/` 정본 동기화·작업 ID·구조 지도 |
+| `.claude/agents/code-reviewer.md` | 12 | Claude용 Code Reviewer 얇은 어댑터 |
+| `.claude/agents/docs-sync.md` | 11 | Claude용 Documentation Sync 얇은 어댑터 |
+| `.codex/agents/code-reviewer.toml` | 9 | Codex용 Code Reviewer 얇은 어댑터 |
+| `.codex/agents/docs-sync.toml` | 9 | Codex용 Documentation Sync 얇은 어댑터 |
 | `scripts/Verify-Workspace.ps1` | 166 | VS Code용 Rust/GPUI 자동 검증과 ChatGPT 데스크톱 handoff manifest·해시 고정 빌드 생성 |
 | `scripts/Invoke-ClaudeVisualCheck.ps1` | 450 | `CLAUDE_LOCAL` 시각 검증 하네스 — 격리 실행(`-SeedConfig`로 상태 재현)·창 캡처(`PrintWindow`)·입력(`SendInput`)·정리 |
 | `scripts/Verify-AdWindowState.ps1` | 282 | 지정 PID와 앱 조상·자손의 최상위·선택적 자식 창 상태와 클래스 후보를 읽기 전용 점검(AD-002·AD-005 진단) |

@@ -59,6 +59,28 @@ flowchart LR
 Markdown 표를 사용할 수 있다. 새 문서에 ASCII 표를 추가하지 말고, 기존 ASCII 구조도를
 수정할 때는 Mermaid로 함께 전환한다.
 
+## 협업 에이전트
+
+에이전트 역할의 정본은 `.github/agents/`에 두고, `.claude/agents/`와 `.codex/agents/`에는
+각 실행 환경에서 정본을 불러오는 얇은 어댑터만 둔다. 역할별 책임은 다음 흐름으로 연결한다.
+
+```mermaid
+flowchart LR
+    implementer["구현 에이전트"] --> reviewer["Code Reviewer<br/>읽기 전용 종합 검토"]
+    reviewer --> sync["Documentation Sync<br/>docs 정본 동기화"]
+    diagnostics["Error Reviewer<br/>컴파일·린트·진단"] -.-> reviewer
+    visual["UI Visual Reviewer<br/>독립 시각 검증"] -.-> reviewer
+```
+
+- **Code Reviewer**는 동작 계약·안전·테스트·구조·문서 정합성을 읽기 전용으로 검토한다.
+  `Error Reviewer`의 컴파일·린트 중심 분석을 대체하지 않는다.
+- **Documentation Sync**는 검증된 소스·테스트 상태를 `docs/` 정본에 반영한다. 소스 동작을
+  수정하지 않으며, 작업 ID·검증 증거·`PROJECT_MAP.md` 줄 수·Mermaid 규칙을 함께 확인한다.
+- **Error Reviewer**와 **UI Visual Reviewer**의 기존 역할은 유지한다. 라이브 OS·E2E·시각
+  증거가 없으면 완료로 표시하지 않는다.
+- 새 누락 사항은 해당 역할의 검토 결과와 작업 ID에 구체적으로 기록하고, 공통 규칙은 이
+  문서에만 추가한다.
+
 ## 구현 기준
 
 - **치명적이지 않은 판단은 묻지 말고 먼저 구현한다.** 표기·용어 통일, 패딩·간격, 기본값,
