@@ -425,14 +425,23 @@ impl GuestCopyEngine {
             }
             let remaining = entry.size_bytes - offset;
             let requested = remaining.min(buffer.len() as u64) as usize;
-            let read = source
-                .read_at(entry, offset, &mut buffer[..requested])
-                .map_err(|error| error.with_guest_path(&entry.path))?;
+            let read = match source.read_at(entry, offset, &mut buffer[..requested]) {
+                Ok(read) => read,
+                Err(error) => {
+                    let error = error.with_guest_path(&entry.path);
+                    drop(output);
+                    Self::remove_partial_file(&destination);
+                    return Err(error);
+                }
+            };
             if read == 0 || read < requested {
-                return Err(VirtualDiskError::SourceChanged(format!(
+                let error = VirtualDiskError::SourceChanged(format!(
                     "게스트 파일 '{}'을 읽는 중 예상보다 일찍 끝났습니다 (offset={}, requested={}, read={})",
                     entry.path, offset, requested, read
-                )));
+                ));
+                drop(output);
+                Self::remove_partial_file(&destination);
+                return Err(error);
             }
 
             if is_cancelled(cancel) {
@@ -442,25 +451,39 @@ impl GuestCopyEngine {
                 return Ok(report);
             }
 
-            output
-                .write_all(&buffer[..read])
-                .map_err(|source| VirtualDiskError::Io {
+            if let Err(source) = output.write_all(&buffer[..read]) {
+                let error = VirtualDiskError::Io {
                     operation: IoOperation::Write,
                     source,
-                })?;
-            offset = offset.checked_add(read as u64).ok_or({
-                VirtualDiskError::BoundsViolation {
-                    offset,
-                    length: read as u64,
-                    capacity: entry.size_bytes,
+                };
+                drop(output);
+                Self::remove_partial_file(&destination);
+                return Err(error);
+            }
+            offset = match offset.checked_add(read as u64) {
+                Some(offset) => offset,
+                None => {
+                    let error = VirtualDiskError::BoundsViolation {
+                        offset,
+                        length: read as u64,
+                        capacity: entry.size_bytes,
+                    };
+                    drop(output);
+                    Self::remove_partial_file(&destination);
+                    return Err(error);
                 }
-            })?;
+            };
         }
 
-        output.flush().map_err(|source| VirtualDiskError::Io {
-            operation: IoOperation::Write,
-            source,
-        })?;
+        if let Err(source) = output.flush() {
+            let error = VirtualDiskError::Io {
+                operation: IoOperation::Write,
+                source,
+            };
+            drop(output);
+            Self::remove_partial_file(&destination);
+            return Err(error);
+        }
         drop(output);
         self.append_metadata(&mut report, &destination, entry);
         report.copied_files = 1;
@@ -473,6 +496,12 @@ impl GuestCopyEngine {
             operation: IoOperation::RemoveFile,
             source,
         })
+    }
+
+    /// 원본 읽기·대상 쓰기 실패 때는 불완전한 파일을 남기지 않되, 원래 오류는 호출자에게
+    /// 그대로 전달한다. 정리 자체가 실패해도 원본 실패 사유를 덮어쓰지 않는다.
+    fn remove_partial_file(path: &Path) {
+        let _ = fs::remove_file(path);
     }
 
     fn ensure_parent_directory(

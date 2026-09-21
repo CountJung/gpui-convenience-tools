@@ -31,7 +31,7 @@
 안전 경계: 원본 VDI는 read-only로만 열고, 실행 중 VM의 VDI 직접 읽기는 구현하지 않는다.
 실행 중 VM 지원은 후속 `GuestFileSource` 구현으로만 추가한다(VDE-021).
 
-**최종 측정**: 2026-09-22 · `app/src` 총 56개 파일 · 21,258줄
+**최종 측정**: 2026-09-22 · `app/src` 총 56개 파일 · 21,289줄
 
 ## 크기 기준 — 줄 수는 증상이다
 
@@ -78,7 +78,7 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `sync_history.rs` | 223 | 동기화 완료 이력의 JSON 배열 저장·순서 보장·손상 파일 보존·개수/기간 보존·최신 목록 로드·소요 시간 계산 |
 | `util.rs` | 139 | 도메인 주인이 없는 순수 헬퍼 — `format_interval`·`interval_to_secs`·`TimeUnit` |
 
-### VirtualBox 도메인 (`app/src/virtual_disk/`) — 4,910줄 / 10파일
+### VirtualBox 도메인 (`app/src/virtual_disk/`) — 4,912줄 / 10파일
 
 | 파일 | 줄 | 책임 |
 | --- | ---: | --- |
@@ -89,7 +89,7 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `ntfs.rs` | 801 | 파티션 범위 `Read + Seek` 어댑터, NTFS 3.1 디렉터리·기본 데이터 스트림 읽기, 압축·암호화·범위·손상 오류와 속성·시간 보존, 고정/손상 픽스처 테스트 |
 | `path_policy.rs` | 335 | 절대 대상 루트 기준 게스트 경로 매핑, Windows 예약 이름·경로 길이 검증, 게스트·호스트 리파스 포인트/심볼릭 링크 추적 차단 |
 | `copy.rs` | 673 | `GuestFileSource` 선택 파일·폴더의 설정 청크 복사, 대상 부모 생성, 건너뜀·덮어쓰기·새 이름 충돌 정책, 메타데이터 결과 집계, 청크 단위 중지와 부분 파일 제거 |
-| `copy/tests.rs` | 326 | 복사 엔진의 충돌·청크·중지·실패·부분 결과 정리 회귀 테스트 |
+| `copy/tests.rs` | 328 | 복사 엔진의 충돌·청크·중지·실패·부분 결과 정리 회귀 테스트 |
 | `issues.rs` | 146 | 복사 오류 종류·안정 억제 키·부분 복사 보고서 연결과 항목별 알림 억제 상태 |
 | `metadata.rs` | 403 | Windows 파일 속성·생성/접근/수정 시간과 비지원·권한 오류를 `MetadataFailure`로 수집 |
 
@@ -368,6 +368,7 @@ G-001 판단: `muted`는 비활성 의미이므로 테두리와 hover를 추가�
 | 2026-09-22 | `app/src/sync_history.rs` | D-019 동기화 이력 보존 정책 | JSON 이력은 추가만 되어 오래된 실행 결과가 무한히 남을 수 있음 | `LogConfig.max_age_days`·`max_files`로 기간·개수 초과분을 새 append 전에 제거하고 최소 한 건을 유지, 보존 경계 테스트·전체 144 passed·4 ignored·Clippy 기존 경고 7건, 52개 파일·19,946줄 기준 지도 갱신 | 파일 용량 롤링은 JSON 이력에 적용하지 않으며 최근 이력 화면은 D-020 후속; commit `ed71af4` push 완료 |
 | 2026-09-22 | `app/src/sync_history.rs`·`app/src/app/mod.rs`·`app/src/app/events.rs`·`app/src/window/file_sync.rs`·`app/src/app/tests/file_sync.rs`·`scripts/Invoke-ClaudeVisualCheck.ps1` | D-020 최근 동기화 이력 카드 부분 구현 | 저장된 실행 결과를 앱 재시작 후 패널에서 볼 수 없고 완료 직후 목록 갱신도 없음 | 최신 20건 로드·완료 이벤트 새로고침·상태/결과 건수/소요 시간 카드·폭 회귀 테스트와 GPUI 시드 렌더 테스트, `-SeedHistory`·`-InitialPanel FileSync` 검증 경로 추가, 전체 145 passed·4 ignored·Clippy 기존 경고 7건, 52개 파일·20,101줄 기준 지도 갱신 | 격리 release 시드 패널 캡처 `d020-history-panel-012458.png`에서 중지/실패/성공 3행 확인, processCount=0·sessionCount=0; 독립 Visual Reviewer는 후속; commits `031148e`, `ff9dc72` push 완료 |
 | 2026-09-22 | `app/src/virtual_disk/copy.rs`·`app/src/virtual_disk/copy/tests.rs`·`docs/PROJECT_MAP.md` | 1,000줄 트리거 복사 테스트 책임 분리 | 복사 중지 보강으로 테스트가 운영 복사 엔진 본문에 누적되어 `copy.rs`가 1,002줄에 도달함 | 테스트 326줄을 `copy/tests.rs`로 이동하고 운영 본문을 673줄로 축소; 전체 56개 파일·21,258줄, 최대 821줄·경고 2개로 갱신; 복사 엔진 테스트 10개 통과 | 동작 변경 없는 구조 분리이며 부분 파일 정리 기능은 별도 후속 커밋에서 검증한다 |
+| 2026-09-22 | `app/src/virtual_disk/copy.rs`·`app/src/virtual_disk/copy/tests.rs`·`docs/TODO.md`·`docs/VERIFICATION.md`·`docs/MASTER_PLAN.md` | VDE-012·VDE-015 복사 실패 부분 결과 정리 | 원본 읽기·대상 쓰기·flush 실패가 새로 생성한 부분 대상 파일을 남길 수 있었음 | 실패 직전 출력 핸들을 닫고 부분 파일을 정리하되 원본 오류 사유를 보존; `collecting_copy_errors_removes_partial_output_and_keeps_issue`와 형제 파일 계속 처리 테스트, 최신 56개 파일·21,289줄 측정 반영 | 실제 대용량 VDI 중지 E2E와 독립 릴리스 UI 검토는 기존 잔여 조건 |
 | 2026-07-29 | 편의 기능 스플리터 3곳 | 공용 레이아웃 승격 | 패널별 고정 초기 폭 | `window::balanced_split` | 설정 pane 과도 축소 방지, 양쪽 가용폭 사용 |
 | 2026-07-29 | `app.rs` | 책임 단위 분할 + 재배치 | 1,798 | `app/` 7파일 (최대 564) | 대시보드·로그 렌더는 소유가 잘못돼 있어 `window/`로 이동 |
 | 2026-07-29 | `platform/windows.rs` | 책임 단위 분할 + 승격 | 1,361 | `platform/windows/` 6파일 (최대 344) | `wide_null`을 `windows/mod.rs`로 **공용 승격** |

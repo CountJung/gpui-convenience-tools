@@ -881,6 +881,19 @@ VDE-017·VDE-019에 계속 남긴다.
 안전 하네스 제약으로 별도 E2E에 남긴다. 전체 테스트 160 passed·4 ignored와 Clippy
 `-D warnings`를 통과했다.
 
+### Phase O-27 — VDI 복사 실패 부분 결과 정리 완료 ✅
+
+VDI 파일을 새로 생성한 뒤 원본 읽기 실패, 대상 쓰기 실패, `flush` 실패 또는 범위 오류가
+발생하면 불완전한 대상 파일이 남을 수 있었다. 오류 직전에 출력 핸들을 닫고 부분 파일을
+best-effort로 제거하되, 정리 실패가 원래 읽기·쓰기 오류 사유를 덮어쓰지 않도록 복사 엔진의
+오류 경계를 보강했다.
+
+`collecting_copy_errors_removes_partial_output_and_keeps_issue`와 형제 파일 계속 처리 테스트로
+부분 대상 파일 제거, `SourceChanged` 분류·로그 보존, 정상 형제 파일 복사를 확인했다. 복사
+엔진 테스트 10개·`cargo check --locked`·Clippy `-D warnings`를 통과했고, 구조 트리거로
+분리한 `copy/tests.rs`를 포함해 최신 측정값은 56개 파일·21,289줄·최대 821줄이다. 실제
+대용량 VDI 중지 E2E와 독립 릴리스 UI 검토는 기존 VDE-015·VDE-012 잔여 조건으로 유지한다.
+
 ### Phase T-1 — T-001·T-002 회귀 테스트 보강 완료 ✅
 
 동기화 엔진이 읽기 전용 대상 파일을 실제로 덮어쓸 수 있는지 확인하는 테스트와,

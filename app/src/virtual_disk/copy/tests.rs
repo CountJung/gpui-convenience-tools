@@ -266,7 +266,7 @@ fn renaming_a_directory_keeps_children_under_the_renamed_directory() {
 }
 
 #[test]
-fn collecting_copy_errors_keeps_the_error_in_the_report_and_issue_log() {
+fn collecting_copy_errors_removes_partial_output_and_keeps_issue() {
     let destination = test_destination("issues");
     let (mut source, _, mut file) = fixture_source();
     file.size_bytes = 12;
@@ -282,6 +282,7 @@ fn collecting_copy_errors_keeps_the_error_in_the_report_and_issue_log() {
     assert_eq!(report.issues.len(), 1);
     assert_eq!(issue_log.issues().len(), 1);
     assert_eq!(report.issues[0].kind, CopyIssueKind::SourceChanged);
+    assert!(!destination.join("folder/data.txt").exists());
     fs::remove_dir_all(destination).unwrap();
 }
 
@@ -308,6 +309,7 @@ fn collecting_directory_copy_continues_with_sibling_files_after_failure() {
     assert_eq!(report.issues.len(), 1);
     assert_eq!(issue_log.issues().len(), 1);
     assert_eq!(report.issues[0].kind, CopyIssueKind::SourceChanged);
+    assert!(!destination.join("folder/broken.txt").exists());
     assert_eq!(
         fs::read(destination.join("folder/data.txt")).unwrap(),
         b"0123456789"
