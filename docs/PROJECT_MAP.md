@@ -30,7 +30,7 @@
 안전 경계: 원본 VDI는 read-only로만 열고, 실행 중 VM의 VDI 직접 읽기는 구현하지 않는다.
 실행 중 VM 지원은 후속 `GuestFileSource` 구현으로만 추가한다(VDE-021).
 
-**최종 측정**: 2026-09-22 · `app/src` 총 53개 파일 · 20,817줄
+**최종 측정**: 2026-09-22 · `app/src` 총 53개 파일 · 20,828줄
 
 ## 크기 기준 — 줄 수는 증상이다
 
@@ -44,7 +44,7 @@
 | 800~1,000 | 🟡 경고 | 다음 작업 전에 구조 리팩터링 |
 | 1,000 초과 | 🔴 위반 | **즉시 리팩터링.** 다른 작업보다 우선 |
 
-현재 🔴 위반 **없음**, 🟡 경고 **5개**. 최대 파일은 883줄(`virtual_disk/vdi.rs`)이며, 다음 VirtualBox UI 작업 전에 책임 단위 분할을 검토한다.
+현재 🔴 위반 **없음**, 🟡 경고 **3개**. 최대 파일은 911줄(`virtual_disk/vdi.rs`)이며, 다음 VirtualBox UI 작업 전에 책임 단위 분할을 검토한다.
 줄 수와 무관하게 처리하는 중복 헬퍼는 아래 「중복 헬퍼 추적」에서 관리한다.
 
 ### 줄 수 측정 명령
@@ -115,7 +115,7 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `virtual_disk_copy.rs` | 492 | VDI 대상 폴더 입력·선택, 백그라운드 read-only 복사, 진행·중지·완료 요약·항목별 오류 로그·미억제 토스트 게이트·탐색기 keymap·검증 자동 복사 |
 | `watch.rs` | 303 | `notify` 재귀 watcher 소유·작업별 변경 이벤트 전달·2초 quiet debounce·감시 실패 중복 억제·작업 변경 시 정리 |
 
-### GPUI 회귀 테스트 (`app/src/app/tests/`) — 1,970줄 / 6파일
+### GPUI 회귀 테스트 (`app/src/app/tests/`) — 1,981줄 / 6파일
 
 테스트는 시나리오별 6개 파일로 나뉘며, 픽스처는 `mod.rs`가 단독 소유하고 하위 모듈은
 `use super::*`로 가져다 쓴다.
@@ -125,9 +125,9 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `file_sync.rs` | 794 | 동기화 조작·진행 표시줄·중지·로그 요약·최근 이력 카드·섹션 너비·전역 스위치·커서 무효화·제외 패턴·감시 방식 UI 경계·저장 연결 |
 | `layout.rs` | 397 | 사이드바·스플리터·카드 경계·divider drag·스크롤 |
 | `interval.rs` | 226 | 주기 드롭다운·프리셋 추가/삭제·패널 간 공유 |
-| `mod.rs` | 176 | 공용 픽스처 (`test_app_root`·`TestPlatform`·`refresh`·`click_debug_element` 등) |
+| `mod.rs` | 191 | 공용 픽스처 (`test_app_root`·`TestPlatform`·`refresh`·`click_debug_element` 등) |
 | `theme.rs` | 85 | 테마 전환과 스위치 가시성 |
-| `virtual_disk.rs` | 277 | VirtualBox 탐색 네비게이션·VDI 입력·파티션 카드·현재 경로·상위 이동·실제 목록·숨김/시스템 전체 선택·복사 진행/실패 요약·오류 억제 상태·키보드 단축키·안전/미지원 상태·새로고침 렌더 경계 |
+| `virtual_disk.rs` | 288 | VirtualBox 탐색 네비게이션·VDI 입력·파티션 카드·현재 경로·상위 이동·실제 목록·숨김/시스템 전체 선택·복사 진행/실패 요약·오류 억제 버튼 dispatch·키보드 단축키·안전/미지원 상태·새로고침 렌더 경계 |
 
 ### 패널 (`app/src/window/`) — 4,146줄 / 11파일
 
