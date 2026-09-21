@@ -90,4 +90,41 @@ if ($orphanMatrixIds.Count -gt 0) {
     throw ("Verification matrix IDs without an active TODO row: " + ($orphanMatrixIds -join ", "))
 }
 
+$decisionHeading = "## 판단·환경 확인이 필요한 보류 항목"
+$decisionStart = Find-LineIndex -Lines $todoLines -Value $decisionHeading
+if ($decisionStart -lt 0) {
+    throw "The TODO decision/environment section was not found."
+}
+
+$decisionMarkerPattern = '^\s*<!--\s*decision-task-ids:\s*(.*?)\s*-->\s*$'
+$decisionMarkerIndexes = @(
+    0..($todoLines.Count - 1) |
+        Where-Object { $todoLines[$_] -match $decisionMarkerPattern }
+)
+if ($decisionMarkerIndexes.Count -ne 1 -or $decisionMarkerIndexes[0] -le $decisionStart) {
+    throw "TODO must contain exactly one decision-task-ids marker after the decision/environment section."
+}
+
+$decisionMarkerLine = $todoLines[$decisionMarkerIndexes[0]]
+$null = $decisionMarkerLine -match $decisionMarkerPattern
+$decisionIds = @($Matches[1] -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+if ($decisionIds.Count -eq 0) {
+    throw "TODO decision-task-ids marker is empty."
+}
+
+$invalidDecisionIds = @($decisionIds | Where-Object { $_ -notmatch '^[A-Z][A-Z0-9]{0,7}-\d{1,4}$' })
+if ($invalidDecisionIds.Count -gt 0) {
+    throw ("Invalid decision-task IDs: " + ($invalidDecisionIds -join ", "))
+}
+
+$duplicateDecisionIds = @($decisionIds | Group-Object | Where-Object Count -gt 1)
+if ($duplicateDecisionIds.Count -gt 0) {
+    throw ("Duplicate decision-task IDs: " + ($duplicateDecisionIds.Name -join ", "))
+}
+
+$orphanDecisionIds = @($decisionIds | Where-Object { $_ -notin $activeIds })
+if ($orphanDecisionIds.Count -gt 0) {
+    throw ("Decision/environment IDs without an active TODO row: " + ($orphanDecisionIds -join ", "))
+}
+
 Write-Output ("DOCS_VERIFIED active={0} matrix={1}" -f $activeIds.Count, $matrixIds.Count)
