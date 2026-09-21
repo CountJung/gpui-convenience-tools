@@ -30,7 +30,7 @@
 안전 경계: 원본 VDI는 read-only로만 열고, 실행 중 VM의 VDI 직접 읽기는 구현하지 않는다.
 실행 중 VM 지원은 후속 `GuestFileSource` 구현으로만 추가한다(VDE-021).
 
-**최종 측정**: 2026-09-22 · `app/src` 총 52개 파일 · 20,141줄
+**최종 측정**: 2026-09-22 · `app/src` 총 53개 파일 · 20,606줄
 
 ## 크기 기준 — 줄 수는 증상이다
 
@@ -44,7 +44,7 @@
 | 800~1,000 | 🟡 경고 | 다음 작업 전에 구조 리팩터링 |
 | 1,000 초과 | 🔴 위반 | **즉시 리팩터링.** 다른 작업보다 우선 |
 
-현재 🔴 위반 **없음**, 🟡 경고 **3개**. 최대 파일은 868줄(`virtual_disk/vdi.rs`)이며, 다음 VirtualBox UI 작업 전에 책임 단위 분할을 검토한다.
+현재 🔴 위반 **없음**, 🟡 경고 **5개**. 최대 파일은 868줄(`virtual_disk/vdi.rs`)이며, 다음 VirtualBox UI 작업 전에 책임 단위 분할을 검토한다.
 줄 수와 무관하게 처리하는 중복 헬퍼는 아래 「중복 헬퍼 추적」에서 관리한다.
 
 ### 줄 수 측정 명령
@@ -96,32 +96,33 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `mod.rs` | 649 | 폴더 동기화 엔진 (UI 비의존 순수 로직) — 진행 보고·중지·이어서 시작·제외 glob·심볼릭 링크 안전 건너뜀 포함 |
 | `tests.rs` | 648 | 복사·건너뜀·심볼릭 링크 안전 건너뜀·읽기 전용 대상 덮어쓰기·미러 삭제·실패 사유·진행 보고·중지·이어서 시작·제외 glob 단위 테스트 |
 
-### 앱 루트 (`app/src/app/`) — 3,912줄 / 11파일
+### 앱 루트 (`app/src/app/`) — 4,273줄 / 12파일
 
 `app.rs`(1,798줄)를 책임별로 분할한 결과다.
 
 | 파일 | 줄 | 책임 |
 | --- | ---: | --- |
-| `mod.rs` | 756 | `AppRoot` 정의·생성자·검증 전용 초기 패널·동기화 이력 초기 로드·백그라운드 UI wake·사이드바(전역 스위치 2개 포함)·폭/VDI 억제 설정 복원·최상위 레이아웃 |
+| `mod.rs` | 758 | `AppRoot` 정의·생성자·검증 전용 초기 패널·동기화 이력 초기 로드·백그라운드 UI wake·사이드바(전역 스위치 2개 포함)·폭/VDI 억제 설정 복원·최상위 레이아웃 |
 | `sync_ops.rs` | 457 | 파일 동기화 작업 조작 (추가·삭제·선택·이름·경로·제외 패턴 입력 저장·수동 실행 큐·중지·전역 스위치·커서 무효화) |
 | `interval.rs` | 313 | 주기 선택 상태(`IntervalPicker`)와 조작 — 프리셋 추가·삭제·드롭다운 동기화 |
-| `events.rs` | 303 | `PlatformEvent` 채널 소비, 진행 상태·동기화 이력 반영, 로그·토스트 유틸 |
-| `background.rs` | 440 | 스캔 스레드와 동기화 스레드 (다중 광고 창 추적·복원·진행 이벤트 빈도 제한·중지·실행 위치·동기화 이력 영속화) |
-| `state.rs` | 260 | 순수 데이터 타입 (`AppState`, `PlatformEvent`, `SyncRunning`, `ActivePanel`, 타깃별 `NAV_*`) |
+| `events.rs` | 326 | `PlatformEvent` 채널 소비, 진행 상태·동기화 이력·감시 실패 강등 반영, 로그·토스트 유틸 |
+| `background.rs` | 459 | 스캔 스레드와 동기화 스레드 (다중 광고 창 추적·복원·진행 이벤트 빈도 제한·중지·실행 위치·동기화 이력 영속화·실시간 watcher 연동) |
+| `state.rs` | 262 | 순수 데이터 타입 (`AppState`, `PlatformEvent`, `SyncRunning`, `ActivePanel`, 감시 실패 강등 이벤트, 타깃별 `NAV_*`) |
 | `ops.rs` | 195 | 광고 차단·서비스 관리·로그 설정 조작 |
 | `inputs.rs` | 136 | 입력 위젯(`InputState`) 지연 생성과 값 동기화 — 파일 동기화 제외 패턴 멀티라인 편집기 포함 |
 | `ui_state.rs` | 79 | `ServiceState`·`SyncState`·`AdBlockState`와 최근 동기화 이력 — 단일 `AppRoot` 엔티티가 소유하는 기능별 UI 상태 묶음 |
 | `virtual_disk_ops.rs` | 522 | VDI 경로 입력·read-only 열기·파티션 검색/선택·게스트 목록 새로고침·폴더 이동·다중 선택·포커스·안전 오류 안내·항목별 반복 알림 억제 저장, `GuestFileSource` 테스트 경계 |
 | `virtual_disk_copy.rs` | 463 | VDI 대상 폴더 입력·선택, 백그라운드 read-only 복사, 진행·중지·완료 요약·항목별 오류 로그·미억제 토스트 게이트·탐색기 keymap |
+| `watch.rs` | 303 | `notify` 재귀 watcher 소유·작업별 변경 이벤트 전달·2초 quiet debounce·감시 실패 중복 억제·작업 변경 시 정리 |
 
-### GPUI 회귀 테스트 (`app/src/app/tests/`) — 1,875줄 / 6파일
+### GPUI 회귀 테스트 (`app/src/app/tests/`) — 1,970줄 / 6파일
 
 테스트는 시나리오별 6개 파일로 나뉘며, 픽스처는 `mod.rs`가 단독 소유하고 하위 모듈은
 `use super::*`로 가져다 쓴다.
 
 | 파일 | 줄 | 책임 |
 | --- | ---: | --- |
-| `file_sync.rs` | 713 | 동기화 조작·진행 표시줄·중지·로그 요약·최근 이력 카드·섹션 너비·전역 스위치·커서 무효화·제외 패턴 UI 경계·저장 연결 |
+| `file_sync.rs` | 794 | 동기화 조작·진행 표시줄·중지·로그 요약·최근 이력 카드·섹션 너비·전역 스위치·커서 무효화·제외 패턴·감시 방식 UI 경계·저장 연결 |
 | `layout.rs` | 397 | 사이드바·스플리터·카드 경계·divider drag·스크롤 |
 | `interval.rs` | 226 | 주기 드롭다운·프리셋 추가/삭제·패널 간 공유 |
 | `mod.rs` | 176 | 공용 픽스처 (`test_app_root`·`TestPlatform`·`refresh`·`click_debug_element` 등) |
@@ -133,7 +134,7 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | 파일 | 줄 | 책임 |
 | --- | ---: | --- |
 | `service_mgr.rs` | 670 | 편의 기능 — Windows 서비스 (목록/제어 ↔ 검색·필터·권한) |
-| `file_sync.rs` | 705 | 편의 기능 — 파일 동기화 (작업 목록 → 설정·제외 패턴 → 실패 기록·최근 실행 이력 + 하단 고정 진행 표시줄) |
+| `file_sync.rs` | 727 | 편의 기능 — 파일 동기화 (작업 목록 → 설정·제외 패턴·감시 방식 → 실패 기록·최근 실행 이력 + 하단 고정 진행 표시줄) |
 | `settings.rs` | 444 | 전역 설정 — 테마 선택·로그 보관 정책 |
 | `ad_block.rs` | 502 | 편의 기능 — 웹뷰 광고 차단 (상태·타겟 ↔ 스캔 주기·프로세스 추가·카드 경계) |
 | `service_view.rs` | 317 | 시스템 — 자동 시작(작업 스케줄러) 등록·삭제·즉시 실행 |
@@ -327,6 +328,9 @@ G-001 판단: `muted`는 비활성 의미이므로 테두리와 hover를 추가�
 | 2026-09-22 | `app/src/window/ui.rs`·`file_sync.rs`·`interval.rs`·`service_mgr.rs`·`service_view.rs`·`app/mod.rs`·`scripts/Invoke-ClaudeVisualCheck.ps1` | G-001 버튼 스타일 덮어쓰기 정리 | 패널별 `border`·`hover`·`no_hover` 덮어쓰기로 공용 버튼 의미가 화면마다 달랐고 확장 메서드가 dead-code가 됨; foreground 안전 차단으로 패널 전환 캡처가 불가능했음 | 세 패널을 생성자 기본값으로 통일하고 확장 메서드 제거, 검증 전용 `-InitialPanel FileSync`·`-InitialPanel AutoStart` 경로 추가, 관련 GPUI 테스트·전체 145 passed·4 ignored·Clippy 기존 경고 7건, 52개 파일·20,101줄 기준 지도 갱신 | 격리 release 파일 동기화 캡처 `g001-file-sync-013019.png`·자동 시작 캡처 `g001-auto-start-013004.png` 성공, processCount=0·sessionCount=0; 독립 Visual Reviewer는 후속 |
 | 2026-09-22 | `Cargo.toml`·`app/Cargo.toml`·`Cargo.lock` | D-009 notify 직접 의존성 승격 | 실시간 감시 예정 기능이 `gpui-component`의 전이 의존성에만 기대고 있어 앱의 의존성 계약이 불명확함 | workspace/app에 `notify 7` 직접 의존성을 선언하고 lockfile을 갱신, `cargo check --locked`·전체 145 passed·4 ignored·Clippy 기존 경고 7건·직접 `cargo tree` 확인; 실시간 감시 동작은 D-010~D-013에서 구현 | 앱 동작 변경 없이 Cargo 경계만 고정; commit `0315bbd` push 완료 |
 | 2026-09-22 | `app/src/config.rs` | D-010 동기화 감시 방식 스키마 | 작업별 감시 방식이 설정 모델에 없어 주기 모드와 실시간 모드를 구분할 수 없음 | `WatchMode::{Interval, Realtime}`·`SyncJob.watch_mode`·구버전 기본값·snake_case 왕복 테스트 추가, 전체 146 passed·4 ignored·Clippy 기존 경고 7건, 52개 파일·20,141줄 기준 지도 갱신 | 실제 이벤트·디바운스·설정 UI는 D-011~D-013에서 구현; commit `15e9765` push 완료 |
+| 2026-09-22 | `app/src/app/watch.rs`·`app/src/app/background.rs`·`app/src/app/tests/file_sync.rs` | D-011 실시간 파일 감시·디바운스 | 실시간 감시 스키마만 있고 변경 이벤트를 동기화 실행으로 연결하지 않음 | `notify` 재귀 watcher, 작업별 2초 quiet debounce, 경로·작업 변경 시 watcher 정리, 실제 임시 폴더 파일 변경 통합 테스트와 디바운스 단위 테스트, 전체 151 passed·4 ignored·Clippy 기존 경고 7건, 53개 파일·20,606줄 기준 지도 갱신 | 구현 커밋 `e68a3f6` push 완료 |
+| 2026-09-22 | `app/src/app/watch.rs`·`app/src/app/state.rs`·`app/src/app/events.rs`·`app/src/app/tests/file_sync.rs` | D-012 감시 실패 자동 강등 | watcher 생성·경로 등록 실패가 반복되거나 작업이 실시간 모드에 남을 수 있음 | 작업별 실패 중복 억제, `SyncWatchFallback` 이벤트, `Interval` 강등·설정 저장·WARN 로그·경고 토스트, 단위·GPUI 회귀 테스트, 전체 151 passed·4 ignored·Clippy 기존 경고 7건 | 구현 커밋 `e68a3f6` push 완료 |
+| 2026-09-22 | `app/src/window/file_sync.rs`·`app/src/app/tests/file_sync.rs`·`scripts/Verify-Workspace.ps1` | D-013 감시 방식 선택 UI | 사용자가 작업별 주기/실시간 방식을 선택할 수 없음 | `실시간 감시` 토글, 실시간 모드의 주기 선택 숨김, 작업 카드 상태 표시, 필수 GPUI 20개와 릴리스 `CLAUDE_LOCAL` 캡처 `d011-realtime-panel-015924.png`, processCount=0·sessionCount=0 | 구현 커밋 `e68a3f6` push 완료 |
 | 2026-09-22 | `app/src/app/ui_state.rs`·`app/mod.rs`·기능별 참조 호출부 | G-002 `AppRoot` 기능 상태 묶음 | 서비스·동기화·광고 스크롤과 작업 상태가 루트 엔티티 필드에 혼재해 소유 경계가 흐림 | GPUI 엔티티는 하나로 유지하고 `ServiceState`·`SyncState`·`AdBlockState` 일반 구조체로 상태 소유권 분리, 전체 139 passed·4 ignored·Clippy 기존 경고 7건, 51개 파일·19,496줄 기준 지도 갱신 | 동작 변경 없는 구조 리팩터링; 실제 화면 검증은 UI 동작 변경이 없어 N/A |
 | 2026-09-22 | `app/src/config.rs`·`app/src/app/mod.rs`·`app/tests/mod.rs` | G-003 스플리터 폭 영속화 | 앱 재시작 시 사용자가 조정한 사이드바 폭이 기본 240px로 돌아감 | `sidebar_width` 설정 필드·200~360px 보정, `ResizableState::sizes()` mouse-up 저장, 시작 시 복원, 설정/GPUI 회귀 테스트·전체 140 passed·4 ignored·Clippy 기존 경고 7건, 51개 파일·19,558줄 기준 지도 갱신 | 격리 release 기본 캡처 `g003-default-003709.png`·320px 시드 복원 캡처 `g003-restored-width-003742.png` 성공; 하네스가 divider 드래그를 지원하지 않아 실제 저장 콜백과 독립 Visual Reviewer는 후속 |
 | 2026-09-22 | `app/src/config.rs`·`app/src/app/mod.rs`·`app/src/app/virtual_disk_ops.rs`·`app/src/app/virtual_disk_copy.rs`·`app/src/window/virtual_disk.rs`·`app/src/app/tests/virtual_disk.rs` | VDE-012 GPUI 오류 알림 연결 | 도메인 오류 보고는 있었지만 화면 상세 로그·반복 알림 억제 상태·항목별 UI 조작이 연결되지 않음 | 항목별 상세 로그, 미억제 오류에만 반복 토스트, 요약 카드의 억제/재표시 버튼, `AppConfig` 저장·복원, 관련 GPUI 직접 상태 전환 테스트와 전체 140 passed·4 ignored·Clippy 기존 경고 7건, 51개 파일·19,707줄 기준 지도 갱신 | 격리 release 기본 캡처 `vde012-default-004932.png` 성공; 실제 VDI 오류 카드·버튼 click dispatch·복사 대상 E2E는 실제 이미지/하네스 제약으로 미확인하며 VDE-019에서 후속 |
@@ -389,12 +393,12 @@ G-001 판단: `muted`는 비활성 의미이므로 테두리와 hover를 추가�
 
 ### 2순위 — 책임 재배치·분할 (중복 제거 후에도 크면)
 
-- **`app/mod.rs` (756)** — 최대 파일이며 800줄 경고까지 44줄 남았다. `AppRoot` 필드가 30개에
+- **`app/mod.rs` (758)** — 최대 파일이며 800줄 경고까지 42줄 남았다. `AppRoot` 필드가 30개에
   가깝다. `TODO.md`의 「`AppRoot` 분할 검토」와 같은 항목이다. 다음에 커지면 사이드바 렌더를
   `app/sidebar.rs`로 떼는 것이 가장 자연스럽다.
-- **`app/tests/file_sync.rs` (713)** — 시나리오가 늘어 두 번째로 크다. 800줄에 닿으면
+- **`app/tests/file_sync.rs` (794)** — 시나리오가 늘어 800줄 경고에 근접했다. 다음 감시·이력 시나리오가 추가되면
   레이아웃/조작/영속화로 다시 나눈다.
-- **`window/service_mgr.rs` (635)** — 가상 리스트 행 렌더가 큰 비중을 차지한다.
+- **`window/service_mgr.rs` (670)** — 가상 리스트 행 렌더가 큰 비중을 차지한다.
   800줄에 닿으면 행 렌더를 `service_mgr/row.rs`로, 보기 설정을 `service_mgr/settings.rs`로 분리한다.
-- **`window/file_sync.rs` (705)** — 진행률·최근 이력·추가 설정 UI가 들어가면 커질 수 있다.
+- **`window/file_sync.rs` (727)** — 진행률·최근 이력·감시 방식 설정 UI가 들어가면 커질 수 있다.
   작업 선택·설정·실패 기록의 렌더 책임을 의미별 하위 모듈로 나누는 것이 자연스럽다.

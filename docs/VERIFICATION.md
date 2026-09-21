@@ -122,9 +122,6 @@ SHA-256을 기록한다. 다른 검증자의 독립 검토가 요구되는 UI �
 | D-006 | RUST | [ ] | [ ] | — | — | [ ] | [ ] | — |
 | D-007 | RUST | [ ] | [ ] | — | — | [ ] | [ ] | — |
 | D-008 | E2E | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | — |
-| D-011 | RUST | [ ] | [ ] | — | — | [ ] | [ ] | — |
-| D-012 | RUST | [ ] | [ ] | — | — | [ ] | [ ] | — |
-| D-013 | E2E | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | — |
 | D-014 | RUST | [ ] | [ ] | — | — | [ ] | [ ] | — |
 | D-015 | RUST | [ ] | [ ] | — | — | [ ] | [ ] | — |
 | D-016 | RUST | [ ] | [ ] | — | — | [ ] | [ ] | — |
@@ -175,6 +172,9 @@ SHA-256을 기록한다. 다른 검증자의 독립 검토가 요구되는 UI �
 | D-019 | RUST | [x] | [x] | — | — | [x] | [x] | `sync_history::tests::applies_log_count_and_age_retention_before_appending`로 로그 설정의 개수·기간 기준을 새 이력 추가 전에 적용하고 최소 1개를 유지하는 경계 검증; `cargo check -p gpui-convenience-tools --locked`; 전체 144 passed·4 ignored; Clippy exit 0(기존 경고 7건); commit `ed71af4` push 완료 |
 | D-009 | RUST | [x] | [x] | — | — | [x] | [x] | workspace와 `app`에 `notify 7` 직접 의존성을 선언하고 `Cargo.lock` 애플리케이션 의존성 목록을 갱신; `cargo check -p gpui-convenience-tools --locked`; `cargo test -p gpui-convenience-tools --all-targets --all-features` 전체 145 passed·4 ignored; `cargo tree -e normal -p gpui-convenience-tools`에서 앱 직접 `notify v7.0.0` 확인; Clippy exit 0(기존 경고 7건); `git diff --check` 통과; 실시간 감시 동작은 D-010~D-013 범위로 유지; commit `0315bbd` push 완료 |
 | D-010 | RUST | [x] | [x] | — | — | [x] | [x] | `SyncJob`에 `WatchMode::{Interval, Realtime}`와 snake_case 직렬화를 추가하고 `watch_mode` 누락 구버전 설정을 `Interval`로 복원; `sync_job_watch_mode_round_trips_with_interval_compatibility`, `sync_job_without_id_gets_one`; `cargo check -p gpui-convenience-tools --locked`; 전체 146 passed·4 ignored; Clippy exit 0(기존 경고 7건); E/V는 스키마 전용 작업으로 적용하지 않음; 실제 감시·디바운스·설정 UI는 D-011~D-013에서 검증; commit `15e9765` push 완료 |
+| D-011 | RUST | [x] | [x] | — | — | [x] | [x] | `app/src/app/watch.rs`에 `notify` 재귀 감시·작업별 2초 quiet debounce·변경 이벤트 기반 실행 예약을 구현; `debounce_coalesces_changes_until_two_seconds_are_quiet`, `realtime_watcher_reports_a_changed_file_after_polling`; 실제 임시 폴더 파일 변경 통합 테스트 포함; `cargo check -p gpui-convenience-tools --locked`; 전체 151 passed·4 ignored; Clippy exit 0(기존 경고 7건); commit `e68a3f6` push 완료 |
+| D-012 | RUST | [x] | [x] | — | — | [x] | [x] | watcher 생성·경로 감시 실패를 작업별 한 번만 보고하고 `SyncWatchFallback` 이벤트로 주기 모드 강등·로그·경고 토스트를 처리; `watch_failure_is_reported_once_until_the_job_mode_changes`, `file_sync_watch_fallback_downgrades_and_logs`; 전체 151 passed·4 ignored; Clippy exit 0(기존 경고 7건); commit `e68a3f6` push 완료 |
+| D-013 | E2E | [x] | [x] | [x] | [x] | [x] | [x] | 파일 동기화 설정에 `실시간 감시` 토글을 추가하고 실시간 모드에서는 주기 선택을 숨김; `file_sync_watch_mode_toggle_updates_selected_job`, `Verify-Workspace.ps1` 필수 GPUI 20개; 릴리스 `CLAUDE_LOCAL` 캡처 `target/visual-validation/captures/d011-realtime-panel-015924.png`에서 작업 카드의 `실시간` 상태·토글·2초 안내 확인; 종료 후 processCount=0·sessionCount=0; commit `e68a3f6` push 완료 |
 
 ### 증거 기록 형식
 
