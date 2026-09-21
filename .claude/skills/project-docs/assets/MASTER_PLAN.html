@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MASTER PLAN — {{PROJECT_NAME}}</title>
+<style>
+  :root{
+    --bg: #14181c;
+    --panel: #1b2127;
+    --panel-border: #2a323a;
+    --text: #dfe6ec;
+    --text-dim: #8a97a3;
+    --accent: #5fd1c9;
+    --done: #6fcf7a;
+    --progress: #e8b34a;
+    --planned: #55606b;
+    --mono: 'SF Mono', 'JetBrains Mono', Consolas, monospace;
+    --sans: -apple-system, 'Segoe UI', Pretendard, sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--bg); color:var(--text);
+    font-family:var(--sans); line-height:1.5; padding:48px 24px 80px;
+  }
+  .wrap{max-width:900px; margin:0 auto;}
+  header{margin-bottom:40px;}
+  .eyebrow{font-family:var(--mono); font-size:12px; letter-spacing:.12em; color:var(--accent); text-transform:uppercase;}
+  h1{font-size:28px; margin:8px 0 4px; font-weight:650;}
+  .meta{font-family:var(--mono); font-size:12px; color:var(--text-dim);}
+  .legend{display:flex; gap:16px; margin-top:16px; font-family:var(--mono); font-size:11px; color:var(--text-dim);}
+  .legend span{display:flex; align-items:center; gap:6px;}
+  .dot{width:8px; height:8px; border-radius:50%; display:inline-block;}
+  .dot.done{background:var(--done);}
+  .dot.progress{background:var(--progress);}
+  .dot.planned{background:var(--planned);}
+  .phase{
+    border:1px solid var(--panel-border); background:var(--panel);
+    border-radius:10px; padding:20px 22px; margin-bottom:14px;
+    display:grid; grid-template-columns:auto 1fr auto; gap:16px; align-items:start;
+  }
+  .phase-num{font-family:var(--mono); font-size:13px; color:var(--text-dim); padding-top:3px;}
+  .phase h2{font-size:16px; margin:0 0 6px;}
+  .phase p{margin:0; color:var(--text-dim); font-size:14px;}
+  .phase .files{margin-top:8px; font-family:var(--mono); font-size:11px; color:var(--text-dim);}
+  .badge{
+    font-family:var(--mono); font-size:11px; padding:4px 10px; border-radius:999px;
+    height:fit-content; white-space:nowrap; border:1px solid transparent;
+  }
+  .badge.done{color:var(--done); border-color:var(--done); background:rgba(111,207,122,.08);}
+  .badge.progress{color:var(--progress); border-color:var(--progress); background:rgba(232,179,74,.08);}
+  .badge.planned{color:var(--planned); border-color:var(--planned); background:rgba(85,96,107,.15);}
+  .docs{
+    margin-top:44px; padding-top:24px; border-top:1px solid var(--panel-border);
+    display:flex; flex-wrap:wrap; gap:10px;
+  }
+  .docs span{
+    font-family:var(--mono); font-size:12px; color:var(--text-dim);
+    border:1px solid var(--panel-border); padding:6px 12px; border-radius:6px;
+  }
+  @media (max-width: 560px){
+    .phase{grid-template-columns:1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Master Plan</div>
+    <h1>{{PROJECT_NAME}}</h1>
+    <div class="meta">마지막 갱신: {{LAST_UPDATED}} — 이 파일은 사람이 읽는 대시보드입니다. 작업 규칙은 AGENTS.md, 구조는 PROJECT_MAP.md를 참고하세요.</div>
+    <div class="legend">
+      <span><i class="dot done"></i>완료</span>
+      <span><i class="dot progress"></i>진행중</span>
+      <span><i class="dot planned"></i>예정</span>
+    </div>
+  </header>
+
+  <section>
+    <!-- 단계(phase) 카드: /project-docs 실행 시 실제 단계로 교체됩니다. 카드를 복제해 단계를 추가하세요. -->
+    <div class="phase">
+      <div class="phase-num">01</div>
+      <div>
+        <h2>{{PHASE_1_TITLE}}</h2>
+        <p>{{PHASE_1_DESC}}</p>
+        <div class="files">{{PHASE_1_RELATED_FILES}}</div>
+      </div>
+      <span class="badge planned">예정</span>
+    </div>
+  </section>
+
+  <div class="docs">
+    <span>AGENTS.md</span>
+    <span>PROJECT_MAP.md</span>
+    <span>ARCHITECTURE.md</span>
+    <span>HARNESS_MAP.md</span>
+    <span>tasks/TASK_TEMPLATE.md</span>
+  </div>
+</div>
+</body>
+</html>
