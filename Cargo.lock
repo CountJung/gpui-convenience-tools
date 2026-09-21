@@ -2328,6 +2328,7 @@ dependencies = [
  "gpui",
  "gpui-component",
  "log",
+ "notify",
  "ntfs",
  "serde",
  "serde_json",

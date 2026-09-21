@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 gpui = { workspace = true }
 gpui-component = { workspace = true }
+notify = { workspace = true }
 anyhow = { workspace = true }
 thiserror = { workspace = true }
 log = { workspace = true }
