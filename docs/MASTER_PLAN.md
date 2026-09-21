@@ -718,6 +718,18 @@ VDI 탐색 화면에서 원본 쓰기 금지와 오프라인 접근 경계를 �
 `cargo check --locked`, 일반 Clippy exit 0, 변경 파일 rustfmt와 `git diff --check`로 수행했다.
 GPUI 파일 행·키보드·복사 UI의 실제 이미지 E2E는 VDE-019의 범위로 남긴다.
 
+### Phase O-18 — VDE-021 실행 중 VM 백엔드 설계 경계 확정
+
+실행 중 VM 지원을 오프라인 VDI 경로와 분리하는 설계 정본을 `docs/VIRTUAL_DISK_BACKENDS.md`에
+추가했다. `VBoxManage guestcontrol`은 VM UUID/이름 기반의 별도 어댑터에서만 사용하며,
+`copyfrom`을 오프라인 `read_at`과 동일한 계약으로 간주하지 않고 필요 시 전송 capability를
+분리한다. `--dereference`와 게스트 변경 명령은 금지하고, 실행 파일 경로·자격 증명·취소·시간
+제한·출력 상한·격리 VM을 후속 구현 조건으로 고정했다.
+
+Oracle 공식 7.1/7.2 문서와 현재 소스의 `GuestFileSource` 계약을 대조해 설계를 작성했으며,
+검토 머신에는 `VBoxManage.exe`가 없어 실제 Guest Control 동작은 검증하지 않았다. VDE-019의
+실제 패널/복사 E2E와 VDE-020 문서 정합성 완료 전에는 이 설계를 구현 완료로 승격하지 않는다.
+
 ## 진행 예정 단계
 
 세부 체크리스트는 `TODO.md`를 정본으로 한다.

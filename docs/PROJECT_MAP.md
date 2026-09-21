@@ -25,6 +25,7 @@
 | `app/src/window/virtual_disk.rs` | VDI 선택·파티션·탐색·파일 행 선택·상위 이동·단축키·진행 UI | VDE-013~017 |
 | `app/src/app/virtual_disk_ops.rs` | **구현됨** — read-only VDI 열기·파티션 검색/선택·게스트 경로 새로고침·폴더 이동·다중 선택·탐색기 포커스·실행 중/미지원 오류 메시지 | VDE-013~014·016~017 |
 | `app/src/app/virtual_disk_copy.rs` | **구현됨** — 대상 폴더 입력/선택, read-only VDI 재연결 백그라운드 복사, 진행·중지·완료 요약 이벤트, 탐색기 keymap 등록 | VDE-015~016; 실제 이미지 E2E는 VDE-019 |
+| `docs/VIRTUAL_DISK_BACKENDS.md` | **설계 정본** — 오프라인 VDI 기본 경로와 실행 중 VM `guestcontrol` 후속 백엔드의 분리·명령·안전·검증 경계 | VDE-021 |
 
 안전 경계: 원본 VDI는 read-only로만 열고, 실행 중 VM의 VDI 직접 읽기는 구현하지 않는다.
 실행 중 VM 지원은 후속 `GuestFileSource` 구현으로만 추가한다(VDE-021).
@@ -316,6 +317,7 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | 2026-09-21 | `app/virtual_disk_ops.rs`·`window/virtual_disk.rs`·`app/tests/virtual_disk.rs` | VDE-017 안전·지원 상태 안내 | 실행 중 VM·잠금·미지원 파일시스템이 일반 읽기 실패와 구분되지 않음 | read-only 안전 경계 카드, 실행 중 VM/잠금 전용 오류, NTFS 3.1 지원 범위 안내, 미지원 파티션 경고, GPUI 상태 렌더 테스트와 920/1000/1280px 실제 캡처 | 실제 VBoxManage 실행 중 VM·미지원 이미지 E2E는 VDE-019에서 검증 |
 | 2026-09-21 | `virtual_disk/partition.rs`·`virtual_disk/vdi.rs`·`virtual_disk/ntfs.rs`·`app/testdata/ntfs-testfs1.img` | VDE-018 고정 NTFS/합성 VDI 검증 | 실제 이미지에 연결된 파티션의 파일시스템 판정과 원본 불변성 통합 증거 없음 | MBR 파티션의 NTFS 3.1 부트 섹터 판정, 고정 NTFS read-only 열거, 손상 복사본 거부, 합성 동적 VDI에서 파티션·루트·파일 읽기 및 VDI 바이트 불변성 테스트 | GPUI 파일 행·키보드·복사 UI E2E는 VDE-019에서 검증 |
 | 2026-09-21 | `app/virtual_disk_ops.rs`·`app/tests/virtual_disk.rs` | VDE-019 GPUI 목록·복사 상태 수용 테스트 착수 | 실제 파일 목록을 주입할 UI 테스트 seam과 복사 상태 렌더 검증이 없음 | `GuestFileSource` trait object 테스트 경계, 숨김·시스템 항목 포함 목록 렌더와 Ctrl+A 선택, 복사 진행·중지·실패 요약 카드 GPUI 테스트 2개 추가; 전체 137 passed·4 ignored | 실제 VirtualBox 패널 캡처·foreground 입력·복사 대상 E2E는 VDE-019 잔여 |
+| 2026-09-21 | `docs/VIRTUAL_DISK_BACKENDS.md` | VDE-021 실행 중 VM 백엔드 설계 검토 | `guestcontrol`을 오프라인 VDI 경로와 혼용할 위험과 실제 명령·자격 증명 경계 미정 | Oracle 공식 명령 계약, `GuestFileSource`/전송 capability 분리, read-only 명령 목록, credential 비저장, 취소·시간 제한·출력 제한, 격리 VM 선행 조건 기록 | `VBoxManage.exe` 미설치로 실제 Guest Control E2E는 후속; VDE-019·VDE-020 완료 전 구현 금지 |
 | 2026-07-29 | 편의 기능 스플리터 3곳 | 공용 레이아웃 승격 | 패널별 고정 초기 폭 | `window::balanced_split` | 설정 pane 과도 축소 방지, 양쪽 가용폭 사용 |
 | 2026-07-29 | `app.rs` | 책임 단위 분할 + 재배치 | 1,798 | `app/` 7파일 (최대 564) | 대시보드·로그 렌더는 소유가 잘못돼 있어 `window/`로 이동 |
 | 2026-07-29 | `platform/windows.rs` | 책임 단위 분할 + 승격 | 1,361 | `platform/windows/` 6파일 (최대 344) | `wide_null`을 `windows/mod.rs`로 **공용 승격** |

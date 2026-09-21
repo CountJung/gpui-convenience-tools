@@ -125,7 +125,7 @@ SHA-256을 기록한다. 다른 검증자의 독립 검토가 요구되는 UI �
 | VDE-018 | RUST | [x] | [x] | — | — | [x] | [x] | `cargo check -p gpui-convenience-tools --locked`; `cargo test -p gpui-convenience-tools virtual_disk:: --all-targets --all-features` (56 passed, 2 ignored); `cargo test --all-targets --all-features` (135 passed, 4 ignored); `cargo clippy --all-targets --all-features` exit 0 (기존 경고 7건); `app/testdata/ntfs-testfs1.img` 기반 합성 MBR+동적 VDI에서 NTFS 루트·파일 읽기와 원본 바이트 불변성 검증, 고정 이미지 read-only 및 복사본 손상 테스트; rustfmt 대상 파일·`git diff --check`; commit·push 완료 |
 | VDE-019 | E2E | [x] | [x] | [x] | [ ] | [x] | [x] | `cargo check -p gpui-convenience-tools --locked`; `cargo test --all-targets --all-features` (137 passed, 4 ignored); GPUI 테스트 `virtual_disk_panel_renders_loaded_hidden_entries_and_selects_all_with_ctrl_a`, `virtual_disk_panel_renders_copy_progress_and_issue_summary`, 기존 키 디스패치 테스트 포함; `Verify-Workspace.ps1` 필수 GPUI 17개 및 전체 테스트 통과; release `CLAUDE_LOCAL` 기본 창 캡처 `target/visual-validation/captures/vde019-default-1000-212738.png`, VirtualBox 패널 전환 Click은 foreground=0으로 안전 차단되어 대상 패널 캡처 미완료; session 정리 processCount=0·sessionCount=0; partial commit `c7b1e17` push 완료 |
 | VDE-020 | DOCS | — | — | — | — | [ ] | [ ] | — |
-| VDE-021 | RUST | [ ] | [ ] | — | — | [ ] | [ ] | — |
+| VDE-021 | DOCS | — | — | — | — | [x] | [ ] | `VIRTUAL_DISK_BACKENDS.md`에 Oracle 공식 `guestcontrol` 계약, 오프라인/실행 중 VM 분리, credential 비저장, 취소·시간 제한·출력 제한·심볼릭 링크 경계를 기록; `VBoxManage.exe` PATH 미발견으로 실제 실행 VM E2E는 미수행; VDE-019·VDE-020 선행 조건과 후속 구현 순서를 명시 |
 | D-006 | RUST | [ ] | [ ] | — | — | [ ] | [ ] | — |
 | D-007 | RUST | [ ] | [ ] | — | — | [ ] | [ ] | — |
 | D-008 | E2E | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | — |

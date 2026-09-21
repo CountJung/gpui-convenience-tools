@@ -69,7 +69,7 @@
 
 - [ ] VDE-019 | 70% | GPUI 자체 테스트로 실제 파일 목록·숨김/시스템 항목·키보드 조작·복사 진행/실패 요약 상태를 검증 완료; 실제 VirtualBox 패널 창 캡처와 독립 Visual Reviewer 확인, 복사 대상 E2E는 후속
 - [ ] VDE-020 | 0% | `PROJECT_MAP.md`에 모듈별 줄 수·책임·공용 유틸을 갱신하고 `MASTER_PLAN.md`에 Phase O 완료 이력 기록
-- [ ] VDE-021 | 0% | 오프라인 기능 안정화 후에만 실행 중 VM용 `VBoxManage guestcontrol` `GuestFileSource` 백엔드의 별도 설계 검토
+- [ ] VDE-021 | 70% | 공식 `VBoxManage guestcontrol` 명령 계약·read-only 안전 경계·`GuestFileSource` 분리 설계를 `VIRTUAL_DISK_BACKENDS.md`에 기록 완료; VDE-019 실제 패널/복사 E2E와 VDE-020 문서 완료, 격리 VM·Guest Additions 준비 전에는 구현·완료 처리하지 않음
 
 > VDE-021은 필수 오프라인 경로의 선행 작업이다. Guest Control이 추가되더라도 실행 중 VDI
 > 직접 읽기를 기본 경로로 되돌리지 않는다.
