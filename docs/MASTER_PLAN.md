@@ -134,6 +134,26 @@ cargo workspace, Hello World 앱 동작 확인
 - `platform/windows.rs`(1,361줄) → `platform/windows/` 6파일 분할
 - 결과: 최대 파일 690줄, 1,000줄 초과 파일 없음
 
+### Phase G-002 — `AppRoot` 기능 상태 묶음 ✅
+
+`AppRoot`의 GPUI 엔티티 생명주기와 이벤트 채널은 유지하면서 기능별 상태 소유권만 일반
+구조체로 분리했다. 엔티티를 기능별로 추가하면 포커스·구독·백그라운드 이벤트 경계가
+불필요하게 늘어나므로, 이번 단계에서는 단일 엔티티 방식을 선택했다.
+
+```mermaid
+flowchart LR
+    root["AppRoot GPUI 엔티티"] --> services["ServiceState"]
+    root --> sync["SyncState"]
+    root --> ad["AdBlockState"]
+    root --> shared["공유 이벤트·백그라운드 경계"]
+```
+
+- `app/ui_state.rs`에 서비스·동기화·광고 패널 상태 구조체를 추가했다.
+- 렌더·입력·이벤트·백그라운드·테스트 픽스처의 필드 참조를 기능 상태 경로로 옮겼다.
+- 전체 `cargo test --all-targets --all-features`에서 139 passed·4 ignored, Clippy는 기존
+  경고 7건만 유지했다.
+- 실제 UI 동작을 바꾸지 않은 구조 리팩터링이므로 E2E·시각 검증은 적용하지 않았다.
+
 ### Phase H — 규칙을 구조 리팩터링 관점으로 승격 ✅
 
 기존 규칙이 "파일 자르기"로 읽혀 줄 수 지표만 내려가고 중복·오배치는 남는 문제가 있었다.

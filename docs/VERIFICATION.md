@@ -145,7 +145,6 @@ SHA-256을 기록한다. 다른 검증자의 독립 검토가 요구되는 UI �
 | E-003 | E2E | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | — |
 | E-004 | E2E | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | — |
 | G-001 | E2E | [x] | [x] | [x] | [ ] | [x] | [x] | `ButtonStyle` 기본값 통일 및 개별 덮어쓰기 제거; `cargo check -p gpui-convenience-tools --locked`; 관련 GPUI 테스트 `ad_block_cards_contain_long_content_at_supported_widths`, `service_rows_keep_names_readable_at_supported_window_widths`, `file_sync_sections_share_one_width_at_every_window_width`; 전체 테스트 139 passed·4 ignored; Clippy 기존 경고 7건; 격리 release 기본 대시보드 캡처 `target/visual-validation/captures/g001-default-001645.png`; 파일 동기화 화면 전환 Click은 foreground=0으로 안전 차단되어 실제 변경 화면 캡처·독립 Visual Reviewer는 후속; commit `0d7bf25` push 완료 |
-| G-002 | RUST | [ ] | [ ] | — | — | [ ] | [ ] | — |
 | K-001 | RUST | [ ] | [ ] | — | — | [ ] | [ ] | — |
 | G-003 | E2E | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | — |
 | G-004 | RUST | [ ] | [ ] | — | — | [ ] | [ ] | — |
@@ -172,6 +171,7 @@ SHA-256을 기록한다. 다른 검증자의 독립 검토가 요구되는 UI �
 | VDE-020 | DOCS | — | — | — | — | [x] | [x] | `PROJECT_MAP.md`의 50개 Rust 파일·19,486줄·모듈별 책임/줄 수와 `MASTER_PLAN.md` Phase O-18 이력을 실측 갱신; `git diff --check` 및 활성 ID 정합성 assertion 통과; Phase O 전체 완료 표시는 VDE-019 후속; commit `840a35e` push 완료 |
 | T-001 | RUST | [x] | [x] | — | — | [x] | [x] | `overwrites_an_existing_readonly_target_file`로 읽기 전용 대상 파일 속성 해제·덮어쓰기·최종 내용 확인; `cargo check -p gpui-convenience-tools --locked`; `cargo test --all-targets --all-features` (139 passed, 4 ignored); Clippy exit 0, 기존 경고 7건; commit `8d14458` push 완료 |
 | T-002 | RUST | [x] | [x] | — | — | [x] | [x] | `update_config_preserves_unedited_fields`로 서비스·타겟·즐겨찾기·동기화 진행 정보·로그 설정 보존과 디스크 재로드 확인; 임시 `GPUI_CONVENIENCE_TOOLS_DATA_DIR` 격리; `cargo check --locked`; 전체 139 passed·4 ignored; Clippy 기존 경고 7건; commit `8d14458` push 완료 |
+| G-002 | RUST | [x] | [x] | — | — | [x] | [x] | `AppRoot` 단일 GPUI 엔티티를 유지하면서 `ServiceState`·`SyncState`·`AdBlockState`로 기능별 상태 소유권 분리; `cargo check -p gpui-convenience-tools --locked`; `cargo test --all-targets --all-features` 전체 139 passed·4 ignored; Clippy 기존 경고 7건; 실제 UI 동작 변경이 없는 구조 리팩터링으로 E/V는 N/A; commit `3185369` push 완료 |
 | VDE-004 | RUST | [x] | [x] | — | — | [x] | [x] | `virtual_disk::vdi` 4개 테스트 통과; VDI 1.1 헤더·블록 맵·동적 미할당/고정 이미지 읽기·차등 이미지 거부·중복/범위/오버플로 검증; `cargo test --all-targets --all-features --locked`, `cargo check -p gpui-convenience-tools --locked`, `git diff --check` 통과 |
 | VDE-005 | RUST | [x] | [x] | — | — | [x] | [x] | `virtual_disk::vdi` 9개 테스트 통과; `.lck` 표식 거부·환경변수 기반 VBoxManage 경로 대조 함수·read-only 핸들·크기/mtime 변경 감지; `cargo test -p gpui-convenience-tools virtual_disk::vdi --locked`, 전체 `cargo test --all-targets --all-features --locked`, `cargo check -p gpui-convenience-tools --locked`, `git diff --check` 통과 |
 | VDE-006 | RUST | [x] | [x] | — | — | [x] | [x] | `virtual_disk::partition` 6개 테스트 통과; MBR 기본·확장 EBR 논리 파티션·protective MBR/GPT·주·백업 GPT 헤더 CRC·MBR 범위 초과 검증; `cargo test -p gpui-convenience-tools --all-targets --all-features --locked`, `cargo check -p gpui-convenience-tools --locked`, `cargo build -p gpui-convenience-tools --locked`, `git diff --check` 통과 |
