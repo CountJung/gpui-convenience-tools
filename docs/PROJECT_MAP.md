@@ -31,7 +31,7 @@
 안전 경계: 원본 VDI는 read-only로만 열고, 실행 중 VM의 VDI 직접 읽기는 구현하지 않는다.
 실행 중 VM 지원은 후속 `GuestFileSource` 구현으로만 추가한다(VDE-021).
 
-**최종 측정**: 2026-09-22 · `app/src` 총 56개 파일 · 21,403줄
+**최종 측정**: 2026-09-22 · `app/src` 총 56개 파일 · 21,453줄
 
 ## 크기 기준 — 줄 수는 증상이다
 
@@ -118,9 +118,9 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `inputs.rs` | 136 | 입력 위젯(`InputState`) 지연 생성과 값 동기화 — 파일 동기화 제외 패턴 멀티라인 편집기 포함 |
 | `ui_state.rs` | 79 | `ServiceState`·`SyncState`·`AdBlockState`와 최근 동기화 이력 — 단일 `AppRoot` 엔티티가 소유하는 기능별 UI 상태 묶음 |
 | `virtual_disk_ops.rs` | 629 | VDI 경로 입력·read-only 열기·파티션 검색/선택·게스트 목록 새로고침·폴더 이동·Ctrl 토글/Shift 범위 다중 선택·포커스·stale 목록 제거를 포함한 안전 오류 안내·항목별 반복 알림 억제 저장 |
-| `virtual_disk_copy.rs` | 519 | VDI 대상 폴더 입력·선택, 백그라운드 read-only 복사, 청크 단위 중지 요청, 진행·중지·완료 요약·항목별 오류 로그·미억제 토스트 게이트·탐색기 keymap·검증 자동 복사·검증 자동 중지 |
+| `virtual_disk_copy.rs` | 564 | VDI 대상 폴더 입력·선택, 백그라운드 read-only 복사, 청크 단위 중지 요청, 진행·중지·완료 요약·항목별 오류 로그·미억제 토스트 게이트·탐색기 keymap·검증 자동 복사·검증 자동 중지·검증 전용 읽기 지연 |
 | `watch.rs` | 303 | `notify` 재귀 watcher 소유·작업별 변경 이벤트 전달·2초 quiet debounce·감시 실패 중복 억제·작업 변경 시 정리 |
-| `validation.rs` | 106 | 릴리스 화면 검증 전용 초기 패널·VDI·파티션·게스트 경로·자동 중지 시드; 사용자 설정에는 저장하지 않는 격리 입력 |
+| `validation.rs` | 111 | 릴리스 화면 검증 전용 초기 패널·VDI·파티션·게스트 경로·자동 중지·읽기 지연 시드; 사용자 설정에는 저장하지 않는 격리 입력 |
 
 ### GPUI 회귀 테스트 (`app/src/app/tests/`) — 2,057줄 / 6파일
 
@@ -191,7 +191,7 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `.codex/agents/code-reviewer.toml` | 9 | Codex용 Code Reviewer 얇은 어댑터 |
 | `.codex/agents/docs-sync.toml` | 9 | Codex용 Documentation Sync 얇은 어댑터 |
 | `scripts/Verify-Workspace.ps1` | 167 | VS Code용 Rust/GPUI 자동 검증과 ChatGPT 데스크톱 handoff manifest·해시 고정 빌드 생성 |
-| `scripts/Invoke-ClaudeVisualCheck.ps1` | 652 | `CLAUDE_LOCAL` 시각 검증 하네스 — 격리 실행(`-SeedConfig`·`-SeedHistory`·`-InitialPanel`로 상태 재현), 다중 파티션 VDI 선택(`-VdiPartitionNumber`), 원본 복사 없는 대용량 VDI 연결(`-ExternalVdiPath`), 자동 중지(`-CancelAfterMs`), 창 캡처(`PrintWindow`)·입력(`SendInput`)·정리 |
+| `scripts/Invoke-ClaudeVisualCheck.ps1` | 664 | `CLAUDE_LOCAL` 시각 검증 하네스 — 격리 실행(`-SeedConfig`·`-SeedHistory`·`-InitialPanel`로 상태 재현), 다중 파티션 VDI 선택(`-VdiPartitionNumber`), 원본 복사 없는 대용량 VDI 연결(`-ExternalVdiPath`), 자동 중지(`-CancelAfterMs`)·읽기 지연(`-ReadDelayMs`), 창 캡처(`PrintWindow`)·입력(`SendInput`)·정리 |
 | `scripts/Verify-AdWindowState.ps1` | 282 | 지정 PID와 앱 조상·자손의 최상위·선택적 자식 창 상태와 클래스 후보를 읽기 전용 점검(AD-002·AD-005 진단) |
 | `scripts/Start-DesktopVisualValidation.ps1` | 126 | manifest 해시 검증 후 단일 임시 데이터 루트 격리 프로세스·세션 파일 생성과 실패 롤백 |
 | `scripts/Stop-DesktopVisualValidation.ps1` | 75 | 기록된 검증 PID·시작 시각과 작업 전용 임시 루트만 검증 후 정리 |
@@ -200,7 +200,7 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `.github/workflows/release.yml` | 140 | `v*` 태그 → Windows·macOS 병렬 빌드 후 단일 Release 생성 |
 | `.github/workflows/macos-build.yml` | 47 | push/PR마다 macOS check·test·패키징 — 비Windows cfg 경로의 **유일한** 검증 지점 |
 
-> `Invoke-ClaudeVisualCheck.ps1`은 639줄이지만 분할하지 않는다. 하나의 Win32 시퀀스
+> `Invoke-ClaudeVisualCheck.ps1`은 664줄이지만 분할하지 않는다. 하나의 Win32 시퀀스
 > (P/Invoke 선언 → 세션 → 캡처 → 입력 → 정리)를 공유하고, 쪼개면 각 파일이 같은 `Add-Type`
 > 블록과 세션 스키마를 중복 소유하게 되어 응집도가 깨진다.
 > 정본의 「구조 리팩터링 기준 > 예외」 조항을 적용한다.
@@ -374,6 +374,7 @@ G-001 판단: `muted`는 비활성 의미이므로 테두리와 hover를 추가�
 | 2026-09-22 | `scripts/Invoke-ClaudeVisualCheck.ps1`·`docs/TODO.md`·`docs/VERIFICATION.md` | D-020·G-001 2차 자체 시각 교차 확인 | 구현 세션의 기존 캡처만으로는 최신 release의 리사이즈 후 카드 경계를 다시 확인할 수 없음 | 별도 격리 세션에서 D-020을 994×702·1280×900으로, G-001을 994×702·1280×900으로 재캡처; 이력 3행·자동 시작 카드·안내 문장 폭을 확인하고 세션 종료 후 process/session 0 기록 | 같은 에이전트의 자체 교차 확인이며 독립 Visual Reviewer 검토는 여전히 후속 |
 | 2026-09-22 | `app/src/app/validation.rs`·`scripts/Invoke-ClaudeVisualCheck.ps1`·`docs/TODO.md`·`docs/VERIFICATION.md` | VDE-015·VDE-019 다중 파티션 실제 VDI 중지 재검증 | TACS VDI의 기본 선택 파티션은 작은 시스템 파티션이어서 OS 경로를 재현할 수 없었고, 파티션 선택 입력은 포그라운드 안전 차단으로 보낼 수 없음 | 검증 전용 `-VdiPartitionNumber`와 `GPUI_CONVENIENCE_TOOLS_VALIDATION_VDI_PARTITION_NUMBER`를 추가하고, 실제 종료 TACS 파티션 5 선택 캡처 `vde015-tacs-partition5-root-060904.png`를 확인; 파티션 1 `$Extend`에서 250ms 중지 `vde015-tacs-extend-cancel-061128.png`는 파일 0개 중지, 600ms `vde015-tacs-extend-cancel-600-061151.png`는 8개·4.1MB 완료로 확인; 원본 길이 85,269,151,744바이트 불변·VM poweroff·process/session 0 | 실제 대용량 파일 청크 중지·외부 키보드·독립 Visual Reviewer는 여전히 미검증 |
 | 2026-09-22 | `app/src/app/tests/virtual_disk.rs`·`scripts/Verify-Workspace.ps1`·`docs/TODO.md`·`docs/VERIFICATION.md` | VDE-014 폴더 더블클릭 GPUI 이벤트 검증 | 기존 폴더 진입 테스트가 상태 메서드 직접 호출에 머물러 실제 행 `on_click`의 더블클릭 분기를 고정하지 못함 | `virtual_disk_directory_row_double_click_enters_directory_and_refreshes_entries`가 렌더된 폴더 행에 `MouseDown/MouseUp click_count=2`를 전달해 경로 이동·새로고침·오류 시 목록 제거를 확인; 필수 GPUI 테스트 26개·전체 161 passed·4 ignored·check·Clippy·구조/문서 게이트 통과; 최신 구조 56개 파일·21,371줄·최대 821줄 | 실제 데스크톱 Click·Shift 입력과 독립 Visual Reviewer는 포그라운드 안전 경계로 미검증 |
+| 2026-09-22 | `app/src/app/virtual_disk_copy.rs`·`app/src/app/validation.rs`·`scripts/Invoke-ClaudeVisualCheck.ps1`·`docs/TODO.md`·`docs/VERIFICATION.md` | VDE-015 실제 대용량 청크 취소 보조 검증 | 실제 TACS VDI에서 자연 속도 복사가 빨리 끝나 대용량 파일 중간 취소를 일정하게 재현하기 어려움 | 검증 전용 `-ReadDelayMs`를 추가해 일반 실행에는 지연을 주지 않고 게스트 `read_at` 호출만 늦춤; 종료된 TACS의 `$Extend/$RmMetadata/$TxfLog`에서 실제 2MiB 파일 복사 중 0바이트 부분 파일을 관찰하고 `-CancelAfterMs 2200` 후 미완성 파일 제거·완료 파일 보존, UI `중지됨 · 파일 2개 · 64.0 KB`와 캡처 `vde015-txf-log-slow-chunk-before-cancel-062617.png`, `vde015-txf-log-slow-chunk-after-cancel-062619.png` 확인; 원본 85,269,151,744바이트·VM poweroff·process/session 0 | 자연 속도 대용량 청크 중지·독립 Visual Reviewer·실제 릴리스 버튼 조작은 후속 |
 | 2026-07-29 | 편의 기능 스플리터 3곳 | 공용 레이아웃 승격 | 패널별 고정 초기 폭 | `window::balanced_split` | 설정 pane 과도 축소 방지, 양쪽 가용폭 사용 |
 | 2026-07-29 | `app.rs` | 책임 단위 분할 + 재배치 | 1,798 | `app/` 7파일 (최대 564) | 대시보드·로그 렌더는 소유가 잘못돼 있어 `window/`로 이동 |
 | 2026-07-29 | `platform/windows.rs` | 책임 단위 분할 + 승격 | 1,361 | `platform/windows/` 6파일 (최대 344) | `wide_null`을 `windows/mod.rs`로 **공용 승격** |

@@ -57,6 +57,10 @@ param(
     [ValidateRange(1, 600000)]
     [int]$CancelAfterMs,
 
+    # Start 전용. 검증용 복사 작업 스레드의 게스트 읽기 호출 사이 지연(ms).
+    [ValidateRange(1, 600000)]
+    [int]$ReadDelayMs,
+
     # Start 전용. VDI 시드 직후 전체 항목을 선택한다. 자동 복사 시에는 자동으로 켜진다.
     [switch]$SelectAllVdi,
 
@@ -397,6 +401,7 @@ switch ($Action) {
         $previousValidationVdiGuestPath = $env:GPUI_CONVENIENCE_TOOLS_VALIDATION_VDI_GUEST_PATH
         $previousValidationVdiPartitionNumber = $env:GPUI_CONVENIENCE_TOOLS_VALIDATION_VDI_PARTITION_NUMBER
         $previousValidationVdiCancelAfterMs = $env:GPUI_CONVENIENCE_TOOLS_VALIDATION_VDI_CANCEL_AFTER_MS
+        $previousValidationVdiReadDelayMs = $env:GPUI_CONVENIENCE_TOOLS_VALIDATION_VDI_READ_DELAY_MS
         $previousVboxManage = $env:GPUI_CONVENIENCE_TOOLS_VBOXMANAGE
         try {
             $env:APPDATA = $appData
@@ -421,6 +426,9 @@ switch ($Action) {
                 }
                 if ($CancelAfterMs -gt 0) {
                     $env:GPUI_CONVENIENCE_TOOLS_VALIDATION_VDI_CANCEL_AFTER_MS = $CancelAfterMs.ToString()
+                }
+                if ($ReadDelayMs -gt 0) {
+                    $env:GPUI_CONVENIENCE_TOOLS_VALIDATION_VDI_READ_DELAY_MS = $ReadDelayMs.ToString()
                 }
                 if (-not [string]::IsNullOrWhiteSpace($InitialGuestPath)) {
                     $env:GPUI_CONVENIENCE_TOOLS_VALIDATION_VDI_GUEST_PATH = $InitialGuestPath
@@ -477,6 +485,10 @@ switch ($Action) {
                 Remove-Item Env:\GPUI_CONVENIENCE_TOOLS_VALIDATION_VDI_CANCEL_AFTER_MS -ErrorAction SilentlyContinue
             }
             else { $env:GPUI_CONVENIENCE_TOOLS_VALIDATION_VDI_CANCEL_AFTER_MS = $previousValidationVdiCancelAfterMs }
+            if ($null -eq $previousValidationVdiReadDelayMs) {
+                Remove-Item Env:\GPUI_CONVENIENCE_TOOLS_VALIDATION_VDI_READ_DELAY_MS -ErrorAction SilentlyContinue
+            }
+            else { $env:GPUI_CONVENIENCE_TOOLS_VALIDATION_VDI_READ_DELAY_MS = $previousValidationVdiReadDelayMs }
             if ($null -eq $previousVboxManage) {
                 Remove-Item Env:\GPUI_CONVENIENCE_TOOLS_VBOXMANAGE -ErrorAction SilentlyContinue
             }

@@ -10,6 +10,7 @@ use std::{
         atomic::{AtomicBool, Ordering},
         Arc,
     },
+    time::Duration,
 };
 
 use gpui::{
@@ -22,7 +23,7 @@ use crate::virtual_disk::{
     ntfs::NtfsGuestFileSource,
     path_policy::HostPathPolicy,
     vdi::VdiReader,
-    GuestFileEntry, VdiPartition, VirtualDiskError,
+    GuestFileEntry, GuestFileSource, GuestFileSystem, VdiPartition, VirtualDiskError,
 };
 
 use super::{state::PlatformEvent, AppRoot};
@@ -112,6 +113,8 @@ pub(crate) struct VirtualDiskCopyState {
     pub(crate) validation_auto_copy_scheduled: bool,
     /// 릴리스 검증 하네스 전용 자동 중지 지연. 일반 사용자 설정에는 저장하지 않는다.
     pub(crate) validation_cancel_after_ms: Option<u64>,
+    /// 릴리스 검증 하네스 전용 게스트 읽기 지연. 일반 사용자 설정에는 저장하지 않는다.
+    pub(crate) validation_read_delay_ms: Option<u64>,
 }
 
 /// 백그라운드 작업이 UI 채널로 전달하는 종료 결과.
@@ -294,6 +297,7 @@ impl AppRoot {
 
         let cancel = Arc::clone(&self.virtual_disk.copy.cancel);
         let event_tx = self.event_tx.clone();
+        let validation_read_delay_ms = self.virtual_disk.copy.validation_read_delay_ms.take();
         std::thread::spawn(move || {
             let outcome = copy_selected_entries(
                 source_path,
@@ -302,6 +306,7 @@ impl AppRoot {
                 entries,
                 cancel,
                 event_tx.clone(),
+                validation_read_delay_ms,
             );
             let _ = event_tx.send(PlatformEvent::VirtualDiskCopyFinished { outcome });
         });
@@ -453,13 +458,18 @@ fn copy_selected_entries(
     entries: Vec<GuestFileEntry>,
     cancel: Arc<AtomicBool>,
     event_tx: tokio::sync::mpsc::UnboundedSender<PlatformEvent>,
+    validation_read_delay_ms: Option<u64>,
 ) -> VirtualDiskCopyOutcome {
     let total_entries = entries.len();
     let _ = event_tx.send(PlatformEvent::VirtualDiskCopyStarted { total_entries });
 
     let result = (|| {
         let reader = VdiReader::open(source_path)?;
-        let mut source = NtfsGuestFileSource::open(reader, partition)?;
+        let source = NtfsGuestFileSource::open(reader, partition)?;
+        let mut source = ValidationDelayedGuestSource {
+            inner: source,
+            delay: validation_read_delay_ms.map(Duration::from_millis),
+        };
         let policy = HostPathPolicy::new(target_path, MAX_HOST_PATH_UNITS)?;
         let engine = GuestCopyEngine::new(policy, CollisionPolicy::Skip, COPY_CHUNK_BYTES)?;
         let mut issue_log = CopyIssueLog::default();
@@ -501,6 +511,41 @@ fn copy_selected_entries(
             report: CopyReport::default(),
             error: Some(format_virtual_disk_error(&error)),
         },
+    }
+}
+
+/// 검증 전용으로 게스트 읽기만 늦춘다. 일반 실행에서는 `delay=None`이며 추가 비용이 없다.
+struct ValidationDelayedGuestSource<S> {
+    inner: S,
+    delay: Option<Duration>,
+}
+
+impl<S: GuestFileSource> GuestFileSource for ValidationDelayedGuestSource<S> {
+    fn filesystem(&self) -> GuestFileSystem {
+        self.inner.filesystem()
+    }
+
+    fn root(&mut self) -> Result<GuestFileEntry, VirtualDiskError> {
+        self.inner.root()
+    }
+
+    fn list_directory(
+        &mut self,
+        directory: &GuestFileEntry,
+    ) -> Result<Vec<GuestFileEntry>, VirtualDiskError> {
+        self.inner.list_directory(directory)
+    }
+
+    fn read_at(
+        &mut self,
+        file: &GuestFileEntry,
+        offset: u64,
+        buffer: &mut [u8],
+    ) -> Result<usize, VirtualDiskError> {
+        if let Some(delay) = self.delay {
+            std::thread::sleep(delay);
+        }
+        self.inner.read_at(file, offset, buffer)
     }
 }
 

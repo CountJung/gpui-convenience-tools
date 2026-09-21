@@ -103,4 +103,9 @@ pub(super) fn seed_validation_virtual_disk(root: &mut AppRoot, cx: &mut Context<
             .ok()
             .and_then(|value| value.parse::<u64>().ok())
             .filter(|delay_ms| *delay_ms > 0);
+    root.virtual_disk.copy.validation_read_delay_ms =
+        std::env::var("GPUI_CONVENIENCE_TOOLS_VALIDATION_VDI_READ_DELAY_MS")
+            .ok()
+            .and_then(|value| value.parse::<u64>().ok())
+            .filter(|delay_ms| *delay_ms > 0);
 }
