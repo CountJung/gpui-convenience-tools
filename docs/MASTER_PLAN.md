@@ -642,7 +642,7 @@ VDE-011에서 분리된 메타데이터 실패와 복사 중 원본 변경·대�
 exit 0(기존 경고 7건)을 다시 확인했다. 실제 릴리스 버튼 조작과 독립 Visual Reviewer는
 VDE-012의 잔여 게이트다.
 
-### Phase O-12 — VDE-013 오프라인 VDI 탐색기 셸 착수
+### Phase O-12 — VDE-013 오프라인 VDI 탐색기 셸 완료 ✅
 
 VirtualBox 오프라인 도메인을 GPUI에서 안전하게 시작할 수 있는 첫 화면과 상태 경계를
 연결했다.
@@ -658,8 +658,11 @@ VirtualBox 오프라인 도메인을 GPUI에서 안전하게 시작할 수 있�
   검증한다.
 
 검증은 `virtual_disk_panel_registers_navigation_and_renders_read_only_shell` GPUI 테스트와
-릴리즈 `CLAUDE_LOCAL` 920×700·1280×700 캡처로 수행했다. 시각 검증 세션 종료 후 프로세스와
-임시 세션 루트가 모두 0개임을 확인했다.
+릴리즈 `CLAUDE_LOCAL` 920×700·1280×700 캡처로 수행했다. 후속 VirtualBox 7.2.14 표준 VDI
+릴리스 검증에서 실제 VDI 경로·MBR/NTFS 파티션·게스트 루트 연결까지 확인했고, 새로고침은
+GPUI 경계 테스트로 고정했다. 캡처는 `vde019-vbox-standard-loaded-023912.png`이며, 시각
+검증 세션 종료 후 프로세스와 임시 세션 루트가 모두 0개였다. 상세 게이트는
+`VERIFICATION.md`의 VDE-013 완료 기록을 참조한다.
 
 ### Phase O-13 — VDE-014 탐색기 목록 조작 착수
 
