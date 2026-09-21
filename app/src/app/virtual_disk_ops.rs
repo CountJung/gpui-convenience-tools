@@ -1,8 +1,8 @@
 //! VirtualBox 오프라인 디스크 탐색 상태와 읽기 작업.
 //!
 //! 이 모듈은 GPUI 렌더링과 VDI/NTFS 읽기 구현을 분리한다. 원본은 항상
-//! `VdiReader`의 read-only 경계로 열며, 이 단계에서는 디스크·파티션·현재 경로를
-//! 준비하고 목록을 새로 고치는 작업만 제공한다.
+//! `VdiReader`의 read-only 경계로 열며, 디스크·파티션·현재 경로·선택·포커스 상태와
+//! 안전/지원 범위 오류 메시지를 관리한다.
 
 use std::{collections::HashSet, path::PathBuf};
 
@@ -11,7 +11,8 @@ use gpui_component::input::{InputEvent, InputState};
 
 use crate::virtual_disk::{
     ntfs::NtfsGuestFileSource, partition::discover_partitions, vdi::VdiReader, GuestFileAttributes,
-    GuestFileEntry, GuestFileKind, GuestFileSource, GuestPath, VdiPartition, VirtualDiskError,
+    GuestFileEntry, GuestFileKind, GuestFileSource, GuestPath, UnsupportedFormatKind, VdiPartition,
+    VirtualDiskError,
 };
 
 use super::virtual_disk_copy::VirtualDiskCopyState;
@@ -264,7 +265,25 @@ impl AppRoot {
 }
 
 fn format_virtual_disk_error(error: &VirtualDiskError) -> String {
-    format!("읽기 실패: {error}")
+    match error {
+        VirtualDiskError::ReadOnlyViolation(detail) => format!(
+            "접근 차단: 실행 중인 VM이 사용 중이거나 잠금 상태인 VDI는 직접 읽을 수 없습니다. VM을 완전히 종료한 뒤 다시 시도하세요. ({detail})"
+        ),
+        VirtualDiskError::UnsupportedFormat {
+            kind: UnsupportedFormatKind::FileSystem,
+            detail,
+        } => format!(
+            "지원하지 않는 파일시스템입니다. 현재 오프라인 탐색은 NTFS 3.1만 지원합니다. ({detail})"
+        ),
+        VirtualDiskError::UnsupportedFormat {
+            kind: UnsupportedFormatKind::PartitionTable,
+            detail,
+        } => format!("지원하지 않는 파티션 테이블입니다. ({detail})"),
+        VirtualDiskError::GuestEntry { path, source } => {
+            format!("게스트 항목 {path} 읽기 실패: {}", format_virtual_disk_error(source))
+        }
+        _ => format!("읽기 실패: {error}"),
+    }
 }
 
 #[cfg(test)]
@@ -285,6 +304,28 @@ mod tests {
         assert!(session.focus_handle.is_none());
         assert!(session.source.is_none());
         assert!(session.error.is_none());
+    }
+
+    #[test]
+    fn running_vm_error_explains_the_safe_offline_boundary() {
+        let message = format_virtual_disk_error(&VirtualDiskError::ReadOnlyViolation(
+            "실행 중인 VM이 VDI를 사용 중입니다".to_string(),
+        ));
+
+        assert!(message.contains("실행 중인 VM"));
+        assert!(message.contains("VM을 완전히 종료"));
+        assert!(message.contains("직접 읽을 수 없습니다"));
+    }
+
+    #[test]
+    fn unsupported_filesystem_error_names_the_supported_version() {
+        let message = format_virtual_disk_error(&VirtualDiskError::UnsupportedFormat {
+            kind: UnsupportedFormatKind::FileSystem,
+            detail: "ext4 파티션".to_string(),
+        });
+
+        assert!(message.contains("지원하지 않는 파일시스템"));
+        assert!(message.contains("NTFS 3.1"));
     }
 }
 

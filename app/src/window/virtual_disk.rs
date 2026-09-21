@@ -1,7 +1,8 @@
 //! VirtualBox 오프라인 VDI 탐색 패널.
 //!
-//! VDE-013~014 범위는 VDI 경로 입력, 파티션 선택, 현재 게스트 경로, 목록 표시,
-//! 폴더 이동과 기본 선택이다. 실제 복사와 키보드 단축키는 후속 단계에서 연결한다.
+//! VDE-013~017 범위는 VDI 경로 입력, 파티션 선택, 현재 게스트 경로, 목록 표시,
+//! 폴더 이동·복사·키보드 단축키와 안전/지원 상태 안내를 제공한다. 실제 이미지 E2E는
+//! VDE-018~019에서 검증한다.
 
 use gpui::{
     div, px, AnyElement, ClickEvent, Context, InteractiveElement, IntoElement, ParentElement,
@@ -35,12 +36,31 @@ pub fn render(this: &mut AppRoot, window: &mut Window, cx: &mut Context<AppRoot>
             .p_1()
             .pr_3()
             .child(render_header(this, cx))
+            .child(render_safety_notice(cx))
             .child(render_source_card(this, cx))
             .child(render_partition_card(this, cx))
             .child(render_directory_card(this, cx))
             .child(render_copy_card(this, cx))
             .into_any_element(),
     )
+}
+
+fn render_safety_notice(cx: &Context<AppRoot>) -> AnyElement {
+    let theme = cx.theme();
+    v_flex()
+        .debug_selector(|| "virtual-disk-safety-notice".to_string())
+        .w_full()
+        .min_w_0()
+        .gap_1()
+        .rounded_lg()
+        .p_3()
+        .bg(theme.warning)
+        .text_color(theme.warning_foreground)
+        .child(div().child("안전 경계: 원본 VDI는 항상 읽기 전용으로만 엽니다."))
+        .child(div().child(
+            "실행 중인 VM이 사용 중인 디스크, 잠금 표식이 있는 디스크는 직접 읽지 않습니다. VM을 종료한 뒤 다시 시도하세요.",
+        ))
+        .into_any_element()
 }
 
 fn render_header(this: &AppRoot, cx: &Context<AppRoot>) -> AnyElement {
@@ -149,21 +169,32 @@ fn render_partition_card(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyEl
             let selected = this.virtual_disk.selected_partition == Some(index);
             let label = format_partition_label(partition);
             let selector_id = format!("virtual-disk-partition-{index}");
-            list = list.child(div().debug_selector(move || selector_id.clone()).child(
-                ui::action_button(
-                    ("virtual-disk-partition", index),
-                    label,
-                    ui::Size::Md,
-                    if selected {
-                        ButtonStyle::primary(cx)
-                    } else {
-                        ButtonStyle::neutral(cx)
-                    },
-                    cx.listener(move |this, _event, _window, cx| {
-                        this.select_virtual_disk_partition(index, cx);
-                    }),
-                ),
-            ));
+            let mut partition_row = v_flex().w_full().min_w_0().gap_1().child(
+                div()
+                    .debug_selector(move || selector_id.clone())
+                    .child(ui::action_button(
+                        ("virtual-disk-partition", index),
+                        label,
+                        ui::Size::Md,
+                        if selected {
+                            ButtonStyle::primary(cx)
+                        } else {
+                            ButtonStyle::neutral(cx)
+                        },
+                        cx.listener(move |this, _event, _window, cx| {
+                            this.select_virtual_disk_partition(index, cx);
+                        }),
+                    )),
+            );
+            if let Some(message) = partition_support_message(partition) {
+                partition_row = partition_row.child(
+                    div()
+                        .debug_selector(move || format!("virtual-disk-partition-warning-{index}"))
+                        .text_color(theme.warning)
+                        .child(message),
+                );
+            }
+            list = list.child(partition_row);
         }
     }
 
@@ -517,6 +548,19 @@ fn format_partition_label(partition: &crate::virtual_disk::VdiPartition) -> Stri
         None => "미지원/미확인 파일시스템".to_string(),
     };
     format!("파티션 {} · {table} · {filesystem}", partition.number)
+}
+
+fn partition_support_message(partition: &crate::virtual_disk::VdiPartition) -> Option<String> {
+    match partition.filesystem {
+        Some(GuestFileSystem::Ntfs { major: 3, minor: 1 }) => None,
+        Some(GuestFileSystem::Ntfs { major, minor }) => Some(format!(
+            "지원하지 않는 파일시스템 버전입니다: NTFS {major}.{minor}. 현재 NTFS 3.1만 탐색할 수 있습니다."
+        )),
+        None => Some(
+            "지원하지 않거나 확인할 수 없는 파일시스템입니다. 현재 NTFS 3.1만 탐색할 수 있습니다."
+                .to_string(),
+        ),
+    }
 }
 
 fn format_attribute_label(attributes: GuestFileAttributes) -> String {
