@@ -114,7 +114,7 @@ fn main() {
             },
             |window, cx| {
                 window.set_window_title("gpui-convenience-tools");
-                let view = cx.new(|cx| AppRoot::new(cx));
+                let view = cx.new(AppRoot::new);
                 cx.new(|cx| Root::new(view, window, cx))
             },
         )

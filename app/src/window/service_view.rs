@@ -1,13 +1,13 @@
-/// 자동 시작 관리 뷰 (작업 스케줄러 방식)
-///
-/// Windows 작업 스케줄러(Task Scheduler)를 통해 로그온 시 자동 시작을
-/// UI에서 등록·삭제·즉시 실행할 수 있는 패널이다.
-///
-/// ## Session 0 격리 문제와 해결책
-/// SCM(Windows Service)은 Session 0(비대화형)에서 실행되어
-/// 사용자 데스크톱 창(KakaoTalk 등)을 EnumWindows/ShowWindow로
-/// 조작할 수 없다. 작업 스케줄러의 ONLOGON + /IT 트리거는
-/// 사용자 세션(Session 1)에서 직접 실행되므로 이 문제가 없다.
+//! 자동 시작 관리 뷰 (작업 스케줄러 방식)
+//!
+//! Windows 작업 스케줄러(Task Scheduler)를 통해 로그온 시 자동 시작을
+//! UI에서 등록·삭제·즉시 실행할 수 있는 패널이다.
+//!
+//! ## Session 0 격리 문제와 해결책
+//! SCM(Windows Service)은 Session 0(비대화형)에서 실행되어
+//! 사용자 데스크톱 창(KakaoTalk 등)을 EnumWindows/ShowWindow로
+//! 조작할 수 없다. 작업 스케줄러의 ONLOGON + /IT 트리거는
+//! 사용자 세션(Session 1)에서 직접 실행되므로 이 문제가 없다.
 
 use gpui::{div, AnyElement, Context, Hsla, IntoElement, ParentElement, Styled, Window};
 use gpui_component::{h_flex, v_flex, theme::ActiveTheme};

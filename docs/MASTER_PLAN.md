@@ -1039,6 +1039,14 @@ passed·4 ignored, Clippy exit 0, `git diff --check`를 통과했으며 구현 �
 전체 145 passed·4 ignored, Clippy exit 0(기존 경고 7건), `git diff --check`와 격리 release
 기본·시드 패널 캡처를 통과했으며 구현 커밋은 `031148e`, 검증 하네스 커밋은 `ff9dc72`이다.
 
+#### 품질 게이트 — Clippy baseline 정리 완료 ✅
+
+- `service_view.rs`의 모듈 문서 주석, Windows 트레이 FFI의 불필요한 mutable 참조,
+  VDI 섹터 정렬 검사의 `is_multiple_of` 사용, `AppRoot::new` 중복 클로저를 정리했다.
+- `cargo check --locked`, 전체 `cargo test --all-targets --all-features --locked`의 155 passed·4
+  ignored, 표준 Clippy의 exit 0·경고 0건을 확인했다. 전체 rustfmt 검사는 기존 baseline 차이로
+  재포맷하지 않았다.
+
 - 실시간 감시(`notify` 직접 의존성·스키마·디바운스·강등·설정 UI는 D-009~D-013 완료)
 - 제외 패턴(glob) 지원
 - 진행률 표시 및 취소

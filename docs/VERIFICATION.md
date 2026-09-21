@@ -21,6 +21,11 @@
 텍스트 입력·divider drag처럼 로컬 창 하네스가 지원하지 않는 입력은 GPUI 테스트로 검증하고,
 하네스 미지원 상태를 `N/A` 사유 없이 `PASS`로 기록하지 않는다.
 
+최신 품질 게이트 기준은 `cargo check -p gpui-convenience-tools --locked`, 전체 테스트
+155 passed·4 ignored, 표준 `cargo clippy --all-targets --all-features --locked` exit 0·경고
+0건이다. 전체 `cargo fmt --check`는 기존 baseline 포맷 차이가 남아 있어 별도 구조 정리 범위로
+유지한다.
+
 ## 작업마다 적용하는 순서
 
 작업 ID 하나를 완료 처리하기 전에 아래 순서를 따른다. 문서 전용 작업은 해당 없는 코드

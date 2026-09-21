@@ -411,14 +411,14 @@ fn validate_header(header: &VdiHeader, file_len: u64) -> Result<(), VirtualDiskE
             ),
         });
     }
-    if header.block_size == 0 || header.block_size % header.sector_size != 0 {
+    if header.block_size == 0 || !header.block_size.is_multiple_of(header.sector_size) {
         return Err(corrupt(format!(
             "VDI 블록 크기가 섹터 경계에 맞지 않습니다: {}",
             header.block_size
         )));
     }
-    if header.offset_bmap as u64 % header.sector_size as u64 != 0
-        || header.offset_data as u64 % header.sector_size as u64 != 0
+    if !(header.offset_bmap as u64).is_multiple_of(header.sector_size as u64)
+        || !(header.offset_data as u64).is_multiple_of(header.sector_size as u64)
     {
         return Err(corrupt(
             "블록 맵 또는 데이터 오프셋이 섹터 경계에 맞지 않습니다",

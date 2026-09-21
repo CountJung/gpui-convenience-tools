@@ -168,7 +168,7 @@ extern "system" fn tray_wnd_proc(
             nid.cbSize = std::mem::size_of::<NOTIFYICONDATAW>() as u32;
             nid.hWnd = hwnd;
             nid.uID = TRAY_ICON_UID;
-            let _ = Shell_NotifyIconW(NIM_DELETE, &mut nid);
+            let _ = Shell_NotifyIconW(NIM_DELETE, &nid);
             PostQuitMessage(0);
         }
         return 0;
@@ -240,7 +240,7 @@ pub fn init_tray_icon() -> Result<()> {
             nid.uCallbackMessage = TRAY_MESSAGE_ID;
             nid.hIcon = hicon;
             nid.szTip = with_tip(nid.szTip, "gpui-convenience-tools");
-            if Shell_NotifyIconW(NIM_ADD, &mut nid) == 0 {
+            if Shell_NotifyIconW(NIM_ADD, &nid) == 0 {
                 let _ = DestroyWindow(hwnd);
                 return;
             }
