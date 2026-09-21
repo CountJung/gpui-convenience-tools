@@ -97,6 +97,7 @@ fn test_app_root(active_panel: ActivePanel) -> AppRoot {
         sync_name_input: None,
         sync_source_input: None,
         sync_target_input: None,
+        sync_exclude_input: None,
         sync_page_scroll: ScrollHandle::default(),
         sync_state: Arc::new(Mutex::new(SyncSharedState::default())),
         external_side_effects_enabled: false,

@@ -7,7 +7,7 @@
 //! 실행 중에 아래로 내려가야 현재 파일이 보이므로 진행 표시의 의미가 없다.
 
 use gpui::{
-    div, AnyElement, Context, InteractiveElement, IntoElement, ParentElement,
+    div, px, AnyElement, Context, InteractiveElement, IntoElement, ParentElement,
     StatefulInteractiveElement, Styled, Window,
 };
 use gpui_component::{h_flex, input::Input, theme::ActiveTheme, v_flex};
@@ -321,6 +321,7 @@ fn render_job_settings(
     let name_input = this.sync_name_input.clone();
     let source_input = this.sync_source_input.clone();
     let target_input = this.sync_target_input.clone();
+    let exclude_input = this.sync_exclude_input.clone();
 
     let interval_row = crate::window::interval::render(this, IntervalTarget::Sync, window, cx);
 
@@ -428,6 +429,23 @@ fn render_job_settings(
                                     this.apply_sync_inputs(window, cx);
                                 }),
                             ),
+                        ))
+                        // ── 제외 패턴 ──
+                        .child(div().text_color(fg).child("제외 패턴"))
+                        .child(div().text_color(muted_fg).child(
+                            "한 줄에 하나씩 입력합니다. 예: **/*.tmp 또는 cache/**",
+                        ))
+                        .child(
+                            div()
+                                .debug_selector(|| "sync-exclude-patterns-input".to_string())
+                                .w_full()
+                                .min_w_0()
+                                .children(exclude_input.as_ref().map(|input| {
+                                    Input::new(input).h(px(96.0))
+                                })),
+                        )
+                        .child(div().text_color(muted_fg).child(
+                            "파일·폴더의 상대 경로 기준이며, 빈 줄은 저장할 때 무시합니다.",
                         ))
                         // ── 감시 주기 ──
                         .child(div().text_color(fg).child("감시 주기"))

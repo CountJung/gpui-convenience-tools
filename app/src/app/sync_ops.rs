@@ -175,6 +175,11 @@ impl AppRoot {
                 state.set_value(job.target.clone(), window, cx)
             });
         }
+        if let Some(input) = self.sync_exclude_input.as_ref() {
+            input.update(cx, |state, cx| {
+                state.set_value(job.exclude_patterns.join("\n"), window, cx)
+            });
+        }
     }
 
     /// 선택한 작업을 수정하고 저장한다.
@@ -195,7 +200,7 @@ impl AppRoot {
         cx.notify();
     }
 
-    /// 입력창의 이름·경로 텍스트를 UI 작업 스냅샷에 반영한다.
+    /// 입력창의 이름·경로·제외 패턴 텍스트를 UI 작업 스냅샷에 반영한다.
     ///
     /// 호출자가 공유 상태 갱신 또는 실행 큐 등록과 함께 저장 시점을 결정한다.
     fn capture_sync_inputs(&mut self, index: usize, cx: &mut Context<Self>) -> bool {
@@ -214,6 +219,11 @@ impl AppRoot {
             .as_ref()
             .map(|i| i.read(cx).value().to_string())
             .unwrap_or_default();
+        let exclude_patterns = self
+            .sync_exclude_input
+            .as_ref()
+            .map(|i| parse_exclude_patterns(i.read(cx).value().as_ref()))
+            .unwrap_or_default();
 
         let changed_id = match self.sync_jobs.get_mut(index) {
             Some(job) => {
@@ -222,6 +232,7 @@ impl AppRoot {
                 job.name = name.trim().to_string();
                 job.source = source.trim().to_string();
                 job.target = target.trim().to_string();
+                job.exclude_patterns = exclude_patterns;
                 paths_changed.then(|| job.id.clone())
             }
             None => return false,
@@ -234,7 +245,7 @@ impl AppRoot {
         true
     }
 
-    /// 입력창의 이름·경로 텍스트를 선택한 작업에 반영한다.
+    /// 입력창의 이름·경로·제외 패턴을 선택한 작업에 반영한다.
     pub(crate) fn apply_sync_inputs(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let Some(index) = self.selected_sync_job else {
             return;
@@ -244,8 +255,8 @@ impl AppRoot {
         }
 
         self.persist_sync_jobs();
-        self.push_log("INFO", "동기화 경로를 저장했습니다.".to_string());
-        self.notify_toast("경로를 저장했습니다", NotificationType::Success, window, cx);
+        self.push_log("INFO", "동기화 설정을 저장했습니다.".to_string());
+        self.notify_toast("동기화 설정을 저장했습니다", NotificationType::Success, window, cx);
         cx.notify();
     }
 
@@ -433,4 +444,13 @@ impl AppRoot {
             self.suppressed_sync_failures.insert(key.to_string());
         }
     }
+}
+
+fn parse_exclude_patterns(value: &str) -> Vec<String> {
+    value
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .map(ToOwned::to_owned)
+        .collect()
 }

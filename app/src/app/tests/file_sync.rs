@@ -71,6 +71,44 @@ fn file_sync_unified_page_uses_full_width_and_scrolls_to_last_record(cx: &mut Te
     assert_inside_viewport(cx, "file-sync-page", "sync-failure-row-11");
 }
 
+#[gpui::test]
+fn file_sync_exclude_patterns_editor_is_multiline_and_contained(cx: &mut TestAppContext) {
+    initialize_components(cx);
+    let (_view, cx) = cx.add_window_view(|_, _| {
+        let mut root = test_app_root(ActivePanel::FileSync);
+        root.sync_jobs = vec![SyncJob {
+            exclude_patterns: vec!["*.tmp".to_string(), "cache/**".to_string()],
+            ..SyncJob::default()
+        }];
+        root.selected_sync_job = Some(0);
+        root
+    });
+
+    for width in [MIN_SUPPORTED_WINDOW_WIDTH, 994.0, 1280.0] {
+        cx.simulate_resize(size(px(width), px(DEFAULT_WINDOW_HEIGHT)));
+        refresh(cx);
+
+        let card = cx
+            .debug_bounds("file-sync-settings-card")
+            .expect("settings card should be rendered");
+        let editor = cx
+            .debug_bounds("sync-exclude-patterns-input")
+            .expect("exclude patterns editor should be rendered");
+        assert!(
+            editor.size.height >= px(80.0),
+            "exclude patterns editor should remain multiline: width={width}, bounds={editor:?}"
+        );
+        assert!(
+            editor.size.width > px(0.0)
+                && editor.size.width <= card.size.width + px(1.0)
+                && editor.origin.x >= card.origin.x
+                && editor.origin.x + editor.size.width
+                    <= card.origin.x + card.size.width + px(1.0),
+            "exclude patterns editor should stay inside settings card: width={width}, card={card:?}, editor={editor:?}"
+        );
+    }
+}
+
 #[test]
 fn running_path_keeps_the_file_name_when_the_path_is_too_long() {
     let mut running = SyncRunning {
@@ -408,12 +446,13 @@ fn file_sync_run_button_saves_current_inputs_and_queues_selected_job(cx: &mut Te
     refresh(cx);
 
     cx.update(|window, app| {
-        let (name, source, target) = {
+        let (name, source, target, exclude) = {
             let root = view.read(app);
             (
                 root.sync_name_input.clone().expect("name input"),
                 root.sync_source_input.clone().expect("source input"),
                 root.sync_target_input.clone().expect("target input"),
+                root.sync_exclude_input.clone().expect("exclude patterns input"),
             )
         };
         name.update(app, |state, cx| state.set_value("즉시 백업", window, cx));
@@ -422,6 +461,9 @@ fn file_sync_run_button_saves_current_inputs_and_queues_selected_job(cx: &mut Te
         });
         target.update(app, |state, cx| {
             state.set_value(r"E:\validation\target", window, cx)
+        });
+        exclude.update(app, |state, cx| {
+            state.set_value("  *.tmp  \n\n cache/** \n", window, cx)
         });
     });
     refresh(cx);
@@ -433,6 +475,7 @@ fn file_sync_run_button_saves_current_inputs_and_queues_selected_job(cx: &mut Te
         assert_eq!(job.name, "즉시 백업");
         assert_eq!(job.source, r"D:\validation\source");
         assert_eq!(job.target, r"E:\validation\target");
+        assert_eq!(job.exclude_patterns, vec!["*.tmp", "cache/**"]);
         assert_eq!(
             root.sync_status
                 .get(&job.id)

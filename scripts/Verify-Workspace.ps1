@@ -17,6 +17,7 @@ $visualTests = @(
     "sidebar_wheel_scroll_reaches_last_navigation_item",
     "rendered_switch_toggles_in_light_dark_and_missing_switch_token_theme",
     "file_sync_unified_page_uses_full_width_and_scrolls_to_last_record",
+    "file_sync_exclude_patterns_editor_is_multiline_and_contained",
     "file_sync_run_button_saves_current_inputs_and_queues_selected_job",
     "file_sync_status_bar_stays_visible_at_compact_height_while_running",
     "file_sync_stop_button_requests_cancellation_and_clears_pending_queue",

@@ -574,7 +574,7 @@ flowchart TD
 - `SyncJob`에 `exclude_patterns: Vec<String>`을 추가하고 `#[serde(default)]`로 기존
   `config.json`에서 누락된 필드를 빈 목록으로 읽도록 했다.
 - 새 작업의 기본값도 빈 목록으로 고정했으며, 실제 동기화 건너뛰기와 입력 UI는
-  D-003~D-005에서 별도로 구현한다.
+  D-003~D-004에서 별도로 구현한다.
 
 #### D-002 — 제외 glob 매처 완료 ✅
 
@@ -582,7 +582,7 @@ flowchart TD
   독립된 `**`는 0개 이상의 하위 폴더를 소비한다.
 - `/`와 `\\`를 같은 구분자로 정규화하고, 메모이제이션한 경로 조각 비교로
   `**/*.tmp`와 `cache/**/index.dat` 같은 패턴을 처리한다.
-- 실제 파일을 건너뛰는 엔진 연결은 D-003, 설정 UI는 D-004에 남긴다.
+- 실제 파일을 건너뛰는 엔진 연결은 D-003에서, 설정 UI는 D-004에서 완료했다.
 
 #### D-003 — 순회 엔진 제외 적용 완료 ✅
 
@@ -595,6 +595,15 @@ flowchart TD
 
 - 제외 파일이 복사되지 않고 건너뜀 수에 반영되는 경우와 제외 디렉터리의 하위 순회·미러
   삭제가 차단되는 경우를 엔진 테스트로 고정했다.
+
+#### D-004 — 제외 패턴 입력 UI 완료 ✅
+
+- 파일 동기화 설정 카드에 상대 경로 glob을 줄바꿈으로 입력하는 멀티라인 편집기를 추가했다.
+- 작업 선택 시 저장된 패턴을 편집기에 복원하고, 설정 저장·즉시 실행 시 공백·빈 줄을 정리해
+  `SyncJob.exclude_patterns`에 반영한다.
+- `file_sync_exclude_patterns_editor_is_multiline_and_contained`와
+  `file_sync_run_button_saves_current_inputs_and_queues_selected_job`로 입력 영역 경계와
+  실행 저장 경로를 고정했다.
 
 - 실시간 감시(`notify` 크레이트, 이미 의존성 트리에 존재)
 - 제외 패턴(glob) 지원

@@ -76,7 +76,7 @@ impl AppRoot {
         self.subscriptions.push(subscription);
     }
 
-    /// 동기화 작업 편집용 입력 3종을 준비한다.
+    /// 동기화 작업 편집용 입력 4종을 준비한다.
     pub(crate) fn ensure_sync_inputs(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.sync_name_input.is_some() {
             return;
@@ -103,6 +103,12 @@ impl AppRoot {
                 .placeholder(r"예: E:\백업\대상")
                 .default_value(job.target.clone())
         });
+        let exclude = cx.new(|cx| {
+            InputState::new(window, cx)
+                .multi_line(true)
+                .placeholder("예: **/*.tmp")
+                .default_value(job.exclude_patterns.join("\n"))
+        });
 
         // 이름은 입력 즉시 반영한다(경로는 '경로 적용'으로 명시 저장).
         let name_sub = cx.subscribe(
@@ -124,6 +130,7 @@ impl AppRoot {
         self.sync_name_input = Some(name);
         self.sync_source_input = Some(source);
         self.sync_target_input = Some(target);
+        self.sync_exclude_input = Some(exclude);
         self.subscriptions.push(name_sub);
     }
 }

@@ -103,6 +103,7 @@ pub struct AppRoot {
     pub(crate) sync_name_input: Option<Entity<InputState>>,
     pub(crate) sync_source_input: Option<Entity<InputState>>,
     pub(crate) sync_target_input: Option<Entity<InputState>>,
+    pub(crate) sync_exclude_input: Option<Entity<InputState>>,
     pub(crate) sync_page_scroll: ScrollHandle,
     sync_state: Arc<Mutex<SyncSharedState>>,
     #[cfg(test)]
@@ -260,10 +261,11 @@ impl AppRoot {
             sync_running: None,
             suppressed_sync_failures: HashSet::new(),
             sync_notify_enabled: true,
-            sync_name_input: None,
-            sync_source_input: None,
-            sync_target_input: None,
-            sync_page_scroll: ScrollHandle::default(),
+        sync_name_input: None,
+        sync_source_input: None,
+        sync_target_input: None,
+        sync_exclude_input: None,
+        sync_page_scroll: ScrollHandle::default(),
             sync_state,
             #[cfg(test)]
             external_side_effects_enabled: true,
