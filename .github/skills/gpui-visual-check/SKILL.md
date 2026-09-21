@@ -138,9 +138,10 @@ scripts\Invoke-ClaudeVisualCheck.ps1 -Action Stop
 `-SeedHistory`로 넘긴다. 앱 시작 시 격리 데이터 루트에 복사되므로 실제 사용자 이력은
 변경하지 않는다.
 
-패널 전환 입력이 포그라운드 안전 차단으로 불가능한 경우에는 `-InitialPanel FileSync`를
-사용한다. 이 값은 검증 프로세스에만 전달되는 실행 전용 환경 변수이며 제품 설정에 저장되지
-않는다. 패널 전환 자체의 클릭 동작은 별도 GPUI 수용 테스트로 검증해야 한다.
+패널 전환 입력이 포그라운드 안전 차단으로 불가능한 경우에는 `-InitialPanel FileSync` 또는
+`-InitialPanel AutoStart`를 사용한다. 이 값은 검증 프로세스에만 전달되는 실행 전용 환경
+변수이며 제품 설정에 저장되지 않는다. 패널 전환 자체의 클릭 동작은 별도 GPUI 수용 테스트로
+검증해야 한다.
 
 - JSON을 Bash 힙독으로 쓰지 말 것 — 백슬래시가 먹혀 `Bad JSON escape`가 난다.
   Write 도구로 쓰거나 경로에 `/`를 쓴다.

@@ -113,6 +113,7 @@ fn initial_panel_from_validation_env() -> ActivePanel {
         .as_deref()
     {
         Some("file_sync") => ActivePanel::FileSync,
+        Some("auto_start") => ActivePanel::AutoStart,
         _ => ActivePanel::Dashboard,
     }
 }

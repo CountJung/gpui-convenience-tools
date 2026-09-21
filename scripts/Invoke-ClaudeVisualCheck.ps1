@@ -43,7 +43,7 @@ param(
     [string]$SeedHistory,
 
     # Start 전용. 검증 전용 환경 변수로 패널 전환 입력 없이 특정 화면을 연다.
-    [ValidateSet("Dashboard", "FileSync")]
+    [ValidateSet("Dashboard", "FileSync", "AutoStart")]
     [string]$InitialPanel = "Dashboard",
 
     [string]$Name = "capture",
@@ -298,6 +298,9 @@ switch ($Action) {
             $env:GPUI_CONVENIENCE_TOOLS_DATA_DIR = $appData
             if ($InitialPanel -eq "FileSync") {
                 $env:GPUI_CONVENIENCE_TOOLS_INITIAL_PANEL = "file_sync"
+            }
+            elseif ($InitialPanel -eq "AutoStart") {
+                $env:GPUI_CONVENIENCE_TOOLS_INITIAL_PANEL = "auto_start"
             }
             $process = Start-Process -FilePath $BinaryPath -PassThru
         }
