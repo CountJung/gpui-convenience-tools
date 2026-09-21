@@ -39,7 +39,9 @@ use services::{
     delete_sys_service_impl, list_sys_services_impl, query_sys_service_impl, start_sys_service_impl,
     stop_sys_service_impl,
 };
-use window_ops::{is_process_id_running, list_running_window_process_names};
+use window_ops::{
+    is_process_id_running, is_target_process_running, list_running_window_process_names,
+};
 
 use crate::platform::{AdWindowSnapshot, Platform};
 
@@ -59,9 +61,7 @@ impl WindowsPlatform {
 
 impl Platform for WindowsPlatform {
     fn is_target_running(&self, process_name: &str) -> bool {
-        list_running_window_process_names()
-            .iter()
-            .any(|running| running.eq_ignore_ascii_case(process_name))
+        is_target_process_running(process_name)
     }
 
     fn list_running_processes(&self) -> Result<Vec<String>> {

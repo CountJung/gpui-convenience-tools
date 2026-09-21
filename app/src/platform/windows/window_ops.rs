@@ -1,9 +1,12 @@
 //! 창·프로세스 열거.
 //!
-//! `EnumWindows`로 타겟 프로세스의 최상위 창을 찾고, 명시된 WebView 계열 클래스와
-//! 소유자/도구 창 특성을 가진 팝업만 광고 창 후보로 판정한다.
+//! `EnumWindows`로 타겟 프로세스와 자손 프로세스의 최상위 창을 찾고, 명시된 WebView
+//! 계열 클래스와 소유자/도구 창 특성을 가진 팝업만 광고 창 후보로 판정한다. 명시적인
+//! 클래스 필터를 설정한 경우에는 같은 프로세스 트리의 자식 창도 후보로 확인한다.
 //!
-//! 프로세스 목록도 창 열거 기반이므로 **창이 없는 프로세스는 나오지 않는다**.
+//! 화면에 표시할 실행 프로세스 목록은 창 열거 기반이지만, 타겟 실행 상태와 광고 창
+//! 탐색은 ToolHelp 프로세스 트리를 사용하므로 WebView2 렌더러처럼 창이 없는 자손도
+//! 놓치지 않는다.
 
 use std::collections::BTreeSet;
 use std::path::Path;
@@ -11,14 +14,18 @@ use std::path::Path;
 use anyhow::{anyhow, Result};
 use windows_sys::Win32::{
     Foundation::{CloseHandle, BOOL, HANDLE, HWND, LPARAM, RECT},
+    System::Diagnostics::ToolHelp::{
+        CreateToolhelp32Snapshot, Process32FirstW, Process32NextW, PROCESSENTRY32W,
+        TH32CS_SNAPPROCESS,
+    },
     System::Threading::{
         OpenProcess, QueryFullProcessImageNameW, PROCESS_QUERY_LIMITED_INFORMATION,
     },
     UI::Input::KeyboardAndMouse::{EnableWindow, IsWindowEnabled},
     UI::WindowsAndMessaging::{
-        EnumWindows, GetClassNameW, GetWindow, GetWindowLongPtrW, GetWindowRect,
-        GetWindowThreadProcessId, IsIconic, IsWindow, IsWindowVisible, IsZoomed, SetWindowPos,
-        ShowWindow, GWL_EXSTYLE, GW_OWNER, SW_HIDE,
+        EnumChildWindows, EnumWindows, GetClassNameW, GetParent, GetWindow, GetWindowLongPtrW,
+        GetWindowRect, GetWindowThreadProcessId, IsIconic, IsWindow, IsWindowVisible, IsZoomed,
+        SetWindowPos, ShowWindow, GWL_EXSTYLE, GW_OWNER, SW_HIDE,
         SW_SHOWMAXIMIZED, SW_SHOWMINNOACTIVE, SW_SHOWNOACTIVATE, SWP_NOACTIVATE, SWP_NOMOVE,
         SWP_NOZORDER, WS_EX_TOOLWINDOW,
     },
@@ -26,10 +33,11 @@ use windows_sys::Win32::{
 
 use crate::platform::{AdWindowShowState, AdWindowSnapshot};
 
-pub(super) struct TopLevelSearchContext {
-    pub(super) process_name_lower: String,
+pub(super) struct WindowSearchContext {
+    pub(super) process_ids: BTreeSet<u32>,
     pub(super) class_filter: String,
     pub(super) found_windows: Vec<HWND>,
+    pub(super) top_level_windows: Vec<HWND>,
 }
 
 struct RunningProcessContext {
@@ -37,17 +45,36 @@ struct RunningProcessContext {
 }
 
 pub(super) unsafe extern "system" fn enum_windows_proc(hwnd: HWND, lparam: LPARAM) -> BOOL {
-    let context = &mut *(lparam as *mut TopLevelSearchContext);
+    let context = &mut *(lparam as *mut WindowSearchContext);
 
-    let Some(process_name) = process_name_from_hwnd(hwnd) else {
+    let Ok(process_id) = window_process_id(hwnd) else {
         return 1;
     };
 
-    if !process_name.eq_ignore_ascii_case(&context.process_name_lower) {
+    if !context.process_ids.contains(&process_id) {
         return 1;
     }
 
-    if !is_ad_window_candidate(hwnd, &context.class_filter) {
+    context.top_level_windows.push(hwnd);
+
+    if !is_ad_window_candidate(hwnd, &context.class_filter, false) {
+        return 1;
+    }
+
+    context.found_windows.push(hwnd);
+    1
+}
+
+unsafe extern "system" fn enum_child_windows_proc(hwnd: HWND, lparam: LPARAM) -> BOOL {
+    let context = &mut *(lparam as *mut WindowSearchContext);
+
+    let Ok(process_id) = window_process_id(hwnd) else {
+        return 1;
+    };
+
+    if !context.process_ids.contains(&process_id)
+        || !is_ad_window_candidate(hwnd, &context.class_filter, true)
+    {
         return 1;
     }
 
@@ -57,24 +84,40 @@ pub(super) unsafe extern "system" fn enum_windows_proc(hwnd: HWND, lparam: LPARA
 
 /// 타겟 프로세스에서 안전한 광고 창 후보를 하나 찾는다.
 ///
-/// 메인 창의 자식 WebView는 같은 클래스명을 공유할 수 있으므로 이 단계에서는
-/// `EnumChildWindows`로 내려가지 않는다. 소유자 창이 있거나 도구 창으로 표시된
-/// 최상위 팝업만 후보로 반환한다.
+/// 기본적으로 소유자 창이 있거나 도구 창으로 표시된 최상위 팝업만 후보로 반환한다.
+/// 명시적인 클래스 필터를 사용하면 타겟 프로세스 트리의 자식 창도 확인한다. `auto:webview`
+/// 는 메인 WebView 오인식 위험 때문에 자식 창에 적용하지 않는다.
 pub(super) fn find_ad_window(process_name: &str, class_filter: &str) -> Option<HWND> {
     find_ad_windows(process_name, class_filter).into_iter().next()
 }
 
 pub(super) fn find_ad_windows(process_name: &str, class_filter: &str) -> Vec<HWND> {
-    let mut context = TopLevelSearchContext {
-        process_name_lower: process_name.to_ascii_lowercase(),
+    let process_ids = target_process_ids(process_name);
+    if process_ids.is_empty() {
+        return Vec::new();
+    }
+
+    let mut context = WindowSearchContext {
+        process_ids,
         class_filter: class_filter.trim().to_string(),
         found_windows: Vec::new(),
+        top_level_windows: Vec::new(),
     };
-    let lparam = &mut context as *mut TopLevelSearchContext as LPARAM;
+    let lparam = &mut context as *mut WindowSearchContext as LPARAM;
 
     // SAFETY: callback and context pointer are valid for the duration of EnumWindows.
     unsafe {
         EnumWindows(Some(enum_windows_proc), lparam);
+
+        // The ad in KakaoTalk is hosted by a WebView2 descendant process but is parented
+        // beneath the app's main window. Enumerate descendants only after top-level candidates
+        // have been collected; explicit class filters are the opt-in safety boundary.
+        if !context.class_filter.eq_ignore_ascii_case("auto:webview") {
+            let top_level_windows = context.top_level_windows.clone();
+            for top_level in top_level_windows {
+                EnumChildWindows(top_level, Some(enum_child_windows_proc), lparam);
+            }
+        }
     }
 
     context.found_windows
@@ -263,7 +306,7 @@ pub(super) fn restore_ad_window_state(snapshot: &AdWindowSnapshot) -> Result<()>
     Ok(())
 }
 
-fn is_ad_window_candidate(hwnd: HWND, class_filter: &str) -> bool {
+fn is_ad_window_candidate(hwnd: HWND, class_filter: &str, child_window: bool) -> bool {
     // Invisible windows are not useful for the visual action and may be the app's
     // hidden startup/helper window.
     if unsafe { IsWindowVisible(hwnd) } == 0 {
@@ -273,6 +316,12 @@ fn is_ad_window_candidate(hwnd: HWND, class_filter: &str) -> bool {
     let class_name = class_name_from_hwnd(hwnd);
     if !class_filter_matches(&class_name, class_filter) {
         return false;
+    }
+
+    if child_window {
+        // A child candidate must be explicitly selected by class. The automatic WebView
+        // matcher is intentionally limited to top-level owned/tool windows.
+        return !class_filter.eq_ignore_ascii_case("auto:webview") && unsafe { GetParent(hwnd) } != 0;
     }
 
     // An unowned, non-tool top-level window is treated as the app's main window.
@@ -286,11 +335,76 @@ fn is_ad_window_candidate(hwnd: HWND, class_filter: &str) -> bool {
 fn class_filter_matches(class_name: &str, class_filter: &str) -> bool {
     if class_filter.eq_ignore_ascii_case("auto:webview") {
         let class_name_lower = class_name.to_ascii_lowercase();
-        return class_name_lower.contains("chrome_widgetwin_1")
+        return class_name_lower.contains("chrome_widgetwin_")
             || class_name_lower.contains("webview");
     }
 
     !class_filter.is_empty() && class_name.eq_ignore_ascii_case(class_filter)
+}
+
+#[derive(Clone)]
+struct ProcessRecord {
+    process_id: u32,
+    parent_process_id: u32,
+    name: String,
+}
+
+/// 타겟 프로세스와 그 자손 프로세스의 PID를 읽기 전용으로 수집한다.
+fn target_process_ids(process_name: &str) -> BTreeSet<u32> {
+    let snapshot = unsafe { CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0) };
+    if snapshot == windows_sys::Win32::Foundation::INVALID_HANDLE_VALUE {
+        return BTreeSet::new();
+    }
+
+    let mut records = Vec::new();
+    let mut entry: PROCESSENTRY32W = unsafe { std::mem::zeroed() };
+    entry.dwSize = std::mem::size_of::<PROCESSENTRY32W>() as u32;
+    let mut has_entry = unsafe { Process32FirstW(snapshot, &mut entry) } != 0;
+    while has_entry {
+        records.push(ProcessRecord {
+            process_id: entry.th32ProcessID,
+            parent_process_id: entry.th32ParentProcessID,
+            name: process_entry_name(&entry),
+        });
+        has_entry = unsafe { Process32NextW(snapshot, &mut entry) } != 0;
+    }
+    unsafe {
+        CloseHandle(snapshot);
+    }
+
+    let target_name = process_name.trim();
+    let mut process_ids = records
+        .iter()
+        .filter(|record| record.name.eq_ignore_ascii_case(target_name))
+        .map(|record| record.process_id)
+        .collect::<BTreeSet<_>>();
+
+    loop {
+        let previous_count = process_ids.len();
+        for record in &records {
+            if process_ids.contains(&record.parent_process_id) {
+                process_ids.insert(record.process_id);
+            }
+        }
+        if process_ids.len() == previous_count {
+            break;
+        }
+    }
+
+    process_ids
+}
+
+pub(super) fn is_target_process_running(process_name: &str) -> bool {
+    !target_process_ids(process_name).is_empty()
+}
+
+fn process_entry_name(entry: &PROCESSENTRY32W) -> String {
+    let length = entry
+        .szExeFile
+        .iter()
+        .position(|character| *character == 0)
+        .unwrap_or(entry.szExeFile.len());
+    String::from_utf16_lossy(&entry.szExeFile[..length])
 }
 
 unsafe extern "system" fn enum_running_processes_proc(hwnd: HWND, lparam: LPARAM) -> BOOL {
@@ -400,7 +514,8 @@ fn query_process_image_name(process_handle: HANDLE) -> Option<String> {
 mod tests {
     use super::{
         capture_ad_window_state, class_filter_matches, collapse_ad_window, find_ad_windows,
-        is_window_collapsed, process_name_from_pid, restore_ad_window_state, window_process_id,
+        is_target_process_running, is_window_collapsed, process_name_from_pid,
+        restore_ad_window_state, target_process_ids, window_process_id,
     };
     use crate::platform::{AdWindowShowState, AdWindowSnapshot};
 
@@ -416,6 +531,7 @@ mod tests {
     #[test]
     fn auto_webview_filter_matches_known_webview_classes() {
         assert!(class_filter_matches("Chrome_WidgetWin_1", "auto:webview"));
+        assert!(class_filter_matches("Chrome_WidgetWin_0", "auto:webview"));
         assert!(class_filter_matches("WebView2Child", "AUTO:WEBVIEW"));
         assert!(!class_filter_matches("MainWindow", "auto:webview"));
     }
@@ -423,6 +539,16 @@ mod tests {
     #[test]
     fn empty_class_filter_does_not_match_every_window() {
         assert!(!class_filter_matches("Chrome_WidgetWin_1", ""));
+    }
+
+    #[test]
+    fn target_process_tree_contains_the_current_process() {
+        let process_name = process_name_from_pid(std::process::id())
+            .expect("the current test process should have an image name");
+        let process_ids = target_process_ids(&process_name);
+
+        assert!(process_ids.contains(&std::process::id()));
+        assert!(is_target_process_running(&process_name));
     }
 
     #[test]
@@ -532,7 +658,7 @@ mod tests {
     fn finds_all_matching_tool_window_fixtures() {
         use std::ptr::null;
         use windows_sys::Win32::UI::WindowsAndMessaging::{
-            CreateWindowExW, DestroyWindow, WS_EX_TOOLWINDOW, WS_POPUP, WS_VISIBLE,
+            CreateWindowExW, DestroyWindow, WS_CHILD, WS_EX_TOOLWINDOW, WS_POPUP, WS_VISIBLE,
         };
 
         let class_name = super::super::wide_null("STATIC");
@@ -558,14 +684,34 @@ mod tests {
         let second = create(&title_b);
         assert_ne!(first, 0, "first fixture window should be created");
         assert_ne!(second, 0, "second fixture window should be created");
+        let child_title = super::super::wide_null("gpui-ad-005-child-fixture");
+        let child = unsafe {
+            CreateWindowExW(
+                0,
+                class_name.as_ptr(),
+                child_title.as_ptr(),
+                WS_CHILD | WS_VISIBLE,
+                0,
+                0,
+                40,
+                30,
+                first,
+                0,
+                0,
+                null(),
+            )
+        };
+        assert_ne!(child, 0, "child fixture window should be created");
 
         let process_name = process_name_from_pid(std::process::id())
             .expect("the current test process should have an image name");
         let found = find_ad_windows(&process_name, "STATIC");
         assert!(found.contains(&first));
         assert!(found.contains(&second));
+        assert!(found.contains(&child));
 
         unsafe {
+            DestroyWindow(child);
             DestroyWindow(first);
             DestroyWindow(second);
         }

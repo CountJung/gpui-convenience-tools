@@ -13,6 +13,9 @@
 
 .EXAMPLE
     pwsh -File .\scripts\Verify-AdWindowState.ps1 -ProcessId 26440 -IncludeChildWindows
+
+.EXAMPLE
+    pwsh -File .\scripts\Verify-AdWindowState.ps1 -ProcessId 26440 -IncludeChildWindows -ClassFilter Chrome_WidgetWin_1
 #>
 
 [CmdletBinding()]
@@ -21,7 +24,10 @@ param(
     [int]$ProcessId = 26440,
 
     [Parameter()]
-    [switch]$IncludeChildWindows
+    [switch]$IncludeChildWindows,
+
+    [Parameter()]
+    [string]$ClassFilter = 'Chrome_WidgetWin_1'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -180,8 +186,16 @@ function Get-WindowRow {
     $width = if ($hasRect) { $rect.Right - $rect.Left } else { 0 }
     $height = if ($hasRect) { $rect.Bottom - $rect.Top } else { 0 }
     $showState = if (-not $visible) { 'Hidden' } elseif ([AdWindowVerificationNative]::IsIconic($Hwnd)) { 'Minimized' } elseif ([AdWindowVerificationNative]::IsZoomed($Hwnd)) { 'Maximized' } else { 'Normal' }
-    $webViewClass = $className -match '(?i)chrome_widgetwin_1|webview'
-    $candidate = $Kind -eq 'TopLevel' -and $visible -and $webViewClass -and (($owner -ne [IntPtr]::Zero) -or $toolWindow)
+    $classMatches = if ($ClassFilter -eq 'auto:webview') {
+        $className -match '(?i)chrome_widgetwin_|webview'
+    } else {
+        $className.Equals($ClassFilter, [StringComparison]::OrdinalIgnoreCase)
+    }
+    $candidate = if ($Kind -eq 'Child') {
+        $IncludeChildWindows -and $visible -and $classMatches -and $ParentHwnd -ne [IntPtr]::Zero -and $ClassFilter -ne 'auto:webview'
+    } else {
+        $visible -and $classMatches -and (($owner -ne [IntPtr]::Zero) -or $toolWindow)
+    }
 
     [pscustomobject]@{
         WindowKind = $Kind
@@ -234,6 +248,7 @@ if ($IncludeChildWindows) {
 
 Write-Host "읽기 전용 광고 창 상태 검증"
 Write-Host "기준 PID: $ProcessId"
+Write-Host "클래스 필터: $ClassFilter"
 Write-Host "관련 PID: $($relatedIds.Count)개 (조상·자손 포함)"
 Write-Host ""
 

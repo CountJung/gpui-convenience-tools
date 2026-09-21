@@ -11,59 +11,20 @@
 
 ## 프로젝트 구조
 
-```text
-gpui-convenience-tools/          ← 저장소 루트
-├── Cargo.toml                   # workspace (members = ["app"])
-├── docs/                         # 프로젝트 문서 정본
-│   ├── README.md
-│   ├── DEVELOPMENT_GUIDE.md
-│   ├── MASTER_PLAN.md
-│   ├── PROJECT_MAP.md
-│   ├── VERIFICATION.md
-│   └── TODO.md
-├── AGENTS.md / CLAUDE.md         # 루트 에이전트 어댑터만 유지
-├── app/                         ← 유일한 크레이트 (package name = gpui-convenience-tools)
-│   ├── Cargo.toml
-│   ├── build.rs                 # /MANIFEST:NO (gpui 임베드 매니페스트 중복 방지)
-│   ├── assets/themes/           # 번들 테마 JSON 21종
-│   └── src/
-│       ├── main.rs              # 진입점: 로거 설치 → 테마 시드 → 윈도우 오픈
-│       ├── config.rs            # AppConfig · SyncJob · LogConfig · 주기 프리셋 · update_config
-│       ├── logging.rs           # 롤링 파일 로거 (log::Log 구현)
-│       ├── util.rs              # 주인 없는 순수 헬퍼 (format_interval · interval_to_secs)
-│       ├── sync/                # 폴더 동기화 엔진 (mod · tests)
-│       ├── app/                 # AppRoot(Render) · 상태 · 이벤트 루프 · 사이드바
-│       │   ├── mod.rs           #   구조체 · 생성자 · 최상위 레이아웃 · 전역 스위치
-│       │   ├── state.rs         #   순수 데이터 타입
-│       │   ├── background.rs    #   스캔 · 동기화 백그라운드 스레드 (광고 창 복원·실행 위치 영속화)
-│       │   ├── ops.rs           #   광고 차단 · 서비스 · 로그 설정 조작
-│       │   ├── sync_ops.rs      #   파일 동기화 작업 조작
-│       │   ├── interval.rs      #   주기 선택 상태 · 프리셋 조작
-│       │   ├── events.rs        #   백그라운드 → UI 이벤트 처리
-│       │   ├── inputs.rs        #   입력 위젯 지연 생성
-│       │   └── tests/           #   GPUI 회귀 테스트 5파일
-│       ├── platform/
-│       │   ├── mod.rs           # Platform trait (창 조작 + SCM)
-│       │   ├── fallback.rs      # 비Windows 구현
-│       │   └── windows/         # Win32 구현
-│       │       ├── mod.rs       #   WindowsPlatform + Platform impl
-│       │       ├── window_ops.rs#   창·프로세스 열거와 광고 창 상태 캡처·복원
-│       │       ├── tray.rs      #   시스템 트레이
-│       │       ├── scm.rs       #   Windows 서비스 등록 · 서비스 모드
-│       │       ├── services.rs  #   설치된 서비스 조회 · 제어
-│       │       └── task_scheduler.rs # 로그온 자동 시작
-│       └── window/
-│           ├── mod.rs           # 패널 모듈 + balanced_split · scroll_pane 헬퍼
-│           ├── ui.rs            # 공용 UI 프리미티브 (배지 · 버튼 · 스위치 · 칩 …)
-│           ├── ad_block.rs      # 편의 기능: 웹뷰 광고 차단
-│           ├── file_sync.rs     # 편의 기능: 파일 동기화
-│           ├── service_mgr.rs   # 편의 기능: Windows 서비스
-│           ├── interval.rs      # 주기 선택 렌더 (두 패널 공용)
-│           ├── dashboard.rs     # 개요: 전체 상태 요약
-│           ├── log_view.rs      # 시스템: 화면 로그
-│           ├── service_view.rs  # 시스템: 자동 시작(작업 스케줄러)
-│           └── settings.rs      # 시스템: 전역 설정(테마 · 로그 보관)
-└── installer/windows/
+```mermaid
+flowchart TD
+    root["gpui-convenience-tools/"]
+    root --> cargo["Cargo.toml<br/>workspace"]
+    root --> docs["docs/<br/>프로젝트 문서 정본"]
+    root --> adapters["AGENTS.md · CLAUDE.md<br/>에이전트 어댑터"]
+    root --> app["app/<br/>유일한 Rust 크레이트"]
+    app --> assets["assets/themes/<br/>번들 테마 JSON 21종"]
+    app --> source["src/"]
+    source --> entry["main.rs · config.rs · logging.rs · util.rs"]
+    source --> engines["sync/ · virtual_disk/"]
+    source --> app_layer["app/<br/>상태 · 백그라운드 · GPUI 테스트"]
+    source --> windows["window/<br/>패널 렌더러 · 공용 UI"]
+    source --> platform["platform/<br/>Platform trait · Windows 구현"]
 ```
 
 ---
@@ -84,15 +45,19 @@ gpui-convenience-tools/          ← 저장소 루트
 
 ### 2. 상태 흐름
 
-```text
-       UI (AppRoot)
-         │  ▲
- 공유    │  │ PlatformEvent 채널
- 뮤텍스  ▼  │ (백그라운드 → UI 단방향)
-   ScannerState        SyncSharedState
-         │                   │
-   광고 스캔 스레드      동기화 스레드
-   (tokio current_thread)   (std::thread, 1초 틱)
+```mermaid
+flowchart TB
+    ui["UI (AppRoot)"]
+    scanner["ScannerState<br/>광고 스캔 스레드<br/>(tokio current_thread)"]
+    sync["SyncSharedState<br/>동기화 스레드<br/>(std::thread, 1초 틱)"]
+    events["PlatformEvent 채널<br/>백그라운드 → UI"]
+    mutex["공유 뮤텍스"]
+
+    scanner --> events --> ui
+    sync --> events
+    ui <--> mutex
+    mutex --> scanner
+    mutex --> sync
 ```
 
 - **UI → 백그라운드**: 공유 뮤텍스에 쓰고 동기화 함수 호출
@@ -494,8 +459,11 @@ VDE-003은 플랫폼 비의존 공통 타입과 `UnsupportedFormatKind`·`IoOper
 - `find_ad_window`가 타겟 프로세스명과 `TargetApp.ad_window_class`를 함께 사용한다
 - 메인 WebView로 간주되는 **소유자 없는 비도구 최상위 창**은 후보에서 제외한다
 - 보이는 최상위 창 중 소유자 창이 있거나 `WS_EX_TOOLWINDOW`인 창만 광고 팝업 후보로 반환한다
-- `auto:webview`와 명시적 창 클래스의 대소문자 무시 매칭을 지원하며, 빈 클래스 필터는
-  모든 창과 일치하지 않는다
+- 타겟 프로세스의 자손 프로세스까지 PID를 확장해 WebView2 호스트 창을 함께 탐색한다
+- 명시적 클래스 필터를 설정한 경우에만 자식 창을 확인하고, `auto:webview`는 자식 창에
+  적용하지 않는다
+- `auto:webview`는 `Chrome_WidgetWin_0`·`Chrome_WidgetWin_1`·WebView 계열을 매칭하며,
+  빈 클래스 필터는 모든 창과 일치하지 않는다
 - 타겟 실행 상태를 광고 창 존재 여부와 분리하여, 광고 팝업이 없어도 프로세스 실행 상태를
   올바르게 표시한다
 
@@ -551,27 +519,28 @@ AD-001에서 선별한 팝업을 숨기기 전에 다음 상태를 `AdWindowSnap
 이 단계까지 광고 창 축소 전환 Phase A의 필수 동작을 완료했다. 타겟별 후보 선택자 고도화와
 사용자 확인형 복원 실패 알림은 후속 요구가 생길 때 별도 작업으로 추가한다.
 
-### Phase A-5 — KakaoTalk 실제 광고 창 상관관계 및 E2E 검증 🗓
+### Phase A-5 — KakaoTalk 실제 광고 창 상관관계 및 E2E 검증 🔄
 
 AD-005에서 KakaoTalk 메인 프로세스와 WebView2 호스트·렌더러 프로세스 사이의 실제 창
-소유 관계를 타겟별로 식별한다. 현재 구현은 타겟 프로세스의 보이는 최상위 광고 후보만
-안전하게 축소하므로, 26440 검증에서 확인된 숨김 자식 창을 광고 창으로 추정해 조작하지
-않는다. 보이는 광고 상태를 재현한 뒤에만 후보 선택자와 0×0 결과를 실제 캡처·복원으로
-검증하며, 재현하지 못하면 가설 기반 수정으로 표시한다.
+소유 관계를 타겟별로 식별한다. ToolHelp로 타겟 프로세스의 자손 PID를 확장하고, 명시적인
+`Chrome_WidgetWin_1` 필터를 설정한 경우 부모 창 아래의 WebView 자식까지 후보로 확인한다.
+현재 머신의 26440 검증에서는 해당 자식 창이 숨김 상태였으므로 실제 보이는 광고에서의
+0×0 축소와 복원은 아직 검증하지 않았다. 보이는 광고 상태를 재현한 뒤에만 E2E 완료로
+판정한다.
 
 ### Phase O — VirtualBox 오프라인 디스크 탐색·복사 🗓
 
 종료된 VirtualBox VM의 VDI에서 숨김·시스템 파일을 탐색하고 현재 PC로 복사하는 기능이다.
 초기 범위는 **오프라인·읽기 전용 VDI 접근**으로 고정한다.
 
-```text
-종료된 VM
-  └─ VDI read-only handle
-       └─ VDI block reader
-            └─ MBR/GPT partition reader
-                 └─ NTFS guest filesystem reader
-                      └─ 공통 GuestFileSource
-                           └─ GPUI 탐색기·선택·호스트 복사
+```mermaid
+flowchart TD
+    vm["종료된 VM"] --> handle["VDI read-only handle"]
+    handle --> blocks["VDI block reader"]
+    blocks --> partition["MBR/GPT partition reader"]
+    partition --> ntfs["NTFS guest filesystem reader"]
+    ntfs --> source["공통 GuestFileSource"]
+    source --> explorer["GPUI 탐색기·선택·호스트 복사"]
 ```
 
 - 원본 VDI에는 절대 쓰지 않으며, 실행 중 VM의 VDI 직접 읽기는 지원하지 않는다

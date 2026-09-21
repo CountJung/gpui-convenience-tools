@@ -111,7 +111,7 @@ SHA-256을 기록한다. 다른 검증자의 독립 검토가 요구되는 UI �
 
 | ID | 프로필 | B | T | E | V | R | C | 증거 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| AD-005 | E2E | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | 읽기 전용 `Verify-AdWindowState.ps1 -ProcessId 26440 -IncludeChildWindows`는 통과했으나, 현재 상태에서 보이는 광고 후보가 없어 실제 0×0 축소는 검증하지 못함; 후보 식별자와 사용자 창 조작 승인 필요 |
+| AD-005 | E2E | [x] | [x] | [ ] | [ ] | [x] | [ ] | ToolHelp 프로세스 트리·자식 창 후보 탐색 구현; `window_ops::tests` 10개 통과; 읽기 전용 `Verify-AdWindowState.ps1 -ProcessId 26440 -IncludeChildWindows -ClassFilter Chrome_WidgetWin_1`에서 WebView2 호스트 PID 9468의 `Chrome_WidgetWin_1` 자식 창(380×91)을 확인했지만 현재 숨김 상태라 실제 0×0 E2E와 커밋 게이트는 미완료 |
 | VDE-004 | RUST | [ ] | [ ] | — | — | [ ] | [ ] | — |
 | VDE-005 | RUST | [ ] | [ ] | — | — | [ ] | [ ] | — |
 | VDE-006 | RUST | [ ] | [ ] | — | — | [ ] | [ ] | — |

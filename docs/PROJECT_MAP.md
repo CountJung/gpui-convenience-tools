@@ -137,7 +137,7 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `windows/scm.rs` | 449 | Windows 서비스(SCM) 등록과 서비스 모드 실행 |
 | `windows/services.rs` | 340 | 설치된 Win32 서비스 조회·시작·중지·삭제, 권한 확인 |
 | `windows/tray.rs` | 274 | 시스템 트레이 아이콘과 메시지 루프 |
-| `windows/window_ops.rs` | 573 | 프로세스별 최상위 창 열거, 클래스 필터, 메인 WebView 제외, 다중 광고 팝업 후보 탐색, 창 상태 캡처·0×0 축소·복원 |
+| `windows/window_ops.rs` | 719 | 타겟 프로세스 트리·최상위/명시적 자식 창 열거, 클래스 필터, 광고 팝업 후보 탐색, 창 상태 캡처·0×0 축소·복원 |
 | `windows/mod.rs` | 178 | `WindowsPlatform` + `Platform` 구현, 다중 창 후보·상태 API 연결, 하위 모듈 re-export |
 | `windows/task_scheduler.rs` | 148 | 로그온 시 자동 시작(`schtasks`) |
 
@@ -153,7 +153,7 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | --- | ---: | --- |
 | `scripts/Verify-Workspace.ps1` | 166 | VS Code용 Rust/GPUI 자동 검증과 ChatGPT 데스크톱 handoff manifest·해시 고정 빌드 생성 |
 | `scripts/Invoke-ClaudeVisualCheck.ps1` | 450 | `CLAUDE_LOCAL` 시각 검증 하네스 — 격리 실행(`-SeedConfig`로 상태 재현)·창 캡처(`PrintWindow`)·입력(`SendInput`)·정리 |
-| `scripts/Verify-AdWindowState.ps1` | 267 | 지정 PID와 앱 조상·자손의 최상위·선택적 자식 창 상태를 읽기 전용 점검(AD-002·AD-005 진단) |
+| `scripts/Verify-AdWindowState.ps1` | 282 | 지정 PID와 앱 조상·자손의 최상위·선택적 자식 창 상태와 클래스 후보를 읽기 전용 점검(AD-002·AD-005 진단) |
 | `scripts/Start-DesktopVisualValidation.ps1` | 126 | manifest 해시 검증 후 단일 임시 데이터 루트 격리 프로세스·세션 파일 생성과 실패 롤백 |
 | `scripts/Stop-DesktopVisualValidation.ps1` | 75 | 기록된 검증 PID·시작 시각과 작업 전용 임시 루트만 검증 후 정리 |
 | `.vscode/tasks.json` | 111 | IDE 전용 검증, Claude 로컬 시각 세션, ChatGPT 데스크톱 인계 준비 작업 |

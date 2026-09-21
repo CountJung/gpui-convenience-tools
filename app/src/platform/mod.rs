@@ -100,7 +100,10 @@ pub trait Platform: Send + Sync {
         ad_window_class: &str,
     ) -> Result<Option<NativeWindowHandle>>;
 
-    /// 타겟 프로세스의 광고 후보 최상위 창을 모두 반환한다.
+    /// 타겟 프로세스와 그 자손 프로세스의 광고 후보 창을 모두 반환한다.
+    ///
+    /// 최상위 팝업은 소유자/도구 창 경계를 적용하고, 자식 창은 명시적인 클래스
+    /// 필터를 지정한 경우에만 플랫폼 구현이 반환할 수 있다.
     fn find_ad_windows(
         &self,
         process_name: &str,

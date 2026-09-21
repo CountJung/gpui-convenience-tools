@@ -40,21 +40,22 @@
 좌측 사이드바는 **개요 / 편의 기능 / 시스템** 세 그룹으로 나뉜다.
 각 편의 기능 페이지는 스플리터로 좌우가 나뉘며, 드래그로 폭을 조절할 수 있다.
 
-```text
-┌──────────────┬──────────────────────────────┬───────────────────┐
-│ 사이드바      │ 기능 영역                     │ 설정 영역          │
-│              │ (목록 · 상태 · 실행 결과)      │ (그 기능의 설정)   │
-│ 개요         │                              │                   │
-│  대시보드     │  ←──────── 스플리터로 폭 조절 ────────→          │
-│ 편의 기능     │                              │                   │
-│  웹뷰 광고 차단│                              │                   │
-│  파일 동기화  │                              │                   │
-│  Windows 서비스│                             │                   │
-│ 시스템        │                              │                   │
-│  자동 시작    │                              │                   │
-│  로그         │                              │                   │
-│  설정         │                              │                   │
-└──────────────┴──────────────────────────────┴───────────────────┘
+```mermaid
+flowchart LR
+    sidebar["사이드바<br/>개요 · 편의 기능 · 시스템"]
+    feature["기능 영역<br/>목록 · 상태 · 실행 결과"]
+    settings["설정 영역<br/>선택한 기능의 설정"]
+
+    sidebar --> feature
+    feature <-->|"스플리터로 폭 조절"| settings
+
+    sidebar -.-> dashboard["대시보드"]
+    sidebar -.-> ad["웹뷰 광고 차단"]
+    sidebar -.-> sync["파일 동기화"]
+    sidebar -.-> service["Windows 서비스"]
+    sidebar -.-> startup["자동 시작"]
+    sidebar -.-> logs["로그"]
+    sidebar -.-> app_settings["설정"]
 ```
 
 앱 전역 설정(테마, 로그 보관)만 **설정** 페이지에 있고, 기능별 설정은 각 기능 페이지 우측에 있다.
@@ -75,17 +76,27 @@ cargo build -p gpui-convenience-tools --release  # 릴리즈
 
 실행 플래그: `--tray`(창 없이 트레이로 시작), `--service`(SCM 서비스 디스패처 모드).
 
+광고 창 후보를 실제로 조작하지 않고 프로세스 트리·최상위·자식 창을 확인하려면 다음 읽기
+전용 진단을 사용한다. 명시적 `Chrome_WidgetWin_1` 필터는 KakaoTalk WebView 광고 자식
+창 확인용이며, 결과의 `Visible=False`는 현재 화면에서 축소 동작을 판정할 수 없다는 뜻이다.
+
+```powershell
+pwsh -NoProfile -File .\scripts\Verify-AdWindowState.ps1 `
+  -ProcessId 26440 -IncludeChildWindows -ClassFilter Chrome_WidgetWin_1
+```
+
 ## 저장 위치
 
 모든 사용자 데이터는 `%APPDATA%\gpui-convenience-tools\` 아래에 있다.
 
-```text
-%APPDATA%\gpui-convenience-tools\
-├── config.json     # 설정(타겟 앱, 동기화 작업, 테마, 로그 설정)
-├── themes\         # 번들 테마 JSON 21종 (최초 실행 시 시드, 이후 감시)
-└── logs\
-    ├── app.log                     # 현재 로그
-    └── app-20260729-142530.log     # 롤링된 로그
+```mermaid
+flowchart TD
+    root["%APPDATA%\\gpui-convenience-tools\\"]
+    root --> config["config.json<br/>타겟 앱 · 동기화 · 테마 · 로그 설정"]
+    root --> themes["themes\\<br/>번들 테마 JSON 21종"]
+    root --> logs["logs\\"]
+    logs --> current["app.log<br/>현재 로그"]
+    logs --> rolled["app-YYYYMMDD-HHMMSS.log<br/>롤링 로그"]
 ```
 
 ## 파일 동기화
@@ -151,13 +162,14 @@ Windows 서비스(SCM)는 Session 0(비대화형)에서 실행되어 사용자 �
 `EnumWindows` / `ShowWindow`로 조작할 수 없다(**Session 0 격리**).
 이 문제를 피하기 위해 자동 시작은 **작업 스케줄러**를 사용한다.
 
-```text
-부팅 → 사용자 로그온
-       └→ Task Scheduler: ONLOGON 트리거 (+ /IT 인터랙티브 플래그)
-            └→ gpui-convenience-tools.exe --tray
-                 ├→ 스캔·동기화 루프 시작
-                 ├→ 300ms 후 트레이로 자동 숨김
-                 └→ EnumWindows / ShowWindow 정상 동작 (사용자 세션)
+```mermaid
+flowchart TD
+    boot["부팅"] --> logon["사용자 로그온"]
+    logon --> task["Task Scheduler<br/>ONLOGON + /IT"]
+    task --> tray["gpui-convenience-tools.exe --tray"]
+    tray --> scan["스캔·동기화 루프 시작"]
+    tray --> hide["300ms 후 트레이로 자동 숨김"]
+    tray --> windows["EnumWindows / ShowWindow<br/>사용자 세션에서 동작"]
 ```
 
 앱 내 **자동 시작** 페이지에서 등록/삭제/즉시 실행이 가능하다. CLI로 직접 관리하려면:

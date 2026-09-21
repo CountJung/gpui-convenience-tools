@@ -5,9 +5,9 @@
 //! 두 영역은 스플리터([`h_resizable`])로 나뉜다.
 //!
 //! ## 동작 원리
-//! 타겟 프로세스의 보이는 최상위 광고 후보를 `EnumWindows`로 찾은 뒤,
-//! 후보 창을 0×0으로 축소하고 입력을 비활성화한다. 메인 WebView와 자식 창을
-//! 광고로 추정해 조작하지 않도록 소유자·도구 창 경계를 적용한다.
+//! 타겟 프로세스 트리의 보이는 광고 후보를 `EnumWindows`로 찾은 뒤, 후보 창을
+//! 0×0으로 축소하고 입력을 비활성화한다. 최상위 창에는 소유자·도구 창 경계를
+//! 적용하고, 자식 창은 명시적인 WebView 클래스 필터를 설정한 경우에만 확인한다.
 
 use gpui::{
     div, px, AnyElement, Context, InteractiveElement, IntoElement, ParentElement,
