@@ -762,8 +762,11 @@ VM·credential 주입이 없어 실제 Guest Control 동작은 검증하지 않�
 
 VirtualBox 7.2.14의 `convertfromraw`로 만든 표준 VDI를 사용해 표준 헤더 오프셋을 실제로
 검증했다. `CLAUDE_LOCAL` 릴리스 실행에서 MBR·NTFS 3.1 파티션과 숨김/시스템 항목 17개,
-937,234바이트 복사 결과, 손상된 `many_subdirs` 항목의 오류 사유를 확인했다. 캡처는
-`vde019-vbox-standard-loaded-023912.png`이며, 세션 종료 후 프로세스·세션 루트·임시 대상이
+937,234바이트 복사 결과, 손상된 `many_subdirs` 항목의 오류 사유를 확인했다. 선택 전
+`0개 선택`과 `-SelectAllVdi` 시드 후 `16개 선택` 캡처도 확인했으며, `Key Ctrl+A`는
+foreground 안전 차단으로 입력을 보내지 않았다. 캡처는
+`vde019-vbox-standard-loaded-023912.png`, `vde019-vbox-key-before-024822.png`,
+`vde019-vbox-select-all-seed-025058.png`이며, 세션 종료 후 프로세스·세션 루트·임시 대상이
 모두 정리되었다. 외부 키보드 입력과 독립 Visual Reviewer 확인은 잔여다.
 표준 VDI 파서·raw fixture export와 검증 커밋은 `bed5914`이다.
 

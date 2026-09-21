@@ -16,6 +16,7 @@
     Capture 대상 창만 PNG로 캡처한다.
     Wheel   대상 창의 지정 지점에 휠 입력을 보낸다.
     Click   대상 창의 지정 지점을 좌클릭한다.
+    Key     대상 창에 지원된 키 조합을 보낸다(`Ctrl+A`).
     Resize  대상 창 크기를 바꾼다(최소 지원 크기 회귀 확인용).
     Stop    기록된 PID와 작업 전용 임시 루트만 정리한다.
 
@@ -29,7 +30,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet("Start", "Capture", "Wheel", "Click", "Resize", "Stop")]
+    [ValidateSet("Start", "Capture", "Wheel", "Click", "Key", "Resize", "Stop")]
     [string]$Action,
 
     [string]$BinaryPath,
@@ -48,6 +49,9 @@ param(
     # Start 전용. 시드 VDI의 선택 항목을 격리 대상 폴더로 자동 복사한다.
     [switch]$AutoCopyVdi,
 
+    # Start 전용. VDI 시드 직후 전체 항목을 선택한다. 자동 복사 시에는 자동으로 켜진다.
+    [switch]$SelectAllVdi,
+
     # Start 전용. 검증 전용 환경 변수로 패널 전환 입력 없이 특정 화면을 연다.
     [ValidateSet("Dashboard", "FileSync", "VirtualDisk", "AutoStart")]
     [string]$InitialPanel = "Dashboard",
@@ -58,7 +62,11 @@ param(
     [int]$Delta = -3,
     [int]$Width = 1000,
     [int]$Height = 700,
-    [int]$SettleMs = 700
+    [int]$SettleMs = 700,
+
+    # Key 전용. 현재 지원하는 검증 키 조합.
+    [ValidateSet("Ctrl+A")]
+    [string]$KeyChord = "Ctrl+A"
 )
 
 $ErrorActionPreference = "Stop"
@@ -97,8 +105,16 @@ public static class ClaudeVisualInterop {
     [StructLayout(LayoutKind.Sequential)] public struct MOUSEINPUT {
         public int dx, dy; public uint mouseData, dwFlags, time; public IntPtr extraInfo;
     }
-    // x64에서 INPUT은 정확히 40바이트여야 한다. 필드를 더하면 SendInput이 조용히 0을 반환한다.
-    [StructLayout(LayoutKind.Sequential)] public struct INPUT { public uint type; public MOUSEINPUT mi; }
+    [StructLayout(LayoutKind.Sequential)] public struct KEYBDINPUT {
+        public ushort wVk, wScan; public uint dwFlags, time; public IntPtr extraInfo;
+    }
+    // x64에서 INPUT은 정확히 40바이트여야 한다. 마우스·키보드 union을 유지해야
+    // SendInput이 두 입력 종류를 모두 올바르게 받는다.
+    [StructLayout(LayoutKind.Explicit, Size = 40)] public struct INPUT {
+        [FieldOffset(0)] public uint type;
+        [FieldOffset(8)] public MOUSEINPUT mi;
+        [FieldOffset(8)] public KEYBDINPUT ki;
+    }
 }
 "@
 
@@ -108,6 +124,10 @@ $PW_RENDERFULLCONTENT = 2
 $MOUSEEVENTF_WHEEL = 0x0800
 $MOUSEEVENTF_LEFTDOWN = 0x0002
 $MOUSEEVENTF_LEFTUP = 0x0004
+$KEYEVENTF_KEYUP = 0x0002
+$INPUT_KEYBOARD = 1
+$VK_CONTROL = 0x11
+$VK_A = 0x41
 
 # `ConvertFrom-Json`은 ISO-8601 문자열을 Kind=Unspecified인 DateTime으로 이미 변환해 둔다.
 # 그 값을 다시 문자열로 만들어 `Parse(...).ToUniversalTime()` 하면 UTC 값을 현지 시각으로
@@ -220,6 +240,37 @@ function Send-MouseInput([uint32]$flags, [uint32]$data) {
     }
 }
 
+function Send-KeyInput([ushort]$virtualKey, [bool]$keyUp) {
+    $input = New-Object ClaudeVisualInterop+INPUT
+    $input.type = $INPUT_KEYBOARD
+    $key = New-Object ClaudeVisualInterop+KEYBDINPUT
+    $key.wVk = $virtualKey
+    $key.dwFlags = if ($keyUp) { $KEYEVENTF_KEYUP } else { 0 }
+    $input.ki = $key
+    $size = [Runtime.InteropServices.Marshal]::SizeOf([Type]'ClaudeVisualInterop+INPUT')
+    $sent = [ClaudeVisualInterop]::SendInput(1, @($input), $size)
+    if ($sent -ne 1) {
+        throw ("SendInput 키 입력을 받아들이지 않았다(sent=$sent, " +
+            "err=$([Runtime.InteropServices.Marshal]::GetLastWin32Error())). " +
+            "대상 앱이 관리자 권한으로 실행 중이면 UIPI가 입력을 차단한다.")
+    }
+}
+
+function Send-KeyChord([string]$chord) {
+    switch ($chord) {
+        "Ctrl+A" {
+            Send-KeyInput $VK_CONTROL $false
+            Start-Sleep -Milliseconds 80
+            Send-KeyInput $VK_A $false
+            Start-Sleep -Milliseconds 80
+            Send-KeyInput $VK_A $true
+            Start-Sleep -Milliseconds 80
+            Send-KeyInput $VK_CONTROL $true
+        }
+        default { throw "지원하지 않는 키 조합이다: $chord" }
+    }
+}
+
 function Save-WindowCapture([IntPtr]$hwnd, [string]$captureName) {
     New-Item -ItemType Directory -Force -Path $captureRoot | Out-Null
     $rect = Get-WindowRect $hwnd
@@ -328,7 +379,9 @@ switch ($Action) {
             if ($null -ne $validationVdiPath) {
                 $env:GPUI_CONVENIENCE_TOOLS_VALIDATION_VDI_PATH = $validationVdiPath
                 $env:GPUI_CONVENIENCE_TOOLS_VALIDATION_VDI_TARGET = Join-Path $sessionRoot "target"
-                $env:GPUI_CONVENIENCE_TOOLS_VALIDATION_VDI_SELECT_ALL = "1"
+                if ($SelectAllVdi -or $AutoCopyVdi) {
+                    $env:GPUI_CONVENIENCE_TOOLS_VALIDATION_VDI_SELECT_ALL = "1"
+                }
                 if ($AutoCopyVdi) {
                     $env:GPUI_CONVENIENCE_TOOLS_VALIDATION_VDI_AUTO_COPY = "1"
                 }
@@ -456,6 +509,15 @@ switch ($Action) {
         }
         Start-Sleep -Milliseconds $SettleMs
         [ordered]@{ action = "Click"; at = ("{0},{1}" -f $point.X, $point.Y) } | ConvertTo-Json -Depth 3
+    }
+
+    "Key" {
+        $session = Read-Session
+        $hwnd = [IntPtr][int64]$session.windowHandle
+        Assert-ForegroundTarget $hwnd
+        Send-KeyChord $KeyChord
+        Start-Sleep -Milliseconds $SettleMs
+        [ordered]@{ action = "Key"; chord = $KeyChord } | ConvertTo-Json -Depth 3
     }
 
     "Resize" {
