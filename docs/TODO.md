@@ -96,7 +96,7 @@
 
 ### D-5. 동기화 이력
 
-- [ ] D-020 | 90% | 패널에 최근 실행 이력 목록(성공/실패 건수, 소요 시간) — `sync-history.json` 로드·완료 후 새로고침·결과 건수/소요 시간 카드와 GPUI 수용 테스트 구현, `-SeedHistory`·`-InitialPanel FileSync`로 시드된 실제 패널 캡처 완료; 독립 Visual Reviewer 확인은 후속
+- [ ] D-020 | 90% | 패널에 최근 실행 이력 목록(성공/실패 건수, 소요 시간) — `sync-history.json` 로드·완료 후 새로고침·결과 건수/소요 시간 카드와 GPUI 수용 테스트 구현, `-SeedHistory`·`-InitialPanel FileSync`로 시드된 실제 패널 캡처 완료; 994×702·1280×900 2차 자체 세션에서 이력 카드 경계와 3행 표시를 재확인하고 `d020-second-pass-before-055457.png`, `d020-second-pass-resized-055501.png`를 남김; 독립 Visual Reviewer 확인은 후속
 
 ---
 
@@ -118,7 +118,9 @@
 - [ ] G-001 | 90% | **`ButtonStyle` 덮어쓰기 정리** *(독립, 단독 커밋)*
       세 패널의 개별 `border`·`hover`·`no_hover` 덮어쓰기와 dead-code 확장 메서드를
       제거하고 공용 기본값으로 통일 완료; 자동·GPUI 검증 통과, 격리 release 파일 동기화·
-      자동 시작 화면 캡처 완료; 독립 Visual Reviewer 확인은 후속
+      자동 시작 화면 캡처 완료; 994×702·1280×900 2차 자체 세션에서 카드·안내 문장 경계를
+      재확인하고 `g001-second-pass-before-055522.png`, `g001-second-pass-resized-055525.png`를
+      남김; 독립 Visual Reviewer 확인은 후속
 
 - [ ] K-001 | 0% | **macOS 네이티브 기능 확장** *(선행 완료: Phase K에서 빌드·릴리즈는 구성됨)*
   현재 macOS는 `platform/fallback.rs`로 컴파일과 파일 동기화만 지원한다.
