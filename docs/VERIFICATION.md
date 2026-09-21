@@ -144,7 +144,7 @@ SHA-256을 기록한다. 다른 검증자의 독립 검토가 요구되는 UI �
 | E-002 | E2E | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | — |
 | E-003 | E2E | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | — |
 | E-004 | E2E | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | — |
-| G-001 | RUST | [ ] | [ ] | — | — | [ ] | [ ] | — |
+| G-001 | E2E | [x] | [x] | [x] | [ ] | [x] | [x] | `ButtonStyle` 기본값 통일 및 개별 덮어쓰기 제거; `cargo check -p gpui-convenience-tools --locked`; 관련 GPUI 테스트 `ad_block_cards_contain_long_content_at_supported_widths`, `service_rows_keep_names_readable_at_supported_window_widths`, `file_sync_sections_share_one_width_at_every_window_width`; 전체 테스트 139 passed·4 ignored; Clippy 기존 경고 7건; 격리 release 기본 대시보드 캡처 `target/visual-validation/captures/g001-default-001645.png`; 파일 동기화 화면 전환 Click은 foreground=0으로 안전 차단되어 실제 변경 화면 캡처·독립 Visual Reviewer는 후속; commit `0d7bf25` push 완료 |
 | G-002 | RUST | [ ] | [ ] | — | — | [ ] | [ ] | — |
 | K-001 | RUST | [ ] | [ ] | — | — | [ ] | [ ] | — |
 | G-003 | E2E | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | — |

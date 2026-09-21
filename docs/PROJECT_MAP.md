@@ -30,7 +30,7 @@
 안전 경계: 원본 VDI는 read-only로만 열고, 실행 중 VM의 VDI 직접 읽기는 구현하지 않는다.
 실행 중 VM 지원은 후속 `GuestFileSource` 구현으로만 추가한다(VDE-021).
 
-**최종 측정**: 2026-09-22 · `app/src` 총 50개 파일 · 19,486줄
+**최종 측정**: 2026-09-22 · `app/src` 총 50개 파일 · 19,465줄
 
 ## 크기 기준 — 줄 수는 증상이다
 
@@ -126,18 +126,18 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `theme.rs` | 85 | 테마 전환과 스위치 가시성 |
 | `virtual_disk.rs` | 259 | VirtualBox 탐색 네비게이션·VDI 입력·파티션 카드·현재 경로·상위 이동·실제 목록·숨김/시스템 전체 선택·복사 진행/실패 요약·키보드 단축키·안전/미지원 상태·새로고침 렌더 경계 |
 
-### 패널 (`app/src/window/`) — 4,033줄 / 11파일
+### 패널 (`app/src/window/`) — 4,012줄 / 11파일
 
 | 파일 | 줄 | 책임 |
 | --- | ---: | --- |
-| `service_mgr.rs` | 672 | 편의 기능 — Windows 서비스 (목록/제어 ↔ 검색·필터·권한) |
-| `file_sync.rs` | 630 | 편의 기능 — 파일 동기화 (작업 목록 → 설정·제외 패턴 → 실패 기록 + 하단 고정 진행 표시줄) |
+| `service_mgr.rs` | 670 | 편의 기능 — Windows 서비스 (목록/제어 ↔ 검색·필터·권한) |
+| `file_sync.rs` | 628 | 편의 기능 — 파일 동기화 (작업 목록 → 설정·제외 패턴 → 실패 기록 + 하단 고정 진행 표시줄) |
 | `settings.rs` | 444 | 전역 설정 — 테마 선택·로그 보관 정책 |
 | `ad_block.rs` | 502 | 편의 기능 — 웹뷰 광고 차단 (상태·타겟 ↔ 스캔 주기·프로세스 추가·카드 경계) |
-| `service_view.rs` | 318 | 시스템 — 자동 시작(작업 스케줄러) 등록·삭제·즉시 실행 |
-| `ui.rs` | 341 | **공용 UI 프리미티브** — 배지·액션 버튼·토글 스위치·통계 타일·설정 행·선택 칩·로그 레벨 칸·폭 경계 |
+| `service_view.rs` | 317 | 시스템 — 자동 시작(작업 스케줄러) 등록·삭제·즉시 실행 |
+| `ui.rs` | 327 | **공용 UI 프리미티브** — 배지·액션 버튼·토글 스위치·통계 타일·설정 행·선택 칩·로그 레벨 칸·폭 경계 |
 | `dashboard.rs` | 161 | 개요 — 전체 상태 요약과 최근 활동 (플랫폼별 요약 카드 + 동기화 상태 배지) |
-| `interval.rs` | 156 | 주기 선택 렌더 — 드롭다운 + (값·단위·추가) 행 + 등록된 프리셋 목록 |
+| `interval.rs` | 154 | 주기 선택 렌더 — 드롭다운 + (값·단위·추가) 행 + 등록된 프리셋 목록 |
 | `log_view.rs` | 110 | 시스템 — 화면 로그 가상 리스트와 로그 파일 현황 |
 | `mod.rs` | 107 | 패널 모듈 선언 + `balanced_split`·`scroll_pane` 레이아웃 헬퍼 |
 | `virtual_disk.rs` | 592 | 편의 기능 — VDI 경로 입력·파티션 선택·게스트 현재 경로·행 선택·폴더/상위 이동·단축키 포커스·안전/미지원 상태·대상 폴더·복사 진행·목록 새로고침 |
@@ -211,7 +211,7 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `window/ui.rs` | `choice_chip(id, label, selected, cx)` | 프리셋 선택 칩. 호출부가 `.on_click(cx.listener(..))`를 이어 붙인다 |
 | `window/ui.rs` | `log_level_label(level, cx)` | 로그 한 줄의 레벨 칸. 레벨 → 색 매핑 포함, 폭 고정 + 줄바꿈 금지 |
 | `window/ui.rs` | `Tone` | 배지 의미 색 — `Success`·`Warning`·`Info`·`Muted` |
-| `window/ui.rs` | `ButtonStyle` | 버튼 의미 색 — `primary`·`neutral`·`secondary`·`danger`·`danger_outline`·`muted` (+ `border`/`hover`/`no_hover` 덮어쓰기) |
+| `window/ui.rs` | `ButtonStyle` | 버튼 의미 색과 기본 hover/border 정책 — `primary`·`neutral`·`secondary`·`danger`·`danger_outline`·`muted` |
 | `window/ui.rs` | `Size` | 여백 — `Sm`(px_2 py_1) · `Md`(px_3 py_1) · `Lg`(px_4 py_2) |
 | `window/mod.rs` | `balanced_split(id, left_min, right_min, left, right)` | 양쪽 최소 폭을 보장하며 가용 너비를 균형 있게 채우는 공용 스플리터 |
 | `window/mod.rs` | `scroll_pane(id, handle, content)` | 자연 높이 컨텐츠가 넘칠 때 세로 스크롤 + 스크롤바 부여. **가로는 잠근다**(`overflow_x_hidden`) |
@@ -273,16 +273,19 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 흩어진다), 구현이 미세하게 다르면(`px_2` vs `px_3`) 통일 대상을 정하되 **그 통일은 별도 커밋**으로
 분리한다. 승격 후 **원본 정의는 반드시 삭제한다.**
 
-### 승격 후 남은 덮어쓰기 (통일 대기)
+### 승격 전 덮어쓰기 기록
 
 `ButtonStyle`의 `border`/`hover`/`no_hover` 덮어쓰기는 **승격 전 화면을 그대로 두기 위한 것**이며,
-그 자체가 통일 후보다. 덮어쓰기가 늘어나면 기본값이 잘못됐다는 신호다.
+G-001에서 제거했다. 아래 표는 변경 전 의도와 통일 판단을 보존하는 기록이다.
 
 | 화면 | 덮어쓰기 | 원래 모습 | 통일안 |
 | --- | --- | --- | --- |
-| `file_sync` 버튼 8개 | `.hover(border)` / `.border(primary_hover)` / `.border(danger_active)` | 테두리 색 = hover 색 | 기본값(테두리 `border`, hover `secondary_hover`)으로 |
-| `service_view` 버튼 4개 | `.border(t.border).no_hover()` | hover 반응 없음 | hover 추가 여부 결정 |
-| `service_mgr` 시작 버튼 | `.border(border).hover(secondary_hover)` (비활성 시) | 비활성도 테두리 유지 | `ButtonStyle::muted` 기본값에 테두리를 넣을지 결정 |
+| `file_sync` 버튼 8개 | `.hover(border)` / `.border(primary_hover)` / `.border(danger_active)` | 테두리 색 = hover 색 | 공용 생성자 기본값 사용 |
+| `service_view` 버튼 4개 | `.border(t.border).no_hover()` | hover 반응 없음 | 공용 생성자 기본 hover 사용 |
+| `service_mgr` 시작 버튼 | `.border(border).hover(secondary_hover)` (비활성 시) | 비활성도 테두리 유지 | `ButtonStyle::muted` 기본값 유지(테두리·hover 없음) |
+
+G-001 판단: `muted`는 비활성 의미이므로 테두리와 hover를 추가하지 않고, 나머지는 각
+`ButtonStyle` 생성자의 기본 상호작용을 사용한다.
 
 ---
 
@@ -319,6 +322,7 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | 2026-09-21 | `app/virtual_disk_ops.rs`·`app/tests/virtual_disk.rs` | VDE-019 GPUI 목록·복사 상태 수용 테스트 착수 | 실제 파일 목록을 주입할 UI 테스트 seam과 복사 상태 렌더 검증이 없음 | `GuestFileSource` trait object 테스트 경계, 숨김·시스템 항목 포함 목록 렌더와 Ctrl+A 선택, 복사 진행·중지·실패 요약 카드 GPUI 테스트 2개 추가; 전체 137 passed·4 ignored | 실제 VirtualBox 패널 캡처·foreground 입력·복사 대상 E2E는 VDE-019 잔여 |
 | 2026-09-21 | `docs/VIRTUAL_DISK_BACKENDS.md` | VDE-021 실행 중 VM 백엔드 설계 검토 | `guestcontrol`을 오프라인 VDI 경로와 혼용할 위험과 실제 명령·자격 증명 경계 미정 | Oracle 공식 명령 계약, `GuestFileSource`/전송 capability 분리, read-only 명령 목록, credential 비저장, 취소·시간 제한·출력 제한, 격리 VM 선행 조건 기록 | `VBoxManage.exe` 미설치로 실제 Guest Control E2E는 후속; VDE-019 완료 전 구현 금지 |
 | 2026-09-22 | `app/src/sync/tests.rs`·`app/src/config.rs`·`docs/PROJECT_MAP.md` | T-001·T-002 회귀 테스트와 구조 지도 실측 갱신 | 읽기 전용 대상 덮어쓰기와 `update_config` 필드 보존을 전체 테스트에서 보장하지 않음; 일부 모듈 줄 수가 이전 기록과 불일치 | 두 회귀 테스트 추가, 격리 설정 경로 검증, 전체 139 passed·4 ignored·Clippy 기존 경고 7건, 50개 파일·19,486줄 기준으로 지도 갱신 | 전체 `cargo fmt --check`는 기존 baseline 불일치로 별도 보류; 기능 변경 없이 테스트·문서만 반영 |
+| 2026-09-22 | `app/src/window/ui.rs`·`file_sync.rs`·`interval.rs`·`service_mgr.rs`·`service_view.rs` | G-001 버튼 스타일 덮어쓰기 정리 | 패널별 `border`·`hover`·`no_hover` 덮어쓰기로 공용 버튼 의미가 화면마다 달랐고 확장 메서드가 dead-code가 됨 | 세 패널을 생성자 기본값으로 통일하고 확장 메서드 제거, 관련 GPUI 테스트·전체 139 passed·4 ignored·Clippy 기존 경고 7건, 50개 파일·19,465줄 기준 지도 갱신 | 격리 release 기본 대시보드 캡처는 성공했지만 파일 동기화 화면 Click이 foreground=0으로 차단되어 변경 화면 캡처와 독립 Visual Reviewer는 후속 |
 | 2026-07-29 | 편의 기능 스플리터 3곳 | 공용 레이아웃 승격 | 패널별 고정 초기 폭 | `window::balanced_split` | 설정 pane 과도 축소 방지, 양쪽 가용폭 사용 |
 | 2026-07-29 | `app.rs` | 책임 단위 분할 + 재배치 | 1,798 | `app/` 7파일 (최대 564) | 대시보드·로그 렌더는 소유가 잘못돼 있어 `window/`로 이동 |
 | 2026-07-29 | `platform/windows.rs` | 책임 단위 분할 + 승격 | 1,361 | `platform/windows/` 6파일 (최대 344) | `wide_null`을 `windows/mod.rs`로 **공용 승격** |
