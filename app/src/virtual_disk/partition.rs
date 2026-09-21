@@ -4,7 +4,7 @@
 //! arithmetic과 디스크 용량 검증을 거치며, 손상된 테이블은 게스트 파일시스템
 //! 계층으로 전달하지 않는다.
 
-use super::{PartitionTableKind, VdiPartition, VirtualDiskError};
+use super::{GuestFileSystem, PartitionTableKind, VdiPartition, VirtualDiskError};
 
 const MBR_SIGNATURE: [u8; 2] = [0x55, 0xaa];
 const MBR_PARTITION_OFFSET: usize = 446;
@@ -113,7 +113,12 @@ fn parse_mbr<S: PartitionSource>(
             }
             continue;
         }
-        partitions.push(to_partition(number, PartitionTableKind::Mbr, &entry));
+        partitions.push(to_partition(
+            source,
+            number,
+            PartitionTableKind::Mbr,
+            &entry,
+        )?);
     }
 
     if let Some(extended) = extended {
@@ -164,13 +169,13 @@ fn parse_extended_partitions<S: PartitionSource>(
                 .ok_or_else(|| corrupt("논리 파티션 시작 LBA가 오버플로됩니다"))?;
             validate_range_in(start, logical.sector_count as u64, base_lba, extended_end)?;
             validate_mbr_range(start, logical.sector_count as u64, total_sectors)?;
-            result.push(VdiPartition {
+            result.push(to_partition_at(
+                source,
                 number,
-                table: PartitionTableKind::Mbr,
-                start_lba: start,
-                sector_count: logical.sector_count as u64,
-                filesystem: None,
-            });
+                PartitionTableKind::Mbr,
+                start,
+                logical.sector_count as u64,
+            )?);
         }
 
         if link.is_empty() {
@@ -303,14 +308,14 @@ fn parse_gpt<S: PartitionSource>(
             .checked_sub(start_lba)
             .and_then(|count| count.checked_add(1))
             .ok_or_else(|| corrupt("GPT 파티션 섹터 수가 오버플로됩니다"))?;
-        result.push(VdiPartition {
-            number: u32::try_from(index + 1)
+        result.push(to_partition_at(
+            source,
+            u32::try_from(index + 1)
                 .map_err(|_| corrupt("GPT 파티션 번호가 u32 범위를 초과합니다"))?,
-            table: PartitionTableKind::Gpt,
+            PartitionTableKind::Gpt,
             start_lba,
             sector_count,
-            filesystem: None,
-        });
+        )?);
     }
     Ok(result)
 }
@@ -446,14 +451,46 @@ fn validate_range_in(
     Ok(())
 }
 
-fn to_partition(number: u32, table: PartitionTableKind, entry: &MbrEntry) -> VdiPartition {
-    VdiPartition {
+fn to_partition<S: PartitionSource>(
+    source: &mut S,
+    number: u32,
+    table: PartitionTableKind,
+    entry: &MbrEntry,
+) -> Result<VdiPartition, VirtualDiskError> {
+    to_partition_at(
+        source,
         number,
         table,
-        start_lba: entry.start_lba as u64,
-        sector_count: entry.sector_count as u64,
-        filesystem: None,
-    }
+        entry.start_lba as u64,
+        entry.sector_count as u64,
+    )
+}
+
+fn to_partition_at<S: PartitionSource>(
+    source: &mut S,
+    number: u32,
+    table: PartitionTableKind,
+    start_lba: u64,
+    sector_count: u64,
+) -> Result<VdiPartition, VirtualDiskError> {
+    Ok(VdiPartition {
+        number,
+        table,
+        start_lba,
+        sector_count,
+        filesystem: detect_filesystem(source, start_lba)?,
+    })
+}
+
+fn detect_filesystem<S: PartitionSource>(
+    source: &mut S,
+    start_lba: u64,
+) -> Result<Option<GuestFileSystem>, VirtualDiskError> {
+    let boot_sector = read_sector_at(source, start_lba)?;
+    let is_ntfs = boot_sector.get(3..11) == Some(b"NTFS    ")
+        && le_u16(&boot_sector, 11)? == source.sector_size() as u16
+        && boot_sector.get(13).copied().is_some_and(|value| value > 0);
+    Ok(is_ntfs.then_some(GuestFileSystem::ntfs_3_1()))
 }
 
 struct MbrEntry {
@@ -505,6 +542,15 @@ fn le_u32(raw: &[u8], offset: usize) -> Result<u32, VirtualDiskError> {
         .ok_or_else(|| corrupt("파티션 테이블 필드가 잘렸습니다"))?;
     Ok(u32::from_le_bytes(
         bytes.try_into().expect("4-byte partition field"),
+    ))
+}
+
+fn le_u16(raw: &[u8], offset: usize) -> Result<u16, VirtualDiskError> {
+    let bytes = raw
+        .get(offset..offset + 2)
+        .ok_or_else(|| corrupt("파티션 테이블 필드가 잘렸습니다"))?;
+    Ok(u16::from_le_bytes(
+        bytes.try_into().expect("2-byte partition field"),
     ))
 }
 
@@ -628,6 +674,22 @@ mod tests {
         assert_eq!(partitions[0].table, PartitionTableKind::Mbr);
         assert_eq!(partitions[0].start_lba, 2048);
         assert_eq!(partitions[0].sector_count, 1024);
+        assert_eq!(partitions[0].filesystem, None);
+    }
+
+    #[test]
+    fn detects_ntfs_3_1_from_partition_boot_sector() {
+        let mut disk = MemoryDisk::new(4096);
+        disk.set_mbr_signature();
+        disk.mbr_entry(0, 0x07, 2048, 1024);
+        let boot = 2048 * SECTOR_SIZE;
+        disk.bytes[boot + 3..boot + 11].copy_from_slice(b"NTFS    ");
+        disk.bytes[boot + 11..boot + 13].copy_from_slice(&(SECTOR_SIZE as u16).to_le_bytes());
+        disk.bytes[boot + 13] = 8;
+
+        let partitions = discover_partitions(&mut disk).unwrap();
+
+        assert_eq!(partitions[0].filesystem, Some(GuestFileSystem::ntfs_3_1()));
     }
 
     #[test]

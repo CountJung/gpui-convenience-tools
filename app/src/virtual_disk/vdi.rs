@@ -572,6 +572,9 @@ fn corrupt(detail: impl Into<String>) -> VirtualDiskError {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::virtual_disk::{
+        ntfs::NtfsGuestFileSource, partition::discover_partitions, GuestFileSource, GuestFileSystem,
+    };
     use std::{
         fs,
         io::Write,
@@ -721,6 +724,33 @@ mod tests {
         remove_fixture(&path);
     }
 
+    #[test]
+    fn reads_bundled_ntfs_through_a_synthetic_vdi_without_mutating_the_source() {
+        let path = write_ntfs_vdi_fixture();
+        let original = fs::read(&path).unwrap();
+        let mut reader = VdiReader::open(&path).unwrap();
+
+        let partitions = discover_partitions(&mut reader).unwrap();
+        assert_eq!(partitions.len(), 1);
+        assert_eq!(partitions[0].filesystem, Some(GuestFileSystem::ntfs_3_1()));
+
+        let mut source = NtfsGuestFileSource::open(reader, partitions[0].clone()).unwrap();
+        let root = source.root().unwrap();
+        let entries = source.list_directory(&root).unwrap();
+        assert!(!entries.is_empty());
+
+        let file = entries
+            .iter()
+            .find(|entry| !entry.is_directory() && entry.size_bytes > 0)
+            .expect("bundled NTFS fixture should contain a readable file");
+        let read_length = usize::try_from(file.size_bytes.min(64)).unwrap();
+        let mut buffer = vec![0; read_length];
+        assert_eq!(source.read_at(file, 0, &mut buffer).unwrap(), read_length);
+        assert_eq!(fs::read(&path).unwrap(), original);
+
+        remove_fixture(&path);
+    }
+
     fn write_fixture(image_type: u32, map: &[u32], allocated: u32) -> PathBuf {
         let path = fixture_path();
         let mut header = base_header(image_type, map.len() as u32, allocated);
@@ -736,6 +766,62 @@ mod tests {
         for block in [vec![b'A'; 512], vec![b'B'; 512]] {
             file.write_all(&block).unwrap();
         }
+        path
+    }
+
+    fn write_ntfs_vdi_fixture() -> PathBuf {
+        let ntfs_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("testdata")
+            .join("ntfs-testfs1.img");
+        let ntfs = fs::read(ntfs_path).expect("bundled NTFS fixture must be present");
+        assert!(ntfs.len().is_multiple_of(BLOCK_SIZE as usize));
+
+        let mut disk = vec![0u8; BLOCK_SIZE as usize];
+        disk[510..512].copy_from_slice(&[0x55, 0xaa]);
+        disk[446 + 4] = 0x07;
+        disk[446 + 8..446 + 12].copy_from_slice(&1u32.to_le_bytes());
+        disk[446 + 12..446 + 16].copy_from_slice(
+            &u32::try_from(ntfs.len() / BLOCK_SIZE as usize)
+                .unwrap()
+                .to_le_bytes(),
+        );
+        disk.extend_from_slice(&ntfs);
+
+        let block_count = u32::try_from(disk.len() / BLOCK_SIZE as usize).unwrap();
+        let map_size = block_map_size(&VdiHeader {
+            version: VdiVersion::CURRENT,
+            header_size: MIN_HEADER_MAIN_SIZE,
+            image_type: VdiImageType::Dynamic,
+            image_flags: 0,
+            offset_bmap: 512,
+            offset_data: 0,
+            sector_size: SECTOR_SIZE,
+            disk_size: disk.len() as u64,
+            block_size: BLOCK_SIZE,
+            block_extra: 0,
+            blocks_in_image: block_count,
+            blocks_allocated: block_count,
+        })
+        .unwrap();
+        let data_offset = 512 + map_size;
+
+        let path = fixture_path();
+        let mut header = base_header(IMAGE_TYPE_DYNAMIC, block_count, block_count);
+        write_u32(&mut header, 0x154, 512);
+        write_u32(&mut header, 0x158, u32::try_from(data_offset).unwrap());
+        let mut file = fs::File::create(&path).unwrap();
+        file.write_all(&header).unwrap();
+
+        for entry in 0..block_count {
+            file.write_all(&entry.to_le_bytes()).unwrap();
+        }
+        file.write_all(&vec![
+            0;
+            usize::try_from(map_size).unwrap()
+                - block_count as usize * 4
+        ])
+        .unwrap();
+        file.write_all(&disk).unwrap();
         path
     }
 

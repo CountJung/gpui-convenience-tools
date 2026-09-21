@@ -486,7 +486,10 @@ fn corrupt(detail: impl Into<String>) -> VirtualDiskError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::fs::File;
+    use std::{
+        fs::{self, File},
+        sync::atomic::{AtomicU64, Ordering},
+    };
 
     #[derive(Debug)]
     struct MemorySource {
@@ -684,6 +687,51 @@ mod tests {
     }
 
     #[test]
+    fn opens_bundled_ntfs_image_read_only() {
+        let path = bundled_ntfs_path();
+        let original = fs::read(&path).unwrap();
+        let file = File::open(&path).unwrap();
+        let size = file.metadata().unwrap().len();
+        let partition = VdiPartition {
+            number: 1,
+            table: super::super::PartitionTableKind::Gpt,
+            start_lba: 0,
+            sector_count: size / 512,
+            filesystem: Some(GuestFileSystem::ntfs_3_1()),
+        };
+        let mut source = NtfsGuestFileSource::open(FileSource { file, size }, partition).unwrap();
+        let root = source.root().unwrap();
+        let entries = source.list_directory(&root).unwrap();
+        assert!(!entries.is_empty());
+        assert_eq!(fs::read(&path).unwrap(), original);
+    }
+
+    #[test]
+    fn rejects_a_corrupt_copy_of_the_bundled_ntfs_image() {
+        let source_path = bundled_ntfs_path();
+        let corrupt_path = corrupt_ntfs_path();
+        let mut bytes = fs::read(&source_path).unwrap();
+        bytes[510] ^= 1;
+        fs::write(&corrupt_path, &bytes).unwrap();
+
+        let file = File::open(&corrupt_path).unwrap();
+        let size = file.metadata().unwrap().len();
+        let partition = VdiPartition {
+            number: 1,
+            table: super::super::PartitionTableKind::Gpt,
+            start_lba: 0,
+            sector_count: size / 512,
+            filesystem: Some(GuestFileSystem::ntfs_3_1()),
+        };
+
+        assert!(matches!(
+            NtfsGuestFileSource::open(FileSource { file, size }, partition),
+            Err(VirtualDiskError::CorruptImage(_))
+        ));
+        fs::remove_file(corrupt_path).unwrap();
+    }
+
+    #[test]
     #[ignore = "실제 NTFS 이미지는 GPUI_CONVENIENCE_TOOLS_NTFS_TEST_IMAGE로 주입한다"]
     fn opens_configured_ntfs_image_read_only() {
         let Some(path) = std::env::var_os("GPUI_CONVENIENCE_TOOLS_NTFS_TEST_IMAGE") else {
@@ -734,5 +782,20 @@ mod tests {
             NtfsGuestFileSource::open(FileSource { file, size }, partition),
             Err(VirtualDiskError::CorruptImage(_))
         ));
+    }
+
+    fn bundled_ntfs_path() -> std::path::PathBuf {
+        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("testdata")
+            .join("ntfs-testfs1.img")
+    }
+
+    fn corrupt_ntfs_path() -> std::path::PathBuf {
+        static NEXT: AtomicU64 = AtomicU64::new(0);
+        std::env::temp_dir().join(format!(
+            "gpui-convenience-vde018-corrupt-{}-{}.img",
+            std::process::id(),
+            NEXT.fetch_add(1, Ordering::Relaxed)
+        ))
     }
 }

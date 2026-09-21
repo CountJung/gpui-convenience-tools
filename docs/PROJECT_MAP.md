@@ -24,12 +24,12 @@
 | `app/src/virtual_disk/metadata.rs` | **구현됨** — 호스트 파일 속성·타임스탬프 적용과 구조화된 적용 실패 결과 | VDE-011 |
 | `app/src/window/virtual_disk.rs` | VDI 선택·파티션·탐색·파일 행 선택·상위 이동·단축키·진행 UI | VDE-013~017 |
 | `app/src/app/virtual_disk_ops.rs` | **구현됨** — read-only VDI 열기·파티션 검색/선택·게스트 경로 새로고침·폴더 이동·다중 선택·탐색기 포커스·실행 중/미지원 오류 메시지 | VDE-013~014·016~017 |
-| `app/src/app/virtual_disk_copy.rs` | **구현됨** — 대상 폴더 입력/선택, read-only VDI 재연결 백그라운드 복사, 진행·중지·완료 요약 이벤트, 탐색기 keymap 등록 | VDE-015~016; 실제 이미지 E2E는 VDE-018~019 |
+| `app/src/app/virtual_disk_copy.rs` | **구현됨** — 대상 폴더 입력/선택, read-only VDI 재연결 백그라운드 복사, 진행·중지·완료 요약 이벤트, 탐색기 keymap 등록 | VDE-015~016; 실제 이미지 E2E는 VDE-019 |
 
 안전 경계: 원본 VDI는 read-only로만 열고, 실행 중 VM의 VDI 직접 읽기는 구현하지 않는다.
 실행 중 VM 지원은 후속 `GuestFileSource` 구현으로만 추가한다(VDE-021).
 
-**최종 측정**: 2026-09-21 · `app/src` 총 50개 파일 · 19,038줄
+**최종 측정**: 2026-09-21 · `app/src` 총 50개 파일 · 19,249줄
 
 ## 크기 기준 — 줄 수는 증상이다
 
@@ -43,7 +43,7 @@
 | 800~1,000 | 🟡 경고 | 다음 작업 전에 구조 리팩터링 |
 | 1,000 초과 | 🔴 위반 | **즉시 리팩터링.** 다른 작업보다 우선 |
 
-현재 🔴 위반 **없음**, 🟡 경고 **1개**. 최대 파일은 834줄(`virtual_disk/copy.rs`)이며, 다음 VirtualBox UI 작업 전에 책임 단위 분할을 검토한다.
+현재 🔴 위반 **없음**, 🟡 경고 **2개**. 최대 파일은 868줄(`virtual_disk/vdi.rs`)이며, 다음 VirtualBox UI 작업 전에 책임 단위 분할을 검토한다.
 줄 수와 무관하게 처리하는 중복 헬퍼는 아래 「중복 헬퍼 추적」에서 관리한다.
 
 ### 줄 수 측정 명령
@@ -72,14 +72,14 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `logging.rs` | 560 | 롤링 파일 로거 (`log::Log` 구현, 테스트용 출력 경로 주입) |
 | `util.rs` | 139 | 도메인 주인이 없는 순수 헬퍼 — `format_interval`·`interval_to_secs`·`TimeUnit` |
 
-### VirtualBox 도메인 (`app/src/virtual_disk/`) — 4,423줄 / 8파일
+### VirtualBox 도메인 (`app/src/virtual_disk/`) — 4,634줄 / 8파일
 
 | 파일 | 줄 | 책임 |
 | --- | ---: | --- |
 | `mod.rs` | 456 | VDI·파티션·게스트 파일 항목 모델, 정규화된 게스트 경로·시간 메타데이터, `GuestFileSource`, 플랫폼 비의존 오류 계약 |
-| `vdi.rs` | 782 | VDI 1.1 read-only 헤더·블록 맵·동적/고정 블록 읽기, 잠금·VM 사용·크기/mtime 안정성 가드 |
-| `partition.rs` | 729 | read-only `PartitionSource` 경계, MBR·EBR·protective MBR·GPT 검색, 양쪽 CRC·LBA 범위 검증 |
-| `ntfs.rs` | 738 | 파티션 범위 `Read + Seek` 어댑터, NTFS 3.1 디렉터리·기본 데이터 스트림 읽기, 압축·암호화·범위·손상 오류와 속성·시간 보존 |
+| `vdi.rs` | 868 | VDI 1.1 read-only 헤더·블록 맵·동적/고정 블록 읽기, 잠금·VM 사용·크기/mtime 안정성 가드, 합성 NTFS VDI 통합 픽스처 |
+| `partition.rs` | 791 | read-only `PartitionSource` 경계, MBR·EBR·protective MBR·GPT 검색, 양쪽 CRC·LBA 범위 검증, NTFS 3.1 부트 섹터 판정 |
+| `ntfs.rs` | 801 | 파티션 범위 `Read + Seek` 어댑터, NTFS 3.1 디렉터리·기본 데이터 스트림 읽기, 압축·암호화·범위·손상 오류와 속성·시간 보존, 고정/손상 픽스처 테스트 |
 | `path_policy.rs` | 335 | 절대 대상 루트 기준 게스트 경로 매핑, Windows 예약 이름·경로 길이 검증, 게스트·호스트 리파스 포인트/심볼릭 링크 추적 차단 |
 | `copy.rs` | 834 | `GuestFileSource` 선택 파일·폴더의 설정 청크 복사, 대상 부모 생성, 건너뜀·덮어쓰기·새 이름 충돌 정책과 메타데이터 결과 집계 |
 | `issues.rs` | 146 | 복사 오류 종류·안정 억제 키·부분 복사 보고서 연결과 항목별 알림 억제 상태 |
@@ -130,7 +130,7 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | 파일 | 줄 | 책임 |
 | --- | ---: | --- |
 | `service_mgr.rs` | 672 | 편의 기능 — Windows 서비스 (목록/제어 ↔ 검색·필터·권한) |
-| `file_sync.rs` | 635 | 편의 기능 — 파일 동기화 (작업 목록 → 설정·제외 패턴 → 실패 기록 + 하단 고정 진행 표시줄) |
+| `file_sync.rs` | 630 | 편의 기능 — 파일 동기화 (작업 목록 → 설정·제외 패턴 → 실패 기록 + 하단 고정 진행 표시줄) |
 | `settings.rs` | 444 | 전역 설정 — 테마 선택·로그 보관 정책 |
 | `ad_block.rs` | 502 | 편의 기능 — 웹뷰 광고 차단 (상태·타겟 ↔ 스캔 주기·프로세스 추가·카드 경계) |
 | `service_view.rs` | 318 | 시스템 — 자동 시작(작업 스케줄러) 등록·삭제·즉시 실행 |
@@ -161,6 +161,13 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | 파일 | 줄 | 책임 |
 | --- | ---: | --- |
 | `app/build.rs` | 12 | `/MANIFEST:NO` 링커 인자 (gpui 임베드 매니페스트 중복 방지) |
+
+### 테스트 픽스처
+
+| 경로 | 크기 | 책임 |
+| --- | ---: | --- |
+| `app/testdata/ntfs-testfs1.img` | 2 MiB | `ntfs` 0.4.0 배포본에서 고정한 NTFS 3.1 read-only 탐색 원본 |
+| `docs/TEST_FIXTURES.md` | — | 고정 이미지 출처·임시 VDI 생성·손상 복사본·격리 경로 계약 |
 
 ### 개발·검증 도구
 
@@ -298,15 +305,16 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | 2026-09-21 | `virtual_disk/vdi.rs` | VDE-005 안전 가드 추가 | 파일 잠금·원본 변경·실행 중 VM 대조 없음 | 782줄의 잠금 표식·환경변수 기반 VBoxManage 조회·크기/mtime 스냅샷·read-only 핸들 검증 | 800줄 주의 구간에 접근했으므로 VDE-006 전에 책임 단위 분할 후보를 검토 |
 | 2026-09-21 | `virtual_disk/partition.rs` | VDE-006 MBR/GPT 파서 추가 | 파티션 검색 구현 없음 | 729줄의 MBR·EBR·GPT 양쪽 CRC·범위 검증과 `PartitionSource` 어댑터 | NTFS 파일시스템 판정은 VDE-007~008에서 연결 |
 | 2026-09-21 | `virtual_disk/ntfs.rs` | VDE-007 NTFS 읽기 전용 어댑터 추가 | NTFS 디렉터리·스트림 접근 구현 없음 | 507줄의 파티션 범위 `Read + Seek`, NTFS 3.1 열거·기본 스트림 읽기·속성 보존과 env 주입 이미지 테스트 | 압축·암호화·항목별 오류 억제는 VDE-008에서 연결 |
-| 2026-09-21 | `virtual_disk/ntfs.rs`·`virtual_disk/mod.rs` | VDE-008 NTFS 오류 경계 추가 | 파일 경로 없는 공통 오류와 압축·암호화 스트림 무방비 읽기 | `GuestEntry` 경로 래퍼, 파티션 범위 재검증, 압축·암호화 플래그 차단, 손상 메타데이터·원본 변경 보존, 오류 단위 테스트와 손상 이미지 테스트 | 항목별 복사 실패 알림·고정 손상 픽스처 묶음은 VDE-012·VDE-018에서 연결 |
+| 2026-09-21 | `virtual_disk/ntfs.rs`·`virtual_disk/mod.rs` | VDE-008 NTFS 오류 경계 추가 | 파일 경로 없는 공통 오류와 압축·암호화 스트림 무방비 읽기 | `GuestEntry` 경로 래퍼, 파티션 범위 재검증, 압축·암호화 플래그 차단, 손상 메타데이터·원본 변경 보존, 오류 단위 테스트와 손상 이미지 테스트 | 항목별 복사 실패 알림은 VDE-012, 고정 손상 픽스처는 VDE-018에서 연결 |
 | 2026-09-21 | `virtual_disk/path_policy.rs`·`virtual_disk/mod.rs` | VDE-009 호스트 경로 안전 매핑 추가 | 게스트 경로를 호스트 복사 대상에 연결하는 안전 경계 없음 | 절대 대상 루트, Windows 예약 이름·금지 문자·UTF-16 길이 제한, 게스트 리파스 포인트와 기존 호스트 링크 추적 차단, 6개 정책 테스트 | 실제 파일 복사·충돌·속성·오류 알림 연결은 VDE-010~012에서 수행 |
 | 2026-09-21 | `virtual_disk/path_policy.rs`·`virtual_disk/copy.rs` | VDE-010 복사 엔진과 경로 정책 분리 | 경로 정책과 복사 엔진이 한 파일에 모여 952줄 경고 구간에 접근 | 경로 정책을 334줄 모듈로 분리하고 복사 엔진을 629줄로 유지, 청크 복사·부모 생성·건너뜀·덮어쓰기·새 이름 충돌과 13개 테스트 추가 | 파일 속성·항목별 실패 알림은 VDE-011~012에서 연결 |
-| 2026-09-21 | `virtual_disk/metadata.rs`·`virtual_disk/ntfs.rs`·`virtual_disk/copy.rs` | VDE-011 메타데이터 적용 추가 | 게스트 속성과 시간 정보가 호스트 복사 결과에 반영되지 않음 | NTFS 생성·수정·접근 시간 모델링, Windows 속성·생성 시간·접근/수정 시간 적용, 비지원·권한 실패 수집, 5개 테스트 | 실제 VDI 이미지의 모든 메타데이터 조합과 UI 알림 연결은 VDE-018~019·VDE-012에서 후속 검증 |
+| 2026-09-21 | `virtual_disk/metadata.rs`·`virtual_disk/ntfs.rs`·`virtual_disk/copy.rs` | VDE-011 메타데이터 적용 추가 | 게스트 속성과 시간 정보가 호스트 복사 결과에 반영되지 않음 | NTFS 생성·수정·접근 시간 모델링, Windows 속성·생성 시간·접근/수정 시간 적용, 비지원·권한 실패 수집, 5개 테스트 | 실제 VDI 이미지의 모든 메타데이터 조합과 UI 알림 연결은 VDE-019·VDE-012에서 후속 검증 |
 | 2026-09-21 | `virtual_disk/issues.rs`·`virtual_disk/copy.rs` | VDE-012 오류 수집 도메인 경계 추가 | 복사 실패가 전체 작업 중단으로만 전달되고 반복 알림 억제 계약이 없음 | 오류 종류 분류, 형제 항목 계속 처리, `CopyReport.issues`, 경로·종류 기반 안정 억제 키와 중복 알림 차단, 11개 관련 테스트 | GPUI 토스트/로그 연결과 억제 상태 영속화는 VDE-013~019 후속 작업 |
-| 2026-09-21 | `app/state.rs`·`app/virtual_disk_ops.rs`·`window/virtual_disk.rs`·`app/tests/virtual_disk.rs` | VDE-013 오프라인 VDI 탐색기 셸 추가 | VirtualBox 도메인이 GPUI 네비게이션과 연결되지 않음 | `ActivePanel`·`NAV_TOOLS` 등록, VDI 경로 입력, read-only VDI/파티션 검색, NTFS 선택 연결, 게스트 루트 경로·새로고침 카드, GPUI 회귀 테스트와 920/1280px 실제 캡처 | 실제 VDI 이미지 성공 경로와 파일 목록 E2E는 VDE-018에서 수행 |
-| 2026-09-21 | `app/virtual_disk_ops.rs`·`window/virtual_disk.rs`·`app/tests/virtual_disk.rs` | VDE-014 탐색기 목록 조작 추가 | VDI 셸에 파일 행 조작과 경로 이동이 없음 | 숨김·시스템 항목을 필터링하지 않는 목록 행, 파일 종류·속성·크기 표시, 폴더 더블클릭, 상위 이동, Ctrl/Shift 선택 집합, 선택 카운트와 GPUI 상위 액션 회귀 테스트, 920/1280px 실제 캡처 | 실제 VDI 파일 행·숨김 항목·범위 선택 상호작용은 VDE-018~019와 VDE-016에서 검증 |
-| 2026-09-21 | `app/virtual_disk_copy.rs`·`window/virtual_disk.rs`·`app/events.rs` | VDE-015 연속형 복사 작업 연결 | 탐색 목록에 대상 폴더·복사 진행 상태가 없음 | 대상 폴더 입력/네이티브 선택, 작업 스레드의 read-only VDI 재연결, 진행 이벤트·원자 중지 요청·완료/실패 요약, 단일 `scroll_pane` 복사 카드, 1000/920/1280px 실제 캡처 | 실제 이미지 복사 결과와 대용량 디렉터리 중지 세분화는 VDE-018~019에서 검증 |
-| 2026-09-21 | `app/virtual_disk_ops.rs`·`window/virtual_disk.rs`·`app/tests/virtual_disk.rs` | VDE-017 안전·지원 상태 안내 | 실행 중 VM·잠금·미지원 파일시스템이 일반 읽기 실패와 구분되지 않음 | read-only 안전 경계 카드, 실행 중 VM/잠금 전용 오류, NTFS 3.1 지원 범위 안내, 미지원 파티션 경고, GPUI 상태 렌더 테스트와 920/1000/1280px 실제 캡처 | 실제 VBoxManage 실행 중 VM·미지원 이미지 E2E는 VDE-018~019에서 검증 |
+| 2026-09-21 | `app/state.rs`·`app/virtual_disk_ops.rs`·`window/virtual_disk.rs`·`app/tests/virtual_disk.rs` | VDE-013 오프라인 VDI 탐색기 셸 추가 | VirtualBox 도메인이 GPUI 네비게이션과 연결되지 않음 | `ActivePanel`·`NAV_TOOLS` 등록, VDI 경로 입력, read-only VDI/파티션 검색, NTFS 선택 연결, 게스트 루트 경로·새로고침 카드, GPUI 회귀 테스트와 920/1280px 실제 캡처 | 실제 VDI 이미지 성공 경로와 파일 목록 E2E는 VDE-019에서 수행 |
+| 2026-09-21 | `app/virtual_disk_ops.rs`·`window/virtual_disk.rs`·`app/tests/virtual_disk.rs` | VDE-014 탐색기 목록 조작 추가 | VDI 셸에 파일 행 조작과 경로 이동이 없음 | 숨김·시스템 항목을 필터링하지 않는 목록 행, 파일 종류·속성·크기 표시, 폴더 더블클릭, 상위 이동, Ctrl/Shift 선택 집합, 선택 카운트와 GPUI 상위 액션 회귀 테스트, 920/1280px 실제 캡처 | 실제 VDI 파일 행·숨김 항목·범위 선택 상호작용은 VDE-019와 VDE-016에서 검증 |
+| 2026-09-21 | `app/virtual_disk_copy.rs`·`window/virtual_disk.rs`·`app/events.rs` | VDE-015 연속형 복사 작업 연결 | 탐색 목록에 대상 폴더·복사 진행 상태가 없음 | 대상 폴더 입력/네이티브 선택, 작업 스레드의 read-only VDI 재연결, 진행 이벤트·원자 중지 요청·완료/실패 요약, 단일 `scroll_pane` 복사 카드, 1000/920/1280px 실제 캡처 | 실제 이미지 복사 결과와 대용량 디렉터리 중지 세분화는 VDE-019에서 검증 |
+| 2026-09-21 | `app/virtual_disk_ops.rs`·`window/virtual_disk.rs`·`app/tests/virtual_disk.rs` | VDE-017 안전·지원 상태 안내 | 실행 중 VM·잠금·미지원 파일시스템이 일반 읽기 실패와 구분되지 않음 | read-only 안전 경계 카드, 실행 중 VM/잠금 전용 오류, NTFS 3.1 지원 범위 안내, 미지원 파티션 경고, GPUI 상태 렌더 테스트와 920/1000/1280px 실제 캡처 | 실제 VBoxManage 실행 중 VM·미지원 이미지 E2E는 VDE-019에서 검증 |
+| 2026-09-21 | `virtual_disk/partition.rs`·`virtual_disk/vdi.rs`·`virtual_disk/ntfs.rs`·`app/testdata/ntfs-testfs1.img` | VDE-018 고정 NTFS/합성 VDI 검증 | 실제 이미지에 연결된 파티션의 파일시스템 판정과 원본 불변성 통합 증거 없음 | MBR 파티션의 NTFS 3.1 부트 섹터 판정, 고정 NTFS read-only 열거, 손상 복사본 거부, 합성 동적 VDI에서 파티션·루트·파일 읽기 및 VDI 바이트 불변성 테스트 | GPUI 파일 행·키보드·복사 UI E2E는 VDE-019에서 검증 |
 | 2026-07-29 | 편의 기능 스플리터 3곳 | 공용 레이아웃 승격 | 패널별 고정 초기 폭 | `window::balanced_split` | 설정 pane 과도 축소 방지, 양쪽 가용폭 사용 |
 | 2026-07-29 | `app.rs` | 책임 단위 분할 + 재배치 | 1,798 | `app/` 7파일 (최대 564) | 대시보드·로그 렌더는 소유가 잘못돼 있어 `window/`로 이동 |
 | 2026-07-29 | `platform/windows.rs` | 책임 단위 분할 + 승격 | 1,361 | `platform/windows/` 6파일 (최대 344) | `wide_null`을 `windows/mod.rs`로 **공용 승격** |
