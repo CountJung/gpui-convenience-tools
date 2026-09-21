@@ -824,6 +824,18 @@ matrix=26`을 통과했다. `vdi.rs`는 966줄에서 821줄로 줄었고, 프로
 사전 스캔 진행률, 링크 처리 모드, Guest Control, macOS 환경 및 독립 Visual Reviewer
 항목은 사용자·환경 조건이 충족될 때까지 활성 TODO로 유지한다.
 
+### Phase O-22 — 최신 release VDI 화면 재검증 기록
+
+VirtualBox 7.2.14 표준 VDI를 격리 release 앱에 다시 주입하고 1200×1000 화면을
+캡처했다. `continuation-vde019-current-release-040648.png`에서 숨김·시스템 항목과
+자동 복사 결과 `파일 17개 · 915.3 KB · 건너뜀 0 · 실패 1` 및 손상된
+`many_subdirs` 사유가 실제 화면에 표시되는 것을 확인했다. 세션 종료 뒤
+`PROCESS_COUNT=0`, `SESSION_COUNT=0`을 확인했다.
+
+이번 확인은 구현 담당자의 실제 화면 검증이며 독립 Visual Reviewer나 외부 키보드·오류
+억제 버튼 조작의 완료 증거로 사용하지 않는다. 해당 잔여 조건은 VDE-012·VDE-014·VDE-016·
+VDE-017·VDE-019에 계속 남긴다.
+
 ### Phase T-1 — T-001·T-002 회귀 테스트 보강 완료 ✅
 
 동기화 엔진이 읽기 전용 대상 파일을 실제로 덮어쓸 수 있는지 확인하는 테스트와,
