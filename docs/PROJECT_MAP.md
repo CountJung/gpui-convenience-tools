@@ -30,7 +30,7 @@
 안전 경계: 원본 VDI는 read-only로만 열고, 실행 중 VM의 VDI 직접 읽기는 구현하지 않는다.
 실행 중 VM 지원은 후속 `GuestFileSource` 구현으로만 추가한다(VDE-021).
 
-**최종 측정**: 2026-09-22 · `app/src` 총 52개 파일 · 20,101줄
+**최종 측정**: 2026-09-22 · `app/src` 총 52개 파일 · 20,141줄
 
 ## 크기 기준 — 줄 수는 증상이다
 
@@ -69,7 +69,7 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | --- | ---: | --- |
 | `main.rs` | 133 | 진입점 — 로거 설치 → 테마 시드 → 윈도우 오픈, `--service`/`--tray` 플래그 분기 |
 | `theme.rs` | 143 | 테마 모드 적용과 스위치 팔레트 최소 대비 보정·번들 테마 감사 테스트 |
-| `config.rs` | 665 | `AppConfig`·`SyncJob`·`LogConfig`·주기 프리셋·사이드바 폭·VDI 오류 억제 키 정의, 동기화 제외 패턴 스키마, `update_config` 단일 저장 경로, 데이터 루트 오버라이드 |
+| `config.rs` | 704 | `AppConfig`·`SyncJob`·`WatchMode`·`LogConfig`·주기 프리셋·사이드바 폭·VDI 오류 억제 키 정의, 동기화 제외 패턴 스키마, `update_config` 단일 저장 경로, 데이터 루트 오버라이드 |
 | `logging.rs` | 560 | 롤링 파일 로거 (`log::Log` 구현, 테스트용 출력 경로 주입) |
 | `sync_history.rs` | 223 | 동기화 완료 이력의 JSON 배열 저장·순서 보장·손상 파일 보존·개수/기간 보존·최신 목록 로드·소요 시간 계산 |
 | `util.rs` | 139 | 도메인 주인이 없는 순수 헬퍼 — `format_interval`·`interval_to_secs`·`TimeUnit` |
@@ -326,6 +326,7 @@ G-001 판단: `muted`는 비활성 의미이므로 테두리와 hover를 추가�
 | 2026-09-22 | `app/src/sync/tests.rs`·`app/src/config.rs`·`docs/PROJECT_MAP.md` | T-001·T-002 회귀 테스트와 구조 지도 실측 갱신 | 읽기 전용 대상 덮어쓰기와 `update_config` 필드 보존을 전체 테스트에서 보장하지 않음; 일부 모듈 줄 수가 이전 기록과 불일치 | 두 회귀 테스트 추가, 격리 설정 경로 검증, 전체 139 passed·4 ignored·Clippy 기존 경고 7건, 50개 파일·19,486줄 기준으로 지도 갱신 | 전체 `cargo fmt --check`는 기존 baseline 불일치로 별도 보류; 기능 변경 없이 테스트·문서만 반영 |
 | 2026-09-22 | `app/src/window/ui.rs`·`file_sync.rs`·`interval.rs`·`service_mgr.rs`·`service_view.rs`·`app/mod.rs`·`scripts/Invoke-ClaudeVisualCheck.ps1` | G-001 버튼 스타일 덮어쓰기 정리 | 패널별 `border`·`hover`·`no_hover` 덮어쓰기로 공용 버튼 의미가 화면마다 달랐고 확장 메서드가 dead-code가 됨; foreground 안전 차단으로 패널 전환 캡처가 불가능했음 | 세 패널을 생성자 기본값으로 통일하고 확장 메서드 제거, 검증 전용 `-InitialPanel FileSync`·`-InitialPanel AutoStart` 경로 추가, 관련 GPUI 테스트·전체 145 passed·4 ignored·Clippy 기존 경고 7건, 52개 파일·20,101줄 기준 지도 갱신 | 격리 release 파일 동기화 캡처 `g001-file-sync-013019.png`·자동 시작 캡처 `g001-auto-start-013004.png` 성공, processCount=0·sessionCount=0; 독립 Visual Reviewer는 후속 |
 | 2026-09-22 | `Cargo.toml`·`app/Cargo.toml`·`Cargo.lock` | D-009 notify 직접 의존성 승격 | 실시간 감시 예정 기능이 `gpui-component`의 전이 의존성에만 기대고 있어 앱의 의존성 계약이 불명확함 | workspace/app에 `notify 7` 직접 의존성을 선언하고 lockfile을 갱신, `cargo check --locked`·전체 145 passed·4 ignored·Clippy 기존 경고 7건·직접 `cargo tree` 확인; 실시간 감시 동작은 D-010~D-013에서 구현 | 앱 동작 변경 없이 Cargo 경계만 고정; commit `0315bbd` push 완료 |
+| 2026-09-22 | `app/src/config.rs` | D-010 동기화 감시 방식 스키마 | 작업별 감시 방식이 설정 모델에 없어 주기 모드와 실시간 모드를 구분할 수 없음 | `WatchMode::{Interval, Realtime}`·`SyncJob.watch_mode`·구버전 기본값·snake_case 왕복 테스트 추가, 전체 146 passed·4 ignored·Clippy 기존 경고 7건, 52개 파일·20,141줄 기준 지도 갱신 | 실제 이벤트·디바운스·설정 UI는 D-011~D-013에서 구현; commit `15e9765` push 완료 |
 | 2026-09-22 | `app/src/app/ui_state.rs`·`app/mod.rs`·기능별 참조 호출부 | G-002 `AppRoot` 기능 상태 묶음 | 서비스·동기화·광고 스크롤과 작업 상태가 루트 엔티티 필드에 혼재해 소유 경계가 흐림 | GPUI 엔티티는 하나로 유지하고 `ServiceState`·`SyncState`·`AdBlockState` 일반 구조체로 상태 소유권 분리, 전체 139 passed·4 ignored·Clippy 기존 경고 7건, 51개 파일·19,496줄 기준 지도 갱신 | 동작 변경 없는 구조 리팩터링; 실제 화면 검증은 UI 동작 변경이 없어 N/A |
 | 2026-09-22 | `app/src/config.rs`·`app/src/app/mod.rs`·`app/tests/mod.rs` | G-003 스플리터 폭 영속화 | 앱 재시작 시 사용자가 조정한 사이드바 폭이 기본 240px로 돌아감 | `sidebar_width` 설정 필드·200~360px 보정, `ResizableState::sizes()` mouse-up 저장, 시작 시 복원, 설정/GPUI 회귀 테스트·전체 140 passed·4 ignored·Clippy 기존 경고 7건, 51개 파일·19,558줄 기준 지도 갱신 | 격리 release 기본 캡처 `g003-default-003709.png`·320px 시드 복원 캡처 `g003-restored-width-003742.png` 성공; 하네스가 divider 드래그를 지원하지 않아 실제 저장 콜백과 독립 Visual Reviewer는 후속 |
 | 2026-09-22 | `app/src/config.rs`·`app/src/app/mod.rs`·`app/src/app/virtual_disk_ops.rs`·`app/src/app/virtual_disk_copy.rs`·`app/src/window/virtual_disk.rs`·`app/src/app/tests/virtual_disk.rs` | VDE-012 GPUI 오류 알림 연결 | 도메인 오류 보고는 있었지만 화면 상세 로그·반복 알림 억제 상태·항목별 UI 조작이 연결되지 않음 | 항목별 상세 로그, 미억제 오류에만 반복 토스트, 요약 카드의 억제/재표시 버튼, `AppConfig` 저장·복원, 관련 GPUI 직접 상태 전환 테스트와 전체 140 passed·4 ignored·Clippy 기존 경고 7건, 51개 파일·19,707줄 기준 지도 갱신 | 격리 release 기본 캡처 `vde012-default-004932.png` 성공; 실제 VDI 오류 카드·버튼 click dispatch·복사 대상 E2E는 실제 이미지/하네스 제약으로 미확인하며 VDE-019에서 후속 |

@@ -907,6 +907,18 @@ flowchart TD
 `cargo check --locked`, 전체 145 passed·4 ignored, `cargo tree` 직접 의존성 확인,
 Clippy exit 0(기존 경고 7건), `git diff --check`를 통과했으며 구현 커밋은 `0315bbd`이다.
 
+#### D-010 — 동기화 감시 방식 스키마 완료 ✅
+
+- `SyncJob.watch_mode`와 `WatchMode::{Interval, Realtime}`를 추가하고 `snake_case` 설정
+  직렬화를 사용한다. 필드가 없는 구버전 `config.json`은 `Interval`로 읽어 기존 주기
+  동작을 보존한다.
+- 실제 `notify` 이벤트 연결·디바운스·감시 실패 시 강등은 D-011~D-012에, 선택 UI는
+  D-013에 남긴다. 이 단계에서는 스키마와 역호환 경계만 검증했다.
+
+`sync_job_watch_mode_round_trips_with_interval_compatibility`, `cargo check --locked`,
+전체 146 passed·4 ignored, Clippy exit 0(기존 경고 7건), `git diff --check`를 통과했으며
+구현 커밋은 `15e9765`이다.
+
 #### D-004 — 제외 패턴 입력 UI 완료 ✅
 
 - 파일 동기화 설정 카드에 상대 경로 glob을 줄바꿈으로 입력하는 멀티라인 편집기를 추가했다.
