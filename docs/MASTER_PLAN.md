@@ -765,7 +765,7 @@ VirtualBox 7.2.14의 `convertfromraw`로 만든 표준 VDI를 사용해 표준 �
 937,234바이트 복사 결과, 손상된 `many_subdirs` 항목의 오류 사유를 확인했다. 캡처는
 `vde019-vbox-standard-loaded-023912.png`이며, 세션 종료 후 프로세스·세션 루트·임시 대상이
 모두 정리되었다. 외부 키보드 입력과 독립 Visual Reviewer 확인은 잔여다.
-표준 VDI 파서·raw fixture export와 검증 커밋은 후속 커밋으로 기록한다.
+표준 VDI 파서·raw fixture export와 검증 커밋은 `bed5914`이다.
 
 ### Phase T-1 — T-001·T-002 회귀 테스트 보강 완료 ✅
 
