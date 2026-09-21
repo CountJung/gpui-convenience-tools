@@ -35,7 +35,11 @@ impl Platform for TestPlatform {
         Ok(Vec::new())
     }
 
-    fn find_ad_window(&self, _process_name: &str) -> Result<Option<NativeWindowHandle>> {
+    fn find_ad_window(
+        &self,
+        _process_name: &str,
+        _ad_window_class: &str,
+    ) -> Result<Option<NativeWindowHandle>> {
         Ok(None)
     }
 

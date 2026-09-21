@@ -25,7 +25,7 @@
 안전 경계: 원본 VDI는 read-only로만 열고, 실행 중 VM의 VDI 직접 읽기는 구현하지 않는다.
 실행 중 VM 지원은 후속 `GuestFileSource` 구현으로만 추가한다(VDE-021).
 
-**최종 측정**: 2026-09-17 · `app/src` 총 39개 파일 · 11,936줄
+**최종 측정**: 2026-09-21 · `app/src` 총 39개 파일 · 11,989줄
 
 ## 크기 기준 — 줄 수는 증상이다
 
@@ -98,7 +98,7 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `ops.rs` | 195 | 광고 차단·서비스 관리·로그 설정 조작 |
 | `inputs.rs` | 129 | 입력 위젯(`InputState`) 지연 생성과 값 동기화 |
 
-### GPUI 회귀 테스트 (`app/src/app/tests/`) — 1,442줄 / 5파일
+### GPUI 회귀 테스트 (`app/src/app/tests/`) — 1,446줄 / 5파일
 
 `app/tests.rs`(929줄, 🟡)를 시나리오별로 나눈 결과다. 픽스처는 `mod.rs`가 단독 소유하고
 하위 모듈은 `use super::*`로 가져다 쓴다.
@@ -108,7 +108,7 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `file_sync.rs` | 639 | 동기화 조작·진행 표시줄·중지·로그 요약·섹션 너비·전역 스위치·커서 무효화 |
 | `layout.rs` | 324 | 사이드바·스플리터·divider drag·스크롤 |
 | `interval.rs` | 226 | 주기 드롭다운·프리셋 추가/삭제·패널 간 공유 |
-| `mod.rs` | 168 | 공용 픽스처 (`test_app_root`·`TestPlatform`·`refresh`·`click_debug_element` 등) |
+| `mod.rs` | 172 | 공용 픽스처 (`test_app_root`·`TestPlatform`·`refresh`·`click_debug_element` 등) |
 | `theme.rs` | 85 | 테마 전환과 스위치 가시성 |
 
 ### 패널 (`app/src/window/`) — 3,281줄 / 10파일
@@ -126,19 +126,19 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `log_view.rs` | 110 | 시스템 — 화면 로그 가상 리스트와 로그 파일 현황 |
 | `mod.rs` | 96 | 패널 모듈 선언 + `balanced_split`·`scroll_pane` 레이아웃 헬퍼 |
 
-### 플랫폼 (`app/src/platform/`) — 1,639줄 / 8파일
+### 플랫폼 (`app/src/platform/`) — 1,680줄 / 8파일
 
 `windows.rs`(1,361줄)를 책임별로 분할한 결과다.
 
 | 파일 | 줄 | 책임 |
 | --- | ---: | --- |
-| `mod.rs` | 145 | `Platform` trait 정의 + 서비스 타입, `NativePlatform` 타깃별 별칭 |
+| `mod.rs` | 149 | `Platform` trait 정의 + 서비스 타입, `NativePlatform` 타깃별 별칭 |
 | `fallback.rs` | 55 | 비Windows `Platform` 구현 — 광고 차단 계열 미지원을 명시적으로 반환 |
 | `windows/scm.rs` | 344 | Windows 서비스(SCM) 등록과 서비스 모드 실행 |
 | `windows/services.rs` | 340 | 설치된 Win32 서비스 조회·시작·중지·삭제, 권한 확인 |
 | `windows/tray.rs` | 274 | 시스템 트레이 아이콘과 메시지 루프 |
-| `windows/window_ops.rs` | 177 | 창·프로세스 열거, 광고 창 탐색 |
-| `windows/mod.rs` | 156 | `WindowsPlatform` + `Platform` 구현, 하위 모듈 re-export |
+| `windows/window_ops.rs` | 224 | 프로세스별 최상위 창 열거, 클래스 필터, 메인 WebView 제외, 광고 팝업 후보 탐색 |
+| `windows/mod.rs` | 146 | `WindowsPlatform` + `Platform` 구현, 하위 모듈 re-export |
 | `windows/task_scheduler.rs` | 148 | 로그온 시 자동 시작(`schtasks`) |
 
 ### 빌드

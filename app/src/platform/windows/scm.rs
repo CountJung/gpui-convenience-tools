@@ -295,7 +295,9 @@ fn run_service_loop(_arguments: Vec<OsString>) -> Result<()> {
                     if !platform_bg.is_target_running(&target.process_name) {
                         continue;
                     }
-                    if let Ok(Some(hwnd)) = platform_bg.find_ad_window(&target.process_name) {
+                    if let Ok(Some(hwnd)) = platform_bg
+                        .find_ad_window(&target.process_name, &target.ad_window_class)
+                    {
                         detected_handle = Some(hwnd);
                         break;
                     }

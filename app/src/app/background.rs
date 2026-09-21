@@ -123,7 +123,9 @@ impl AppRoot {
 
                             any_running = true;
 
-                            if let Ok(Some(hwnd)) = platform.find_ad_window(&target.process_name) {
+                            if let Ok(Some(hwnd)) = platform
+                                .find_ad_window(&target.process_name, &target.ad_window_class)
+                            {
                                 detected_handle = Some(hwnd);
                                 break;
                             }

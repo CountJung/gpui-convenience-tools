@@ -70,7 +70,11 @@ impl std::fmt::Display for SysServiceStartType {
 pub trait Platform: Send + Sync {
     fn is_target_running(&self, process_name: &str) -> bool;
     fn list_running_processes(&self) -> Result<Vec<String>>;
-    fn find_ad_window(&self, process_name: &str) -> Result<Option<NativeWindowHandle>>;
+    fn find_ad_window(
+        &self,
+        process_name: &str,
+        ad_window_class: &str,
+    ) -> Result<Option<NativeWindowHandle>>;
     fn hide_ad(&self, handle: NativeWindowHandle) -> Result<()>;
     fn show_ad(&self, handle: NativeWindowHandle) -> Result<()>;
 

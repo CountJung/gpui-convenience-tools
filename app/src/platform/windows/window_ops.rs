@@ -1,7 +1,7 @@
 //! 창·프로세스 열거.
 //!
-//! `EnumWindows`로 타겟 프로세스의 최상위 창을 찾고, 그 자식 중
-//! WebView 계열 클래스를 광고 창으로 판정한다.
+//! `EnumWindows`로 타겟 프로세스의 최상위 창을 찾고, 명시된 WebView 계열 클래스와
+//! 소유자/도구 창 특성을 가진 팝업만 광고 창 후보로 판정한다.
 //!
 //! 프로세스 목록도 창 열거 기반이므로 **창이 없는 프로세스는 나오지 않는다**.
 
@@ -14,17 +14,15 @@ use windows_sys::Win32::{
         OpenProcess, QueryFullProcessImageNameW, PROCESS_QUERY_LIMITED_INFORMATION,
     },
     UI::WindowsAndMessaging::{
-        EnumChildWindows, EnumWindows, GetClassNameW, GetWindowThreadProcessId,
+        EnumWindows, GetClassNameW, GetWindow, GetWindowLongPtrW, GetWindowThreadProcessId,
+        IsWindowVisible, GWL_EXSTYLE, GW_OWNER, WS_EX_TOOLWINDOW,
     },
 };
 
 pub(super) struct TopLevelSearchContext {
     pub(super) process_name_lower: String,
-    pub(super) found_child: Option<HWND>,
-}
-
-struct ChildSearchContext {
-    found_child: Option<HWND>,
+    pub(super) class_filter: String,
+    pub(super) found_window: Option<HWND>,
 }
 
 struct RunningProcessContext {
@@ -42,34 +40,63 @@ pub(super) unsafe extern "system" fn enum_windows_proc(hwnd: HWND, lparam: LPARA
         return 1;
     }
 
-    let mut child_context = ChildSearchContext { found_child: None };
-    let child_param = &mut child_context as *mut ChildSearchContext as LPARAM;
-
-    EnumChildWindows(hwnd, Some(enum_child_proc), child_param);
-
-    if let Some(child) = child_context.found_child {
-        context.found_child = Some(child);
-        return 0;
+    if !is_ad_window_candidate(hwnd, &context.class_filter) {
+        return 1;
     }
 
-    1
+    context.found_window = Some(hwnd);
+    0
 }
 
-unsafe extern "system" fn enum_child_proc(hwnd: HWND, lparam: LPARAM) -> BOOL {
-    let context = &mut *(lparam as *mut ChildSearchContext);
+/// 타겟 프로세스에서 안전한 광고 창 후보를 하나 찾는다.
+///
+/// 메인 창의 자식 WebView는 같은 클래스명을 공유할 수 있으므로 이 단계에서는
+/// `EnumChildWindows`로 내려가지 않는다. 소유자 창이 있거나 도구 창으로 표시된
+/// 최상위 팝업만 후보로 반환한다.
+pub(super) fn find_ad_window(process_name: &str, class_filter: &str) -> Option<HWND> {
+    let mut context = TopLevelSearchContext {
+        process_name_lower: process_name.to_ascii_lowercase(),
+        class_filter: class_filter.trim().to_string(),
+        found_window: None,
+    };
+    let lparam = &mut context as *mut TopLevelSearchContext as LPARAM;
 
-    let class_name = class_name_from_hwnd(hwnd);
-    let class_name_lower = class_name.to_ascii_lowercase();
-
-    let is_webview = class_name_lower.contains("chrome_widgetwin_1")
-        || class_name_lower.contains("webview");
-
-    if is_webview {
-        context.found_child = Some(hwnd);
-        return 0;
+    // SAFETY: callback and context pointer are valid for the duration of EnumWindows.
+    unsafe {
+        EnumWindows(Some(enum_windows_proc), lparam);
     }
 
-    1
+    context.found_window
+}
+
+fn is_ad_window_candidate(hwnd: HWND, class_filter: &str) -> bool {
+    // Invisible windows are not useful for the visual action and may be the app's
+    // hidden startup/helper window.
+    if unsafe { IsWindowVisible(hwnd) } == 0 {
+        return false;
+    }
+
+    let class_name = class_name_from_hwnd(hwnd);
+    if !class_filter_matches(&class_name, class_filter) {
+        return false;
+    }
+
+    // An unowned, non-tool top-level window is treated as the app's main window.
+    // This intentionally favors safety over catching every possible popup until
+    // a target-specific selector is available.
+    let owner = unsafe { GetWindow(hwnd, GW_OWNER) };
+    let ex_style = unsafe { GetWindowLongPtrW(hwnd, GWL_EXSTYLE) as u32 };
+    owner != 0 || ex_style & WS_EX_TOOLWINDOW != 0
+}
+
+fn class_filter_matches(class_name: &str, class_filter: &str) -> bool {
+    if class_filter.eq_ignore_ascii_case("auto:webview") {
+        let class_name_lower = class_name.to_ascii_lowercase();
+        return class_name_lower.contains("chrome_widgetwin_1")
+            || class_name_lower.contains("webview");
+    }
+
+    !class_filter.is_empty() && class_name.eq_ignore_ascii_case(class_filter)
 }
 
 unsafe extern "system" fn enum_running_processes_proc(hwnd: HWND, lparam: LPARAM) -> BOOL {
@@ -127,13 +154,7 @@ fn process_name_from_hwnd(hwnd: HWND) -> Option<String> {
 
 pub(super) fn process_name_from_pid(process_id: u32) -> Option<String> {
     // SAFETY: OpenProcess is called with query-only rights and returns null on failure.
-    let process_handle = unsafe {
-        OpenProcess(
-            PROCESS_QUERY_LIMITED_INFORMATION,
-            0,
-            process_id,
-        )
-    };
+    let process_handle = unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, process_id) };
 
     if process_handle == 0 {
         return None;
@@ -174,4 +195,30 @@ fn query_process_image_name(process_handle: HANDLE) -> Option<String> {
         .map(|name| name.to_ascii_lowercase());
 
     file_name
+}
+
+#[cfg(test)]
+mod tests {
+    use super::class_filter_matches;
+
+    #[test]
+    fn explicit_class_filter_is_case_insensitive() {
+        assert!(class_filter_matches(
+            "Chrome_WidgetWin_1",
+            "chrome_widgetwin_1"
+        ));
+        assert!(!class_filter_matches("Chrome_WidgetWin_1", "OtherWindow"));
+    }
+
+    #[test]
+    fn auto_webview_filter_matches_known_webview_classes() {
+        assert!(class_filter_matches("Chrome_WidgetWin_1", "auto:webview"));
+        assert!(class_filter_matches("WebView2Child", "AUTO:WEBVIEW"));
+        assert!(!class_filter_matches("MainWindow", "auto:webview"));
+    }
+
+    #[test]
+    fn empty_class_filter_does_not_match_every_window() {
+        assert!(!class_filter_matches("Chrome_WidgetWin_1", ""));
+    }
 }

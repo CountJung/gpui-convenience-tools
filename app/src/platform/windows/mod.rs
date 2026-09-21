@@ -31,15 +31,15 @@ pub use tray::{
 use anyhow::{anyhow, Result};
 
 use windows_sys::Win32::{
-    Foundation::{HWND, LPARAM},
-    UI::WindowsAndMessaging::{EnumWindows, IsWindow, ShowWindow, SW_HIDE, SW_SHOW},
+    Foundation::HWND,
+    UI::WindowsAndMessaging::{IsWindow, ShowWindow, SW_HIDE, SW_SHOW},
 };
 
 use services::{
     delete_sys_service_impl, list_sys_services_impl, query_sys_service_impl, start_sys_service_impl,
     stop_sys_service_impl,
 };
-use window_ops::{enum_windows_proc, list_running_window_process_names, TopLevelSearchContext};
+use window_ops::list_running_window_process_names;
 
 use crate::platform::Platform;
 
@@ -59,27 +59,17 @@ impl WindowsPlatform {
 
 impl Platform for WindowsPlatform {
     fn is_target_running(&self, process_name: &str) -> bool {
-        self.find_ad_window(process_name).ok().flatten().is_some()
+        list_running_window_process_names()
+            .iter()
+            .any(|running| running.eq_ignore_ascii_case(process_name))
     }
 
     fn list_running_processes(&self) -> Result<Vec<String>> {
         Ok(list_running_window_process_names())
     }
 
-    fn find_ad_window(&self, process_name: &str) -> Result<Option<HWND>> {
-        let mut context = TopLevelSearchContext {
-            process_name_lower: process_name.to_ascii_lowercase(),
-            found_child: None,
-        };
-
-        let lparam = &mut context as *mut TopLevelSearchContext as LPARAM;
-
-        // SAFETY: callback and context pointer are valid for the duration of EnumWindows.
-        unsafe {
-            EnumWindows(Some(enum_windows_proc), lparam);
-        }
-
-        Ok(context.found_child)
+    fn find_ad_window(&self, process_name: &str, ad_window_class: &str) -> Result<Option<HWND>> {
+        Ok(window_ops::find_ad_window(process_name, ad_window_class))
     }
 
     fn hide_ad(&self, handle: HWND) -> Result<()> {
