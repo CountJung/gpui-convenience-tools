@@ -5,8 +5,9 @@
 //! 두 영역은 스플리터([`h_resizable`])로 나뉜다.
 //!
 //! ## 동작 원리
-//! 타겟 프로세스의 최상위 창을 `EnumWindows`로 찾은 뒤, 자식 창 중
-//! WebView 계열 클래스(`Chrome_WidgetWin_1` 등)를 `ShowWindow(SW_HIDE)`로 숨긴다.
+//! 타겟 프로세스의 보이는 최상위 광고 후보를 `EnumWindows`로 찾은 뒤,
+//! 후보 창을 0×0으로 축소하고 입력을 비활성화한다. 메인 WebView와 자식 창을
+//! 광고로 추정해 조작하지 않도록 소유자·도구 창 경계를 적용한다.
 
 use gpui::{
     div, px, AnyElement, Context, InteractiveElement, IntoElement, ParentElement,

@@ -4,17 +4,24 @@
 
 .DESCRIPTION
     지정한 PID의 조상·자손 프로세스를 찾고, 해당 프로세스가 소유한 최상위 창의
-    클래스·소유자·도구 창 여부·표시 상태·좌표를 출력한다. AD-001 후보 판정과
-    AD-002 상태 캡처에 필요한 정보를 확인하지만, 창을 숨기거나 이동하지 않는다.
+    클래스·소유자·도구 창 여부·표시 상태·좌표를 출력한다. IncludeChildWindows를
+    지정하면 최상위 창 아래의 자식 창도 읽는다. AD-001 후보 판정과 AD-002 상태
+    캡처에 필요한 정보를 확인하지만, 창을 숨기거나 이동하지 않는다.
 
 .EXAMPLE
     pwsh -File .\scripts\Verify-AdWindowState.ps1 -ProcessId 26440
+
+.EXAMPLE
+    pwsh -File .\scripts\Verify-AdWindowState.ps1 -ProcessId 26440 -IncludeChildWindows
 #>
 
 [CmdletBinding()]
 param(
     [Parameter()]
-    [int]$ProcessId = 26440
+    [int]$ProcessId = 26440,
+
+    [Parameter()]
+    [switch]$IncludeChildWindows
 )
 
 $ErrorActionPreference = 'Stop'
@@ -106,6 +113,9 @@ public static class AdWindowVerificationNative {
     [DllImport("user32.dll")]
     public static extern bool EnumWindows(EnumWindowsProc callback, IntPtr lParam);
 
+    [DllImport("user32.dll")]
+    public static extern bool EnumChildWindows(IntPtr parent, EnumWindowsProc callback, IntPtr lParam);
+
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     public static extern int GetClassName(IntPtr hWnd, StringBuilder className, int maxCount);
 
@@ -141,34 +151,42 @@ public static class AdWindowVerificationNative {
 '@
 
 $windowRows = [System.Collections.Generic.List[object]]::new()
+$topLevelHandles = [System.Collections.Generic.List[IntPtr]]::new()
 $relatedLookup = [System.Collections.Generic.HashSet[int]]$windowProcessIds
-$callback = [AdWindowVerificationNative+EnumWindowsProc] {
-    param($hWnd, $unused)
+
+function Get-WindowRow {
+    param(
+        [IntPtr]$Hwnd,
+        [string]$Kind,
+        [IntPtr]$ParentHwnd
+    )
 
     [uint32]$windowProcessId = 0
-    [void][AdWindowVerificationNative]::GetWindowThreadProcessId($hWnd, [ref]$windowProcessId)
+    [void][AdWindowVerificationNative]::GetWindowThreadProcessId($Hwnd, [ref]$windowProcessId)
     if (-not $relatedLookup.Contains([int]$windowProcessId)) {
-        return $true
+        return $null
     }
 
     $classNameBuffer = [System.Text.StringBuilder]::new(256)
-    $classLength = [AdWindowVerificationNative]::GetClassName($hWnd, $classNameBuffer, $classNameBuffer.Capacity)
+    $classLength = [AdWindowVerificationNative]::GetClassName($Hwnd, $classNameBuffer, $classNameBuffer.Capacity)
     $className = if ($classLength -gt 0) { $classNameBuffer.ToString() } else { '' }
-    $owner = [AdWindowVerificationNative]::GetWindow($hWnd, 4) # GW_OWNER
-    $exStyle = [Int64][AdWindowVerificationNative]::GetWindowLongPtr($hWnd, -20) # GWL_EXSTYLE
-    $visible = [AdWindowVerificationNative]::IsWindowVisible($hWnd)
+    $owner = [AdWindowVerificationNative]::GetWindow($Hwnd, 4) # GW_OWNER
+    $exStyle = [Int64][AdWindowVerificationNative]::GetWindowLongPtr($Hwnd, -20) # GWL_EXSTYLE
+    $visible = [AdWindowVerificationNative]::IsWindowVisible($Hwnd)
     $toolWindow = (($exStyle -band 0x80) -ne 0) # WS_EX_TOOLWINDOW
 
     $rect = [AdWindowVerificationNative+RECT]::new()
-    $hasRect = [AdWindowVerificationNative]::GetWindowRect($hWnd, [ref]$rect)
+    $hasRect = [AdWindowVerificationNative]::GetWindowRect($Hwnd, [ref]$rect)
     $width = if ($hasRect) { $rect.Right - $rect.Left } else { 0 }
     $height = if ($hasRect) { $rect.Bottom - $rect.Top } else { 0 }
-    $showState = if (-not $visible) { 'Hidden' } elseif ([AdWindowVerificationNative]::IsIconic($hWnd)) { 'Minimized' } elseif ([AdWindowVerificationNative]::IsZoomed($hWnd)) { 'Maximized' } else { 'Normal' }
+    $showState = if (-not $visible) { 'Hidden' } elseif ([AdWindowVerificationNative]::IsIconic($Hwnd)) { 'Minimized' } elseif ([AdWindowVerificationNative]::IsZoomed($Hwnd)) { 'Maximized' } else { 'Normal' }
     $webViewClass = $className -match '(?i)chrome_widgetwin_1|webview'
-    $candidate = $visible -and $webViewClass -and (($owner -ne [IntPtr]::Zero) -or $toolWindow)
+    $candidate = $Kind -eq 'TopLevel' -and $visible -and $webViewClass -and (($owner -ne [IntPtr]::Zero) -or $toolWindow)
 
-    $windowRows.Add([pscustomobject]@{
-        Hwnd = ('0x{0:X}' -f $hWnd.ToInt64())
+    [pscustomobject]@{
+        WindowKind = $Kind
+        Hwnd = ('0x{0:X}' -f $Hwnd.ToInt64())
+        Parent = ('0x{0:X}' -f $ParentHwnd.ToInt64())
         Pid = [int]$windowProcessId
         Class = $className
         Visible = $visible
@@ -180,12 +198,39 @@ $callback = [AdWindowVerificationNative+EnumWindowsProc] {
         Width = $width
         Height = $height
         AdCandidate = $candidate
-    })
+    }
+}
+
+$callback = [AdWindowVerificationNative+EnumWindowsProc] {
+    param($hWnd, $unused)
+
+    $row = Get-WindowRow -Hwnd $hWnd -Kind 'TopLevel' -ParentHwnd ([IntPtr]::Zero)
+    if ($null -ne $row) {
+        $windowRows.Add($row)
+        $topLevelHandles.Add($hWnd)
+    }
 
     return $true
 }
 
 [void][AdWindowVerificationNative]::EnumWindows($callback, [IntPtr]::Zero)
+
+if ($IncludeChildWindows) {
+    $childCallback = [AdWindowVerificationNative+EnumWindowsProc] {
+        param($hWnd, $parentHwnd)
+
+        $row = Get-WindowRow -Hwnd $hWnd -Kind 'Child' -ParentHwnd $parentHwnd
+        if ($null -ne $row) {
+            $windowRows.Add($row)
+        }
+
+        return $true
+    }
+
+    foreach ($topLevelHwnd in $topLevelHandles) {
+        [void][AdWindowVerificationNative]::EnumChildWindows($topLevelHwnd, $childCallback, $topLevelHwnd)
+    }
+}
 
 Write-Host "읽기 전용 광고 창 상태 검증"
 Write-Host "기준 PID: $ProcessId"
@@ -203,11 +248,19 @@ $processRows = foreach ($id in ($relatedIds | Sort-Object)) {
 }
 $processRows | Format-Table Pid, ParentPid, Name -AutoSize
 
-Write-Host "기준 PID와 앱 조상·자손의 최상위 창 (셸 조상 제외)"
+if ($IncludeChildWindows) {
+    Write-Host "기준 PID와 앱 조상·자손의 최상위·자식 창 (셸 조상 제외)"
+} else {
+    Write-Host "기준 PID와 앱 조상·자손의 최상위 창 (셸 조상 제외)"
+}
 if ($windowRows.Count -eq 0) {
     Write-Host '(없음)'
 } else {
-    $windowRows | Sort-Object Pid, Hwnd | Format-Table -AutoSize
+    $windowRows |
+        Sort-Object Pid, WindowKind, Hwnd |
+        Format-Table WindowKind, Hwnd, Parent, Pid, Class, Visible, Owner, ToolWindow, State, X, Y, Width, Height, AdCandidate -AutoSize |
+        Out-String -Width 260 |
+        Write-Host
 }
 
 Write-Host ""
