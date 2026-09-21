@@ -938,6 +938,19 @@ passed·4 ignored, Clippy exit 0, `git diff --check`를 통과했으며 구현 �
 `applies_log_count_and_age_retention_before_appending`, `cargo check --locked`, 전체 144
 passed·4 ignored, Clippy exit 0, `git diff --check`를 통과했으며 구현 커밋은 `ed71af4`이다.
 
+#### D-020 — 최근 동기화 이력 카드 부분 구현
+
+- 앱 시작 시 `sync-history.json`의 최신 20건을 읽고, 동기화 완료 이벤트 후 목록을 새로 고친다.
+  파일 동기화 패널에는 성공·실패 포함·중지 상태, 복사/건너뜀/삭제/실패 건수와 소요 시간을
+  표시하는 카드가 설정·실패 목록 뒤에 배치된다. 설정 저장 버튼이 최소 화면에서 밀리지 않도록
+  기존 설정 카드의 위치를 보존했다.
+- `file_sync_renders_recent_history_with_result_counts_and_duration`와 섹션 폭 회귀 테스트,
+  `Verify-Workspace.ps1` 필수 18개 테스트를 추가·통과했다. 기본 대시보드 릴리스 캡처는 통과했지만
+  실제 이력 행을 시드한 패널 캡처와 독립 Visual Reviewer 확인은 남아 있어 TODO를 유지한다.
+
+전체 145 passed·4 ignored, Clippy exit 0(기존 경고 7건), `git diff --check`와 격리 release
+기본 캡처를 통과했으며 구현 커밋은 `031148e`이다.
+
 - 실시간 감시(`notify` 크레이트, 이미 의존성 트리에 존재)
 - 제외 패턴(glob) 지원
 - 진행률 표시 및 취소

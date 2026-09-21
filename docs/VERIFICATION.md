@@ -136,7 +136,7 @@ SHA-256을 기록한다. 다른 검증자의 독립 검토가 요구되는 UI �
 | D-014 | RUST | [ ] | [ ] | — | — | [ ] | [ ] | — |
 | D-015 | RUST | [ ] | [ ] | — | — | [ ] | [ ] | — |
 | D-016 | RUST | [ ] | [ ] | — | — | [ ] | [ ] | — |
-| D-020 | E2E | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | — |
+| D-020 | E2E | [x] | [x] | [x] | [ ] | [x] | [x] | `cargo check -p gpui-convenience-tools --locked`; `file_sync_renders_recent_history_with_result_counts_and_duration`로 이력 행 selector와 결과 카드 경계를 시드 상태에서 확인; `file_sync_sections_share_one_width_at_every_window_width`에 이력 카드 폭 회귀 포함; `Verify-Workspace.ps1` 필수 GPUI 18개 및 전체 145 passed·4 ignored; Clippy exit 0(기존 경고 7건); 격리 release 기본 캡처 `target/visual-validation/captures/d020-default-011352.png`, processCount=0·sessionCount=0; 기본 대시보드는 이력 행 시드 상태가 아니므로 실제 이력 패널 시각 검증·독립 Visual Reviewer는 후속; commit `031148e` source push 완료 |
 | E-001 | E2E | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | — |
 | E-002 | E2E | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | — |
 | E-003 | E2E | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | — |
