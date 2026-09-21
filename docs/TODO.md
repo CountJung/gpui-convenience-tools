@@ -68,8 +68,7 @@
 ### O-5. 검증·후속 백엔드
 
 - [ ] VDE-019 | 70% | GPUI 자체 테스트로 실제 파일 목록·숨김/시스템 항목·키보드 조작·복사 진행/실패 요약 상태를 검증 완료; 실제 VirtualBox 패널 창 캡처와 독립 Visual Reviewer 확인, 복사 대상 E2E는 후속
-- [ ] VDE-020 | 0% | `PROJECT_MAP.md`에 모듈별 줄 수·책임·공용 유틸을 갱신하고 `MASTER_PLAN.md`에 Phase O 완료 이력 기록
-- [ ] VDE-021 | 70% | 공식 `VBoxManage guestcontrol` 명령 계약·read-only 안전 경계·`GuestFileSource` 분리 설계를 `VIRTUAL_DISK_BACKENDS.md`에 기록 완료; VDE-019 실제 패널/복사 E2E와 VDE-020 문서 완료, 격리 VM·Guest Additions 준비 전에는 구현·완료 처리하지 않음
+- [ ] VDE-021 | 70% | 공식 `VBoxManage guestcontrol` 명령 계약·read-only 안전 경계·`GuestFileSource` 분리 설계를 `VIRTUAL_DISK_BACKENDS.md`에 기록 완료; VDE-019 실제 패널/복사 E2E, 격리 VM·Guest Additions 준비 전에는 구현·완료 처리하지 않음
 
 > VDE-021은 필수 오프라인 경로의 선행 작업이다. Guest Control이 추가되더라도 실행 중 VDI
 > 직접 읽기를 기본 경로로 되돌리지 않는다.
@@ -162,5 +161,19 @@
 
 ## 4. 테스트
 
-- [ ] T-001 | 0% | `sync.rs` — 읽기 전용 대상 파일 덮어쓰기 테스트
-- [ ] T-002 | 0% | `config.rs` — `update_config`가 다른 필드를 보존하는지 회귀 테스트
+완료한 `T-001`·`T-002`는 `VERIFICATION.md`의 완료 검증 기록과 `MASTER_PLAN.md`의
+완료 단계로 이동했다.
+
+## 판단·환경 확인이 필요한 보류 항목
+
+- `D-006`~`D-008`: 전체 파일 사전 스캔으로 정확한 진행률을 제공할지, 대용량 폴더의
+  이중 순회 비용을 허용할지 사용자·제품 판단이 필요하다.
+- `VDE-019`: 격리 릴리즈 앱에서 VirtualBox 패널을 실제로 열고 파일 행·키보드·호스트
+  복사 대상까지 확인해야 한다. 현재 화면 하네스의 foreground 입력 제한과 실제 VDI/VM
+  환경이 남아 있다.
+- Phase O 전체 완료 이력: VDE-020 문서 정합성은 완료했지만, Phase O 전체 완료 표시는
+  VDE-019의 실제 E2E가 끝난 뒤 확정한다.
+- `VDE-021`: `VBoxManage.exe`, Guest Additions, 테스트 VM과 자격 증명 주입 방식이
+  준비되기 전에는 구현·실행 검증하지 않는다. 기본 오프라인 VDI 경로를 유지한다.
+- 전체 `cargo fmt --check`: 기존 baseline의 다수 포맷 불일치가 있어 이번 테스트 커밋에서는
+  전체 재포맷을 수행하지 않았다. 다음 별도 구조/정리 작업에서 범위를 결정한다.

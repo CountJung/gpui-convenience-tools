@@ -30,7 +30,7 @@
 안전 경계: 원본 VDI는 read-only로만 열고, 실행 중 VM의 VDI 직접 읽기는 구현하지 않는다.
 실행 중 VM 지원은 후속 `GuestFileSource` 구현으로만 추가한다(VDE-021).
 
-**최종 측정**: 2026-09-21 · `app/src` 총 50개 파일 · 19,388줄
+**최종 측정**: 2026-09-22 · `app/src` 총 50개 파일 · 19,486줄
 
 ## 크기 기준 — 줄 수는 증상이다
 
@@ -44,7 +44,7 @@
 | 800~1,000 | 🟡 경고 | 다음 작업 전에 구조 리팩터링 |
 | 1,000 초과 | 🔴 위반 | **즉시 리팩터링.** 다른 작업보다 우선 |
 
-현재 🔴 위반 **없음**, 🟡 경고 **2개**. 최대 파일은 868줄(`virtual_disk/vdi.rs`)이며, 다음 VirtualBox UI 작업 전에 책임 단위 분할을 검토한다.
+현재 🔴 위반 **없음**, 🟡 경고 **3개**. 최대 파일은 868줄(`virtual_disk/vdi.rs`)이며, 다음 VirtualBox UI 작업 전에 책임 단위 분할을 검토한다.
 줄 수와 무관하게 처리하는 중복 헬퍼는 아래 「중복 헬퍼 추적」에서 관리한다.
 
 ### 줄 수 측정 명령
@@ -67,9 +67,9 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 
 | 파일 | 줄 | 책임 |
 | --- | ---: | --- |
-| `main.rs` | 129 | 진입점 — 로거 설치 → 테마 시드 → 윈도우 오픈, `--service`/`--tray` 플래그 분기 |
+| `main.rs` | 132 | 진입점 — 로거 설치 → 테마 시드 → 윈도우 오픈, `--service`/`--tray` 플래그 분기 |
 | `theme.rs` | 143 | 테마 모드 적용과 스위치 팔레트 최소 대비 보정·번들 테마 감사 테스트 |
-| `config.rs` | 546 | `AppConfig`·`SyncJob`·`LogConfig`·주기 프리셋 정의, 동기화 제외 패턴 스키마, `update_config` 단일 저장 경로, 데이터 루트 오버라이드 |
+| `config.rs` | 617 | `AppConfig`·`SyncJob`·`LogConfig`·주기 프리셋 정의, 동기화 제외 패턴 스키마, `update_config` 단일 저장 경로, 데이터 루트 오버라이드 |
 | `logging.rs` | 560 | 롤링 파일 로거 (`log::Log` 구현, 테스트용 출력 경로 주입) |
 | `util.rs` | 139 | 도메인 주인이 없는 순수 헬퍼 — `format_interval`·`interval_to_secs`·`TimeUnit` |
 
@@ -86,16 +86,16 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `issues.rs` | 146 | 복사 오류 종류·안정 억제 키·부분 복사 보고서 연결과 항목별 알림 억제 상태 |
 | `metadata.rs` | 403 | Windows 파일 속성·생성/접근/수정 시간과 비지원·권한 오류를 `MetadataFailure`로 수집 |
 
-### 동기화 엔진 (`app/src/sync/`) — 1,246줄 / 2파일
+### 동기화 엔진 (`app/src/sync/`) — 1,273줄 / 2파일
 
 동기화 엔진을 `sync/mod.rs` 본문과 `sync/tests.rs` 테스트로 나눈 결과다.
 
 | 파일 | 줄 | 책임 |
 | --- | ---: | --- |
 | `mod.rs` | 650 | 폴더 동기화 엔진 (UI 비의존 순수 로직) — 진행 보고·중지·이어서 시작·제외 glob 적용 포함 |
-| `tests.rs` | 596 | 복사·건너뜀·미러 삭제·실패 사유·진행 보고·중지·이어서 시작·제외 glob 단위 테스트 |
+| `tests.rs` | 623 | 복사·건너뜀·읽기 전용 대상 덮어쓰기·미러 삭제·실패 사유·진행 보고·중지·이어서 시작·제외 glob 단위 테스트 |
 
-### 앱 루트 (`app/src/app/`) — 3,692줄 / 10파일
+### 앱 루트 (`app/src/app/`) — 3,739줄 / 10파일
 
 `app.rs`(1,798줄)를 책임별로 분할한 결과다.
 
@@ -109,13 +109,13 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `state.rs` | 260 | 순수 데이터 타입 (`AppState`, `PlatformEvent`, `SyncRunning`, `ActivePanel`, 타깃별 `NAV_*`) |
 | `ops.rs` | 195 | 광고 차단·서비스 관리·로그 설정 조작 |
 | `inputs.rs` | 136 | 입력 위젯(`InputState`) 지연 생성과 값 동기화 — 파일 동기화 제외 패턴 멀티라인 편집기 포함 |
-| `virtual_disk_ops.rs` | 419 | VDI 경로 입력·read-only 열기·파티션 검색/선택·게스트 목록 새로고침·폴더 이동·다중 선택·포커스·안전 오류 안내, `GuestFileSource` 테스트 경계 |
+| `virtual_disk_ops.rs` | 466 | VDI 경로 입력·read-only 열기·파티션 검색/선택·게스트 목록 새로고침·폴더 이동·다중 선택·포커스·안전 오류 안내, `GuestFileSource` 테스트 경계 |
 | `virtual_disk_copy.rs` | 441 | VDI 대상 폴더 입력·선택, 백그라운드 read-only 복사, 진행·중지·완료 요약 상태·탐색기 keymap |
 
-### GPUI 회귀 테스트 (`app/src/app/tests/`) — 1,800줄 / 6파일
+### GPUI 회귀 테스트 (`app/src/app/tests/`) — 1,826줄 / 6파일
 
-`app/tests.rs`(929줄, 🟡)를 시나리오별로 나눈 결과다. 픽스처는 `mod.rs`가 단독 소유하고
-하위 모듈은 `use super::*`로 가져다 쓴다.
+테스트는 시나리오별 6개 파일로 나뉘며, 픽스처는 `mod.rs`가 단독 소유하고 하위 모듈은
+`use super::*`로 가져다 쓴다.
 
 | 파일 | 줄 | 책임 |
 | --- | ---: | --- |
@@ -124,7 +124,7 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `interval.rs` | 226 | 주기 드롭다운·프리셋 추가/삭제·패널 간 공유 |
 | `mod.rs` | 177 | 공용 픽스처 (`test_app_root`·`TestPlatform`·`refresh`·`click_debug_element` 등) |
 | `theme.rs` | 85 | 테마 전환과 스위치 가시성 |
-| `virtual_disk.rs` | 233 | VirtualBox 탐색 네비게이션·VDI 입력·파티션 카드·현재 경로·상위 이동·실제 목록·숨김/시스템 전체 선택·복사 진행/실패 요약·키보드 단축키·안전/미지원 상태·새로고침 렌더 경계 |
+| `virtual_disk.rs` | 259 | VirtualBox 탐색 네비게이션·VDI 입력·파티션 카드·현재 경로·상위 이동·실제 목록·숨김/시스템 전체 선택·복사 진행/실패 요약·키보드 단축키·안전/미지원 상태·새로고침 렌더 경계 |
 
 ### 패널 (`app/src/window/`) — 4,033줄 / 11파일
 
@@ -317,7 +317,8 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | 2026-09-21 | `app/virtual_disk_ops.rs`·`window/virtual_disk.rs`·`app/tests/virtual_disk.rs` | VDE-017 안전·지원 상태 안내 | 실행 중 VM·잠금·미지원 파일시스템이 일반 읽기 실패와 구분되지 않음 | read-only 안전 경계 카드, 실행 중 VM/잠금 전용 오류, NTFS 3.1 지원 범위 안내, 미지원 파티션 경고, GPUI 상태 렌더 테스트와 920/1000/1280px 실제 캡처 | 실제 VBoxManage 실행 중 VM·미지원 이미지 E2E는 VDE-019에서 검증 |
 | 2026-09-21 | `virtual_disk/partition.rs`·`virtual_disk/vdi.rs`·`virtual_disk/ntfs.rs`·`app/testdata/ntfs-testfs1.img` | VDE-018 고정 NTFS/합성 VDI 검증 | 실제 이미지에 연결된 파티션의 파일시스템 판정과 원본 불변성 통합 증거 없음 | MBR 파티션의 NTFS 3.1 부트 섹터 판정, 고정 NTFS read-only 열거, 손상 복사본 거부, 합성 동적 VDI에서 파티션·루트·파일 읽기 및 VDI 바이트 불변성 테스트 | GPUI 파일 행·키보드·복사 UI E2E는 VDE-019에서 검증 |
 | 2026-09-21 | `app/virtual_disk_ops.rs`·`app/tests/virtual_disk.rs` | VDE-019 GPUI 목록·복사 상태 수용 테스트 착수 | 실제 파일 목록을 주입할 UI 테스트 seam과 복사 상태 렌더 검증이 없음 | `GuestFileSource` trait object 테스트 경계, 숨김·시스템 항목 포함 목록 렌더와 Ctrl+A 선택, 복사 진행·중지·실패 요약 카드 GPUI 테스트 2개 추가; 전체 137 passed·4 ignored | 실제 VirtualBox 패널 캡처·foreground 입력·복사 대상 E2E는 VDE-019 잔여 |
-| 2026-09-21 | `docs/VIRTUAL_DISK_BACKENDS.md` | VDE-021 실행 중 VM 백엔드 설계 검토 | `guestcontrol`을 오프라인 VDI 경로와 혼용할 위험과 실제 명령·자격 증명 경계 미정 | Oracle 공식 명령 계약, `GuestFileSource`/전송 capability 분리, read-only 명령 목록, credential 비저장, 취소·시간 제한·출력 제한, 격리 VM 선행 조건 기록 | `VBoxManage.exe` 미설치로 실제 Guest Control E2E는 후속; VDE-019·VDE-020 완료 전 구현 금지 |
+| 2026-09-21 | `docs/VIRTUAL_DISK_BACKENDS.md` | VDE-021 실행 중 VM 백엔드 설계 검토 | `guestcontrol`을 오프라인 VDI 경로와 혼용할 위험과 실제 명령·자격 증명 경계 미정 | Oracle 공식 명령 계약, `GuestFileSource`/전송 capability 분리, read-only 명령 목록, credential 비저장, 취소·시간 제한·출력 제한, 격리 VM 선행 조건 기록 | `VBoxManage.exe` 미설치로 실제 Guest Control E2E는 후속; VDE-019 완료 전 구현 금지 |
+| 2026-09-22 | `app/src/sync/tests.rs`·`app/src/config.rs`·`docs/PROJECT_MAP.md` | T-001·T-002 회귀 테스트와 구조 지도 실측 갱신 | 읽기 전용 대상 덮어쓰기와 `update_config` 필드 보존을 전체 테스트에서 보장하지 않음; 일부 모듈 줄 수가 이전 기록과 불일치 | 두 회귀 테스트 추가, 격리 설정 경로 검증, 전체 139 passed·4 ignored·Clippy 기존 경고 7건, 50개 파일·19,486줄 기준으로 지도 갱신 | 전체 `cargo fmt --check`는 기존 baseline 불일치로 별도 보류; 기능 변경 없이 테스트·문서만 반영 |
 | 2026-07-29 | 편의 기능 스플리터 3곳 | 공용 레이아웃 승격 | 패널별 고정 초기 폭 | `window::balanced_split` | 설정 pane 과도 축소 방지, 양쪽 가용폭 사용 |
 | 2026-07-29 | `app.rs` | 책임 단위 분할 + 재배치 | 1,798 | `app/` 7파일 (최대 564) | 대시보드·로그 렌더는 소유가 잘못돼 있어 `window/`로 이동 |
 | 2026-07-29 | `platform/windows.rs` | 책임 단위 분할 + 승격 | 1,361 | `platform/windows/` 6파일 (최대 344) | `wide_null`을 `windows/mod.rs`로 **공용 승격** |

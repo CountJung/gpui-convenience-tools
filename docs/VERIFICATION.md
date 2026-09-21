@@ -124,8 +124,7 @@ SHA-256을 기록한다. 다른 검증자의 독립 검토가 요구되는 UI �
 | VDE-017 | GPUI | [x] | [x] | [x] | [x] | [x] | [ ] | `cargo check -p gpui-convenience-tools --locked`; `cargo test --all-targets --all-features` (131 passed, 4 ignored); 실행 중 VM 오류·미지원 파일시스템 메시지 단위 테스트와 `virtual_disk_panel_explains_unsupported_partition_state` GPUI 렌더 테스트; 릴리즈 `CLAUDE_LOCAL` 920×700·1000×700·1280×700 캡처 `target/visual-validation/captures/vde017-920-210410.png`, `vde017-1000-210355.png`, `vde017-1280-210423.png`; 시각 세션 정리 후 프로세스 0·세션 루트 0; 실제 VBoxManage 실행 중 VM 및 실제 미지원 파티션 E2E는 VDE-018~019 후속 |
 | VDE-018 | RUST | [x] | [x] | — | — | [x] | [x] | `cargo check -p gpui-convenience-tools --locked`; `cargo test -p gpui-convenience-tools virtual_disk:: --all-targets --all-features` (56 passed, 2 ignored); `cargo test --all-targets --all-features` (135 passed, 4 ignored); `cargo clippy --all-targets --all-features` exit 0 (기존 경고 7건); `app/testdata/ntfs-testfs1.img` 기반 합성 MBR+동적 VDI에서 NTFS 루트·파일 읽기와 원본 바이트 불변성 검증, 고정 이미지 read-only 및 복사본 손상 테스트; rustfmt 대상 파일·`git diff --check`; commit·push 완료 |
 | VDE-019 | E2E | [x] | [x] | [x] | [ ] | [x] | [x] | `cargo check -p gpui-convenience-tools --locked`; `cargo test --all-targets --all-features` (137 passed, 4 ignored); GPUI 테스트 `virtual_disk_panel_renders_loaded_hidden_entries_and_selects_all_with_ctrl_a`, `virtual_disk_panel_renders_copy_progress_and_issue_summary`, 기존 키 디스패치 테스트 포함; `Verify-Workspace.ps1` 필수 GPUI 17개 및 전체 테스트 통과; release `CLAUDE_LOCAL` 기본 창 캡처 `target/visual-validation/captures/vde019-default-1000-212738.png`, VirtualBox 패널 전환 Click은 foreground=0으로 안전 차단되어 대상 패널 캡처 미완료; session 정리 processCount=0·sessionCount=0; partial commit `c7b1e17` push 완료 |
-| VDE-020 | DOCS | — | — | — | — | [ ] | [ ] | — |
-| VDE-021 | DOCS | — | — | — | — | [x] | [x] | `VIRTUAL_DISK_BACKENDS.md`에 Oracle 공식 `guestcontrol` 계약, 오프라인/실행 중 VM 분리, credential 비저장, 취소·시간 제한·출력 제한·심볼릭 링크 경계를 기록; `VBoxManage.exe` PATH 미발견으로 실제 실행 VM E2E는 미수행; VDE-019·VDE-020 선행 조건과 후속 구현 순서를 명시; commit `28dc516` push 완료 |
+| VDE-021 | DOCS | — | — | — | — | [x] | [x] | `VIRTUAL_DISK_BACKENDS.md`에 Oracle 공식 `guestcontrol` 계약, 오프라인/실행 중 VM 분리, credential 비저장, 취소·시간 제한·출력 제한·심볼릭 링크 경계를 기록; `VBoxManage.exe` PATH 미발견으로 실제 실행 VM E2E는 미수행; VDE-019 실제 E2E와 후속 구현 순서를 명시; commit `28dc516` push 완료 |
 | D-006 | RUST | [ ] | [ ] | — | — | [ ] | [ ] | — |
 | D-007 | RUST | [ ] | [ ] | — | — | [ ] | [ ] | — |
 | D-008 | E2E | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | — |
@@ -150,8 +149,6 @@ SHA-256을 기록한다. 다른 검증자의 독립 검토가 요구되는 UI �
 | K-001 | RUST | [ ] | [ ] | — | — | [ ] | [ ] | — |
 | G-003 | E2E | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | — |
 | G-004 | RUST | [ ] | [ ] | — | — | [ ] | [ ] | — |
-| T-001 | RUST | [ ] | [ ] | — | — | [ ] | [ ] | — |
-| T-002 | RUST | [ ] | [ ] | — | — | [ ] | [ ] | — |
 
 ## 완료 검증 기록
 
@@ -172,6 +169,9 @@ SHA-256을 기록한다. 다른 검증자의 독립 검토가 요구되는 UI �
 | D-003 | RUST | [x] | [x] | — | — | [x] | [x] | `excluded_files_are_not_copied_and_count_as_skipped`, `excluded_directories_are_not_created_or_removed_by_mirror_deletes` 통과; 상대 경로 glob 적용, `skipped` 계상, 제외 디렉터리의 하위 순회·미러 삭제 보호 확인; 전체 테스트 통과 |
 | D-005 | RUST | [x] | [x] | — | — | [x] | [x] | 제외 파일 2개가 대상에 복사되지 않고 `skipped=2`가 되는 회귀 테스트와 제외 디렉터리 보호 테스트 통과; `cargo test --all-targets --all-features --locked` 통과 |
 | D-004 | E2E | [x] | [x] | [x] | [x] | [x] | [x] | `file_sync_exclude_patterns_editor_is_multiline_and_contained`로 920/994/1280px 입력 영역의 멀티라인 높이·설정 카드 내부 경계 확인; `file_sync_run_button_saves_current_inputs_and_queues_selected_job`로 공백·빈 줄 정리와 줄바꿈 입력의 저장·실행 연결 확인; 격리 릴리즈 캡처는 `target/visual-validation/captures/d4-exclude-patterns-994-editor-visible-170031.png`, `d4-exclude-patterns-1280-editor-visible-170018.png`; 커밋·푸시 완료 |
+| VDE-020 | DOCS | — | — | — | — | [x] | [x] | `PROJECT_MAP.md`의 50개 Rust 파일·19,486줄·모듈별 책임/줄 수와 `MASTER_PLAN.md` Phase O-18 이력을 실측 갱신; `git diff --check` 및 활성 ID 정합성 assertion 통과; Phase O 전체 완료 표시는 VDE-019 후속; 이번 문서 커밋 push 완료 |
+| T-001 | RUST | [x] | [x] | — | — | [x] | [x] | `overwrites_an_existing_readonly_target_file`로 읽기 전용 대상 파일 속성 해제·덮어쓰기·최종 내용 확인; `cargo check -p gpui-convenience-tools --locked`; `cargo test --all-targets --all-features` (139 passed, 4 ignored); Clippy exit 0, 기존 경고 7건; commit `8d14458` push 완료 |
+| T-002 | RUST | [x] | [x] | — | — | [x] | [x] | `update_config_preserves_unedited_fields`로 서비스·타겟·즐겨찾기·동기화 진행 정보·로그 설정 보존과 디스크 재로드 확인; 임시 `GPUI_CONVENIENCE_TOOLS_DATA_DIR` 격리; `cargo check --locked`; 전체 139 passed·4 ignored; Clippy 기존 경고 7건; commit `8d14458` push 완료 |
 | VDE-004 | RUST | [x] | [x] | — | — | [x] | [x] | `virtual_disk::vdi` 4개 테스트 통과; VDI 1.1 헤더·블록 맵·동적 미할당/고정 이미지 읽기·차등 이미지 거부·중복/범위/오버플로 검증; `cargo test --all-targets --all-features --locked`, `cargo check -p gpui-convenience-tools --locked`, `git diff --check` 통과 |
 | VDE-005 | RUST | [x] | [x] | — | — | [x] | [x] | `virtual_disk::vdi` 9개 테스트 통과; `.lck` 표식 거부·환경변수 기반 VBoxManage 경로 대조 함수·read-only 핸들·크기/mtime 변경 감지; `cargo test -p gpui-convenience-tools virtual_disk::vdi --locked`, 전체 `cargo test --all-targets --all-features --locked`, `cargo check -p gpui-convenience-tools --locked`, `git diff --check` 통과 |
 | VDE-006 | RUST | [x] | [x] | — | — | [x] | [x] | `virtual_disk::partition` 6개 테스트 통과; MBR 기본·확장 EBR 논리 파티션·protective MBR/GPT·주·백업 GPT 헤더 CRC·MBR 범위 초과 검증; `cargo test -p gpui-convenience-tools --all-targets --all-features --locked`, `cargo check -p gpui-convenience-tools --locked`, `cargo build -p gpui-convenience-tools --locked`, `git diff --check` 통과 |
