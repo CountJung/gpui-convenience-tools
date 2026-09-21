@@ -29,7 +29,7 @@ use crate::platform::{AdWindowShowState, AdWindowSnapshot};
 pub(super) struct TopLevelSearchContext {
     pub(super) process_name_lower: String,
     pub(super) class_filter: String,
-    pub(super) found_window: Option<HWND>,
+    pub(super) found_windows: Vec<HWND>,
 }
 
 struct RunningProcessContext {
@@ -51,8 +51,8 @@ pub(super) unsafe extern "system" fn enum_windows_proc(hwnd: HWND, lparam: LPARA
         return 1;
     }
 
-    context.found_window = Some(hwnd);
-    0
+    context.found_windows.push(hwnd);
+    1
 }
 
 /// 타겟 프로세스에서 안전한 광고 창 후보를 하나 찾는다.
@@ -61,10 +61,14 @@ pub(super) unsafe extern "system" fn enum_windows_proc(hwnd: HWND, lparam: LPARA
 /// `EnumChildWindows`로 내려가지 않는다. 소유자 창이 있거나 도구 창으로 표시된
 /// 최상위 팝업만 후보로 반환한다.
 pub(super) fn find_ad_window(process_name: &str, class_filter: &str) -> Option<HWND> {
+    find_ad_windows(process_name, class_filter).into_iter().next()
+}
+
+pub(super) fn find_ad_windows(process_name: &str, class_filter: &str) -> Vec<HWND> {
     let mut context = TopLevelSearchContext {
         process_name_lower: process_name.to_ascii_lowercase(),
         class_filter: class_filter.trim().to_string(),
-        found_window: None,
+        found_windows: Vec::new(),
     };
     let lparam = &mut context as *mut TopLevelSearchContext as LPARAM;
 
@@ -73,7 +77,7 @@ pub(super) fn find_ad_window(process_name: &str, class_filter: &str) -> Option<H
         EnumWindows(Some(enum_windows_proc), lparam);
     }
 
-    context.found_window
+    context.found_windows
 }
 
 /// 창을 숨기기 전 위치·크기·표시 상태를 읽기 전용으로 캡처한다.
@@ -124,6 +128,48 @@ pub(super) fn capture_ad_window_state(hwnd: HWND) -> Result<AdWindowSnapshot> {
         show_state,
         enabled: unsafe { IsWindowEnabled(hwnd) != 0 },
     })
+}
+
+pub(super) fn is_window_alive(hwnd: HWND) -> bool {
+    unsafe { IsWindow(hwnd) != 0 }
+}
+
+pub(super) fn window_process_id(hwnd: HWND) -> Result<u32> {
+    if unsafe { IsWindow(hwnd) } == 0 {
+        return Err(anyhow!("invalid HWND for process ID query"));
+    }
+
+    let mut process_id = 0u32;
+    // SAFETY: hwnd is valid and process_id points to writable local storage.
+    unsafe {
+        GetWindowThreadProcessId(hwnd, &mut process_id as *mut u32);
+    }
+    if process_id == 0 {
+        return Err(anyhow!("window process ID is unavailable"));
+    }
+
+    Ok(process_id)
+}
+
+pub(super) fn is_window_collapsed(hwnd: HWND) -> Result<bool> {
+    if unsafe { IsWindow(hwnd) } == 0 {
+        return Err(anyhow!("invalid HWND for collapse state query"));
+    }
+
+    let mut rect = RECT {
+        left: 0,
+        top: 0,
+        right: 0,
+        bottom: 0,
+    };
+    // SAFETY: hwnd is valid and rect points to writable local storage.
+    if unsafe { GetWindowRect(hwnd, &mut rect as *mut RECT) } == 0 {
+        return Err(anyhow!("GetWindowRect failed while checking collapse state"));
+    }
+
+    Ok(rect.right == rect.left
+        && rect.bottom == rect.top
+        && unsafe { IsWindowEnabled(hwnd) } == 0)
 }
 
 /// 광고 후보 창을 0×0으로 축소하고 입력 대상에서 제외한다.
@@ -286,18 +332,9 @@ pub(super) fn class_name_from_hwnd(hwnd: HWND) -> String {
 }
 
 fn process_name_from_hwnd(hwnd: HWND) -> Option<String> {
-    let mut process_id = 0u32;
-
-    // SAFETY: process_id points to valid memory and hwnd comes from Win32 APIs.
-    unsafe {
-        GetWindowThreadProcessId(hwnd, &mut process_id as *mut u32);
-    }
-
-    if process_id == 0 {
-        return None;
-    }
-
-    process_name_from_pid(process_id)
+    window_process_id(hwnd)
+        .ok()
+        .and_then(process_name_from_pid)
 }
 
 pub(super) fn process_name_from_pid(process_id: u32) -> Option<String> {
@@ -362,7 +399,8 @@ fn query_process_image_name(process_handle: HANDLE) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::{
-        capture_ad_window_state, class_filter_matches, collapse_ad_window, restore_ad_window_state,
+        capture_ad_window_state, class_filter_matches, collapse_ad_window, find_ad_windows,
+        is_window_collapsed, process_name_from_pid, restore_ad_window_state, window_process_id,
     };
     use crate::platform::{AdWindowShowState, AdWindowSnapshot};
 
@@ -411,6 +449,12 @@ mod tests {
     #[test]
     fn invalid_window_cannot_be_collapsed() {
         assert!(collapse_ad_window(0).is_err());
+    }
+
+    #[test]
+    fn invalid_window_state_queries_fail_closed() {
+        assert!(is_window_collapsed(0).is_err());
+        assert!(window_process_id(0).is_err());
     }
 
     #[test]
@@ -481,6 +525,49 @@ mod tests {
 
         unsafe {
             DestroyWindow(hwnd);
+        }
+    }
+
+    #[test]
+    fn finds_all_matching_tool_window_fixtures() {
+        use std::ptr::null;
+        use windows_sys::Win32::UI::WindowsAndMessaging::{
+            CreateWindowExW, DestroyWindow, WS_EX_TOOLWINDOW, WS_POPUP, WS_VISIBLE,
+        };
+
+        let class_name = super::super::wide_null("STATIC");
+        let title_a = super::super::wide_null("gpui-ad-004-fixture-a");
+        let title_b = super::super::wide_null("gpui-ad-004-fixture-b");
+        let create = |title: &[u16]| unsafe {
+            CreateWindowExW(
+                WS_EX_TOOLWINDOW,
+                class_name.as_ptr(),
+                title.as_ptr(),
+                WS_POPUP | WS_VISIBLE,
+                -32000,
+                -32000,
+                80,
+                60,
+                0,
+                0,
+                0,
+                null(),
+            )
+        };
+        let first = create(&title_a);
+        let second = create(&title_b);
+        assert_ne!(first, 0, "first fixture window should be created");
+        assert_ne!(second, 0, "second fixture window should be created");
+
+        let process_name = process_name_from_pid(std::process::id())
+            .expect("the current test process should have an image name");
+        let found = find_ad_windows(&process_name, "STATIC");
+        assert!(found.contains(&first));
+        assert!(found.contains(&second));
+
+        unsafe {
+            DestroyWindow(first);
+            DestroyWindow(second);
         }
     }
 }

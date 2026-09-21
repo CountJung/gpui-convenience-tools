@@ -99,12 +99,39 @@ pub trait Platform: Send + Sync {
         process_name: &str,
         ad_window_class: &str,
     ) -> Result<Option<NativeWindowHandle>>;
+
+    /// 타겟 프로세스의 광고 후보 최상위 창을 모두 반환한다.
+    fn find_ad_windows(
+        &self,
+        process_name: &str,
+        ad_window_class: &str,
+    ) -> Result<Vec<NativeWindowHandle>> {
+        Ok(self
+            .find_ad_window(process_name, ad_window_class)?
+            .into_iter()
+            .collect())
+    }
     fn hide_ad(&self, handle: NativeWindowHandle) -> Result<()>;
     fn show_ad(&self, handle: NativeWindowHandle) -> Result<()>;
 
     /// 광고 창을 활성화하지 않은 채 화면 크기를 0×0으로 축소하고 입력을 막는다.
     fn collapse_ad(&self, _handle: NativeWindowHandle) -> Result<()> {
         Err(anyhow::anyhow!("광고 창 0×0 축소는 지원되지 않습니다."))
+    }
+
+    /// 저장된 HWND가 아직 유효한지 확인한다.
+    fn is_ad_window_alive(&self, _handle: NativeWindowHandle) -> bool {
+        false
+    }
+
+    /// HWND가 현재 어느 프로세스에 속하는지 조회한다.
+    fn ad_window_process_id(&self, _handle: NativeWindowHandle) -> Result<u32> {
+        Err(anyhow::anyhow!("광고 창 프로세스 ID 조회는 지원되지 않습니다."))
+    }
+
+    /// 창이 0×0 축소·비활성 상태인지 읽기 전용으로 확인한다.
+    fn is_ad_window_collapsed(&self, _handle: NativeWindowHandle) -> Result<bool> {
+        Err(anyhow::anyhow!("광고 창 축소 상태 조회는 지원되지 않습니다."))
     }
 
     /// 저장된 창이 속한 프로세스가 아직 실행 중인지 확인한다.

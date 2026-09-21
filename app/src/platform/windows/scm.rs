@@ -5,6 +5,7 @@
 //! [`super::task_scheduler`]를 사용한다. 이 모듈은 서비스 등록 기능 자체를 위해 남아 있다.
 
 use anyhow::{anyhow, Result};
+use std::collections::{HashMap, HashSet};
 use std::ffi::{OsStr, OsString};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -25,20 +26,48 @@ use windows_service::{
 
 pub const WIN_SERVICE_NAME: &str = "gpui-convenience-tools";
 
-fn restore_hidden_ad_window(
+fn restore_collapsed_ad_windows(
     platform: &dyn Platform,
-    last_hidden: &mut Option<AdWindowSnapshot>,
-) -> bool {
-    let Some(snapshot) = last_hidden.take() else {
-        return true;
-    };
+    collapsed_windows: &mut HashMap<NativeWindowHandle, AdWindowSnapshot>,
+    force: bool,
+) {
+    let handles: Vec<_> = collapsed_windows
+        .iter()
+        .filter_map(|(handle, snapshot)| {
+            (force || !platform.is_process_id_running(snapshot.process_id)).then_some(*handle)
+        })
+        .collect();
 
-    match platform.restore_ad_window_state(&snapshot) {
-        Ok(()) => true,
-        Err(err) => {
-            log::warn!("서비스 모드에서 광고 창 원래 상태 복원 실패: {err}");
-            false
+    for handle in handles {
+        let Some(snapshot) = collapsed_windows.remove(&handle) else {
+            continue;
+        };
+
+        if let Err(err) = platform.restore_ad_window_state(&snapshot) {
+            log::warn!(
+                "서비스 모드에서 광고 창 원래 상태 복원 실패 (HWND {:?}): {err}",
+                handle
+            );
         }
+    }
+}
+
+fn discard_dead_ad_window_snapshots(
+    platform: &dyn Platform,
+    collapsed_windows: &mut HashMap<NativeWindowHandle, AdWindowSnapshot>,
+) {
+    let dead_handles: Vec<_> = collapsed_windows
+        .keys()
+        .copied()
+        .filter(|handle| !platform.is_ad_window_alive(*handle))
+        .collect();
+
+    for handle in dead_handles {
+        collapsed_windows.remove(&handle);
+        log::info!(
+            "서비스 모드에서 광고 창이 닫혀 기존 상태 스냅샷을 폐기했습니다 (HWND {:?})",
+            handle
+        );
     }
 }
 
@@ -288,7 +317,8 @@ fn run_service_loop(_arguments: Vec<OsString>) -> Result<()> {
         };
 
         rt.block_on(async move {
-            let mut last_hidden: Option<AdWindowSnapshot> = None;
+            let mut collapsed_windows: HashMap<NativeWindowHandle, AdWindowSnapshot> =
+                HashMap::new();
 
             loop {
                 let snapshot = scanner_state_bg
@@ -302,61 +332,91 @@ fn run_service_loop(_arguments: Vec<OsString>) -> Result<()> {
                 };
 
                 if !service_enabled {
-                    restore_hidden_ad_window(platform_bg.as_ref(), &mut last_hidden);
+                    restore_collapsed_ad_windows(platform_bg.as_ref(), &mut collapsed_windows, true);
                     tokio::time::sleep(Duration::from_secs(1)).await;
                     continue;
                 }
 
                 let mut any_running = false;
-                let mut detected_handle: Option<NativeWindowHandle> = None;
+                let mut candidate_windows = HashSet::new();
 
                 for target in targets.iter().filter(|t| t.enabled) {
                     if !platform_bg.is_target_running(&target.process_name) {
                         continue;
                     }
                     any_running = true;
-                    if let Ok(Some(hwnd)) = platform_bg
-                        .find_ad_window(&target.process_name, &target.ad_window_class)
+                    match platform_bg
+                        .find_ad_windows(&target.process_name, &target.ad_window_class)
                     {
-                        detected_handle = Some(hwnd);
-                        break;
+                        Ok(windows) => candidate_windows.extend(windows),
+                        Err(err) => {
+                            log::warn!("서비스 모드에서 광고 창 후보 열거 실패: {err}");
+                        }
                     }
                 }
 
-                if let Some(hwnd) = detected_handle {
-                    let is_new_window = last_hidden
-                        .as_ref()
-                        .is_none_or(|snapshot| snapshot.handle != hwnd);
+                discard_dead_ad_window_snapshots(
+                    platform_bg.as_ref(),
+                    &mut collapsed_windows,
+                );
 
-                    if is_new_window
-                        && restore_hidden_ad_window(platform_bg.as_ref(), &mut last_hidden)
-                    {
-                        match platform_bg.capture_ad_window_state(hwnd) {
-                            Ok(snapshot) => match platform_bg.collapse_ad(hwnd) {
-                                Ok(()) => {
-                                    log::info!("Ad window hidden (service mode)");
-                                    last_hidden = Some(snapshot);
+                for hwnd in candidate_windows {
+                    let current_process_id = match platform_bg.ad_window_process_id(hwnd) {
+                        Ok(process_id) => process_id,
+                        Err(err) => {
+                            log::warn!("서비스 모드에서 광고 창 프로세스 ID 조회 실패: {err}");
+                            continue;
+                        }
+                    };
+
+                    if let Some(snapshot) = collapsed_windows.get(&hwnd) {
+                        if snapshot.process_id != current_process_id {
+                            log::warn!(
+                                "서비스 모드에서 HWND가 다른 프로세스로 재사용되어 상태를 폐기합니다 (HWND {:?})",
+                                hwnd
+                            );
+                            collapsed_windows.remove(&hwnd);
+                        } else {
+                            match platform_bg.is_ad_window_collapsed(hwnd) {
+                                Ok(true) => continue,
+                                Ok(false) => log::info!(
+                                    "서비스 모드에서 광고 창 수동 상태 변경을 감지해 다시 0×0으로 축소합니다 (HWND {:?})",
+                                    hwnd
+                                ),
+                                Err(err) => {
+                                    log::warn!("서비스 모드에서 광고 창 축소 상태 조회 실패: {err}");
+                                    continue;
                                 }
-                                Err(e) => {
-                                    log::warn!("collapse_ad failed: {e}");
-                                }
-                            },
-                            Err(e) => {
-                                log::warn!("capture_ad_window_state failed: {e}");
                             }
-                        }
-                    } else if !is_new_window {
-                        if let Err(e) = platform_bg.collapse_ad(hwnd) {
-                            log::warn!("collapse_ad retry failed: {e}");
+
+                            if let Err(err) = platform_bg.collapse_ad(hwnd) {
+                                log::warn!("서비스 모드에서 광고 창 재축소 실패: {err}");
+                            }
+                            continue;
                         }
                     }
-                } else if !any_running
-                    || last_hidden.as_ref().is_some_and(|snapshot| {
-                        !platform_bg.is_process_id_running(snapshot.process_id)
-                    })
-                {
-                    restore_hidden_ad_window(platform_bg.as_ref(), &mut last_hidden);
+
+                    match platform_bg.capture_ad_window_state(hwnd) {
+                        Ok(snapshot) => match platform_bg.collapse_ad(hwnd) {
+                            Ok(()) => {
+                                log::info!("Ad window collapsed (service mode)");
+                                collapsed_windows.insert(hwnd, snapshot);
+                            }
+                            Err(err) => {
+                                log::warn!("collapse_ad failed: {err}");
+                            }
+                        },
+                        Err(err) => {
+                            log::warn!("capture_ad_window_state failed: {err}");
+                        }
+                    }
                 }
+
+                restore_collapsed_ad_windows(
+                    platform_bg.as_ref(),
+                    &mut collapsed_windows,
+                    !any_running,
+                );
 
                 tokio::time::sleep(Duration::from_secs(1)).await;
             }

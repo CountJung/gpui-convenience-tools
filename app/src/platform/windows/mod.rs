@@ -72,6 +72,10 @@ impl Platform for WindowsPlatform {
         Ok(window_ops::find_ad_window(process_name, ad_window_class))
     }
 
+    fn find_ad_windows(&self, process_name: &str, ad_window_class: &str) -> Result<Vec<HWND>> {
+        Ok(window_ops::find_ad_windows(process_name, ad_window_class))
+    }
+
     fn hide_ad(&self, handle: HWND) -> Result<()> {
         // SAFETY: IsWindow only reads window metadata.
         if unsafe { IsWindow(handle) } == 0 {
@@ -102,6 +106,18 @@ impl Platform for WindowsPlatform {
 
     fn collapse_ad(&self, handle: HWND) -> Result<()> {
         window_ops::collapse_ad_window(handle)
+    }
+
+    fn is_ad_window_alive(&self, handle: HWND) -> bool {
+        window_ops::is_window_alive(handle)
+    }
+
+    fn ad_window_process_id(&self, handle: HWND) -> Result<u32> {
+        window_ops::window_process_id(handle)
+    }
+
+    fn is_ad_window_collapsed(&self, handle: HWND) -> Result<bool> {
+        window_ops::is_window_collapsed(handle)
     }
 
     fn is_process_id_running(&self, process_id: u32) -> bool {

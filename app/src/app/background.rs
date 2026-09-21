@@ -7,7 +7,7 @@
 
 use std::{
     cell::RefCell,
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     future::pending,
     sync::{atomic::Ordering, Arc, Mutex},
     time::{Duration, Instant},
@@ -67,23 +67,46 @@ fn instant_from_unix(unix_secs: u64) -> Option<Instant> {
     Instant::now().checked_sub(Duration::from_secs(elapsed))
 }
 
-/// 저장된 창 상태를 한 번만 복원하고 추적을 끝낸다.
+/// 종료되었거나 기능이 꺼진 광고 창 스냅샷을 복원한다.
 ///
 /// 복원이 실패해도 같은 잘못된 HWND를 반복 조작하지 않도록 스냅샷을 먼저 제거한다.
-fn restore_hidden_ad_window(
+fn restore_collapsed_ad_windows(
     platform: &dyn Platform,
-    last_hidden: &mut Option<AdWindowSnapshot>,
-) -> bool {
-    let Some(snapshot) = last_hidden.take() else {
-        return true;
-    };
+    collapsed_windows: &mut HashMap<NativeWindowHandle, AdWindowSnapshot>,
+    force: bool,
+) {
+    let handles: Vec<_> = collapsed_windows
+        .iter()
+        .filter_map(|(handle, snapshot)| {
+            (force || !platform.is_process_id_running(snapshot.process_id)).then_some(*handle)
+        })
+        .collect();
 
-    match platform.restore_ad_window_state(&snapshot) {
-        Ok(()) => true,
-        Err(err) => {
-            log::warn!("광고 창 원래 상태 복원 실패: {err}");
-            false
+    for handle in handles {
+        let Some(snapshot) = collapsed_windows.remove(&handle) else {
+            continue;
+        };
+
+        if let Err(err) = platform.restore_ad_window_state(&snapshot) {
+            log::warn!("광고 창 원래 상태 복원 실패 (HWND {:?}): {err}", handle);
         }
+    }
+}
+
+/// 닫히거나 재생성되어 더 이상 유효하지 않은 HWND의 스냅샷을 제거한다.
+fn discard_dead_ad_window_snapshots(
+    platform: &dyn Platform,
+    collapsed_windows: &mut HashMap<NativeWindowHandle, AdWindowSnapshot>,
+) {
+    let dead_handles: Vec<_> = collapsed_windows
+        .keys()
+        .copied()
+        .filter(|handle| !platform.is_ad_window_alive(*handle))
+        .collect();
+
+    for handle in dead_handles {
+        collapsed_windows.remove(&handle);
+        log::info!("광고 창이 닫혀 기존 상태 스냅샷을 폐기했습니다 (HWND {:?})", handle);
     }
 }
 
@@ -109,7 +132,8 @@ impl AppRoot {
             runtime.block_on(async move {
                 tokio::spawn(async move {
                     let mut last_running: Option<bool> = None;
-                    let mut last_hidden: Option<AdWindowSnapshot> = None;
+                    let mut collapsed_windows: HashMap<NativeWindowHandle, AdWindowSnapshot> =
+                        HashMap::new();
 
                     loop {
                         let snapshot = scanner_state
@@ -125,7 +149,11 @@ impl AppRoot {
                         let sleep_duration = Duration::from_secs(interval_secs.max(1) as u64);
 
                         if !service_enabled {
-                            restore_hidden_ad_window(platform.as_ref(), &mut last_hidden);
+                            restore_collapsed_ad_windows(
+                                platform.as_ref(),
+                                &mut collapsed_windows,
+                                true,
+                            );
                             if last_running != Some(false) {
                                 let _ = event_tx.send(PlatformEvent::TargetStatusChanged(false));
                                 last_running = Some(false);
@@ -135,7 +163,7 @@ impl AppRoot {
                         }
 
                         let mut any_running = false;
-                        let mut detected_handle: Option<NativeWindowHandle> = None;
+                        let mut candidate_windows = HashSet::new();
 
                         for target in targets.iter().filter(|t| t.enabled) {
                             if !platform.is_target_running(&target.process_name) {
@@ -144,50 +172,80 @@ impl AppRoot {
 
                             any_running = true;
 
-                            if let Ok(Some(hwnd)) = platform
-                                .find_ad_window(&target.process_name, &target.ad_window_class)
+                            match platform
+                                .find_ad_windows(&target.process_name, &target.ad_window_class)
                             {
-                                detected_handle = Some(hwnd);
-                                break;
+                                Ok(windows) => candidate_windows.extend(windows),
+                                Err(err) => {
+                                    log::warn!("광고 창 후보 열거 실패: {err}");
+                                }
                             }
                         }
 
-                        if let Some(hwnd) = detected_handle {
-                            let is_new_window = last_hidden
-                                .as_ref()
-                                .is_none_or(|snapshot| snapshot.handle != hwnd);
+                        discard_dead_ad_window_snapshots(
+                            platform.as_ref(),
+                            &mut collapsed_windows,
+                        );
 
-                            if is_new_window
-                                && restore_hidden_ad_window(platform.as_ref(), &mut last_hidden)
-                            {
-                                match platform.capture_ad_window_state(hwnd) {
-                                    Ok(snapshot) => match platform.collapse_ad(hwnd) {
-                                        Ok(()) => {
-                                            last_hidden = Some(snapshot);
-                                            let _ = event_tx.send(PlatformEvent::AdBlocked);
+                        for hwnd in candidate_windows {
+                            let current_process_id = match platform.ad_window_process_id(hwnd) {
+                                Ok(process_id) => process_id,
+                                Err(err) => {
+                                    log::warn!("광고 창 프로세스 ID 조회 실패: {err}");
+                                    continue;
+                                }
+                            };
+
+                            if let Some(snapshot) = collapsed_windows.get(&hwnd) {
+                                if snapshot.process_id != current_process_id {
+                                    log::warn!(
+                                        "HWND가 다른 프로세스로 재사용되어 기존 광고 창 상태를 폐기합니다 (HWND {:?})",
+                                        hwnd
+                                    );
+                                    collapsed_windows.remove(&hwnd);
+                                } else {
+                                    match platform.is_ad_window_collapsed(hwnd) {
+                                        Ok(true) => continue,
+                                        Ok(false) => {
+                                            log::info!(
+                                                "광고 창의 수동 상태 변경을 감지해 다시 0×0으로 축소합니다 (HWND {:?})",
+                                                hwnd
+                                            );
                                         }
                                         Err(err) => {
-                                            log::warn!("광고 창 0×0 축소 실패: {err}");
+                                            log::warn!("광고 창 축소 상태 조회 실패: {err}");
+                                            continue;
                                         }
-                                    },
-                                    Err(err) => {
-                                        log::warn!("광고 창 원래 상태 캡처 실패: {err}");
                                     }
-                                }
-                            } else if !is_new_window {
-                                // 사용자가 숨겨진 창을 다시 표시했을 수 있으므로 같은 HWND도
-                                // 다시 숨긴다. 원래 상태 스냅샷은 덮어쓰지 않는다.
-                                if let Err(err) = platform.collapse_ad(hwnd) {
-                                    log::warn!("광고 창 재축소 실패: {err}");
+
+                                    if let Err(err) = platform.collapse_ad(hwnd) {
+                                        log::warn!("광고 창 재축소 실패: {err}");
+                                    }
+                                    continue;
                                 }
                             }
-                        } else if !any_running
-                            || last_hidden.as_ref().is_some_and(|snapshot| {
-                                !platform.is_process_id_running(snapshot.process_id)
-                            })
-                        {
-                            restore_hidden_ad_window(platform.as_ref(), &mut last_hidden);
+
+                            match platform.capture_ad_window_state(hwnd) {
+                                Ok(snapshot) => match platform.collapse_ad(hwnd) {
+                                    Ok(()) => {
+                                        collapsed_windows.insert(hwnd, snapshot);
+                                        let _ = event_tx.send(PlatformEvent::AdBlocked);
+                                    }
+                                    Err(err) => {
+                                        log::warn!("광고 창 0×0 축소 실패: {err}");
+                                    }
+                                },
+                                Err(err) => {
+                                    log::warn!("광고 창 원래 상태 캡처 실패: {err}");
+                                }
+                            }
                         }
+
+                        restore_collapsed_ad_windows(
+                            platform.as_ref(),
+                            &mut collapsed_windows,
+                            !any_running,
+                        );
 
                         if last_running != Some(any_running) {
                             let _ = event_tx.send(PlatformEvent::TargetStatusChanged(any_running));
