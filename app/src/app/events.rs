@@ -191,6 +191,25 @@ impl AppRoot {
                     }
                     self.handle_sync_finished(id, label, outcome, window, cx);
                 }
+                PlatformEvent::VirtualDiskCopyStarted { total_entries } => {
+                    self.handle_virtual_disk_copy_started(total_entries);
+                }
+                PlatformEvent::VirtualDiskCopyProgress {
+                    completed_entries,
+                    total_entries,
+                    current_path,
+                    report,
+                } => {
+                    self.handle_virtual_disk_copy_progress(
+                        completed_entries,
+                        total_entries,
+                        current_path,
+                        &report,
+                    );
+                }
+                PlatformEvent::VirtualDiskCopyFinished { outcome } => {
+                    self.handle_virtual_disk_copy_finished(outcome, window, cx);
+                }
             }
         }
     }

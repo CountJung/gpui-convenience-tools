@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{atomic::AtomicBool, Arc};
 
+use super::virtual_disk_copy::VirtualDiskCopyOutcome;
 use crate::config::SyncJob;
 use crate::sync::SyncOutcome;
 
@@ -77,6 +78,18 @@ pub(crate) enum PlatformEvent {
         failed: usize,
     },
     SyncFinished { id: String, label: String, outcome: SyncOutcome },
+    VirtualDiskCopyStarted {
+        total_entries: usize,
+    },
+    VirtualDiskCopyProgress {
+        completed_entries: usize,
+        total_entries: usize,
+        current_path: String,
+        report: crate::virtual_disk::copy::CopyReport,
+    },
+    VirtualDiskCopyFinished {
+        outcome: VirtualDiskCopyOutcome,
+    },
 }
 
 #[derive(Clone, Debug)]

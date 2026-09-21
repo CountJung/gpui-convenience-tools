@@ -21,6 +21,7 @@ mod interval;
 mod ops;
 mod state;
 mod sync_ops;
+mod virtual_disk_copy;
 mod virtual_disk_ops;
 
 pub(crate) use interval::{IntervalPicker, IntervalTarget};

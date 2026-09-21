@@ -14,6 +14,7 @@ use crate::virtual_disk::{
     GuestFileEntry, GuestFileKind, GuestFileSource, GuestPath, VdiPartition, VirtualDiskError,
 };
 
+use super::virtual_disk_copy::VirtualDiskCopyState;
 use super::AppRoot;
 
 /// VDE-013에서 사용하는 오프라인 VDI 탐색 세션.
@@ -26,6 +27,7 @@ pub(crate) struct VirtualDiskSession {
     pub(crate) current_path: GuestPath,
     pub(crate) entries: Vec<GuestFileEntry>,
     pub(crate) selected_paths: HashSet<GuestPath>,
+    pub(crate) copy: VirtualDiskCopyState,
     pub(crate) source: Option<NtfsGuestFileSource<VdiReader>>,
     pub(crate) error: Option<String>,
 }
@@ -41,6 +43,7 @@ impl Default for VirtualDiskSession {
             current_path: GuestPath::root(),
             entries: Vec::new(),
             selected_paths: HashSet::new(),
+            copy: VirtualDiskCopyState::default(),
             source: None,
             error: None,
         }

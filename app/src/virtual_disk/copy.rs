@@ -42,7 +42,7 @@ pub struct CopyReport {
 }
 
 impl CopyReport {
-    fn merge(&mut self, other: Self) {
+    pub(crate) fn merge(&mut self, other: Self) {
         self.copied_files += other.copied_files;
         self.copied_bytes += other.copied_bytes;
         self.skipped_entries += other.skipped_entries;

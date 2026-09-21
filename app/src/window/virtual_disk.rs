@@ -19,6 +19,7 @@ use super::ui::{self, ButtonStyle};
 
 pub fn render(this: &mut AppRoot, window: &mut Window, cx: &mut Context<AppRoot>) -> AnyElement {
     this.ensure_virtual_disk_input(window, cx);
+    this.ensure_virtual_disk_target_input(window, cx);
 
     let page_scroll = this.virtual_disk_page_scroll.clone();
     scroll_pane(
@@ -33,6 +34,7 @@ pub fn render(this: &mut AppRoot, window: &mut Window, cx: &mut Context<AppRoot>
             .child(render_source_card(this, cx))
             .child(render_partition_card(this, cx))
             .child(render_directory_card(this, cx))
+            .child(render_copy_card(this, cx))
             .into_any_element(),
     )
 }
@@ -321,6 +323,146 @@ fn render_directory_card(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyEl
         )
         .child(entries)
         .into_any_element()
+}
+
+fn render_copy_card(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElement {
+    let theme = cx.theme();
+    let input = this
+        .virtual_disk
+        .copy
+        .target_path_input
+        .as_ref()
+        .map(|input| {
+            div()
+                .debug_selector(|| "virtual-disk-target-input".to_string())
+                .flex_1()
+                .min_w_0()
+                .child(Input::new(input))
+        });
+
+    let mut card =
+        v_flex()
+            .debug_selector(|| "virtual-disk-copy-card".to_string())
+            .w_full()
+            .min_w_0()
+            .gap_3()
+            .rounded_lg()
+            .p_3()
+            .bg(theme.secondary)
+            .border_1()
+            .border_color(theme.border)
+            .child(div().text_color(theme.foreground).child("호스트 대상 폴더"))
+            .child(
+                h_flex()
+                    .w_full()
+                    .min_w_0()
+                    .gap_2()
+                    .items_center()
+                    .children(input)
+                    .child(ui::action_button(
+                        "virtual-disk-target-pick",
+                        "폴더 선택",
+                        ui::Size::Md,
+                        ButtonStyle::neutral(cx),
+                        cx.listener(|this, _event, window, cx| {
+                            this.pick_virtual_disk_target(window, cx);
+                        }),
+                    )),
+            )
+            .child(div().text_color(theme.muted_foreground).child(
+                "선택한 게스트 항목을 대상 폴더 아래에 복사합니다. 기존 파일은 건너뜁니다.",
+            ));
+
+    if let Some(progress) = &this.virtual_disk.copy.progress {
+        let status = format!(
+            "{} / {}개 항목 · 파일 {}개 · {} · 건너뜀 {} · 실패 {}",
+            progress.completed_entries,
+            progress.total_entries,
+            progress.copied_files,
+            format_bytes(progress.copied_bytes),
+            progress.skipped_entries,
+            progress.failed_entries,
+        );
+        card = card.child(
+            v_flex()
+                .debug_selector(|| "virtual-disk-copy-progress".to_string())
+                .gap_1()
+                .rounded_md()
+                .p_2()
+                .bg(theme.background)
+                .child(
+                    div()
+                        .text_color(theme.foreground)
+                        .child(if progress.stopping {
+                            "중지 요청을 처리하는 중입니다…"
+                        } else {
+                            "복사 중…"
+                        }),
+                )
+                .child(div().text_color(theme.muted_foreground).child(status))
+                .child(div().text_color(theme.muted_foreground).child(
+                    if progress.current_path.is_empty() {
+                        "준비 중…".to_string()
+                    } else {
+                        progress.current_path.clone()
+                    },
+                )),
+        );
+        card = card.child(
+            div()
+                .debug_selector(|| "virtual-disk-copy-stop".to_string())
+                .child(ui::action_button(
+                    "virtual-disk-copy-stop-action",
+                    "복사 중지",
+                    ui::Size::Md,
+                    ButtonStyle::danger_outline(cx),
+                    cx.listener(|this, _event, window, cx| {
+                        this.stop_virtual_disk_copy(window, cx);
+                    }),
+                )),
+        );
+    } else {
+        card = card.child(
+            div()
+                .debug_selector(|| "virtual-disk-copy-start".to_string())
+                .child(ui::action_button(
+                    "virtual-disk-copy-start-action",
+                    "선택 항목 복사",
+                    ui::Size::Md,
+                    ButtonStyle::primary(cx),
+                    cx.listener(|this, _event, window, cx| {
+                        this.start_virtual_disk_copy(window, cx);
+                    }),
+                )),
+        );
+    }
+
+    if let Some(summary) = &this.virtual_disk.copy.summary {
+        let summary_tone = if summary.error.is_some() || summary.failed_entries > 0 {
+            ui::Tone::Warning
+        } else if summary.cancelled {
+            ui::Tone::Info
+        } else {
+            ui::Tone::Success
+        };
+        let mut summary_view = v_flex()
+            .debug_selector(|| "virtual-disk-copy-summary".to_string())
+            .gap_1()
+            .rounded_md()
+            .p_2()
+            .bg(theme.background)
+            .child(ui::badge(summary.line(), summary_tone, ui::Size::Sm, cx));
+        for issue in summary.issues.iter().take(5) {
+            summary_view = summary_view.child(
+                div()
+                    .text_color(theme.muted_foreground)
+                    .child(format!("{} · {}", issue.path, issue.detail)),
+            );
+        }
+        card = card.child(summary_view);
+    }
+
+    card.into_any_element()
 }
 
 fn format_partition_label(partition: &crate::virtual_disk::VdiPartition) -> String {

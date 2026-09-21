@@ -38,4 +38,16 @@ fn virtual_disk_panel_registers_navigation_and_renders_read_only_shell(cx: &mut 
         cx.debug_bounds("virtual-disk-parent").is_some(),
         "parent directory action should be rendered"
     );
+    assert!(
+        cx.debug_bounds("virtual-disk-copy-card").is_some(),
+        "copy card should be rendered"
+    );
+    assert!(
+        cx.debug_bounds("virtual-disk-target-input").is_some(),
+        "copy target input should be rendered"
+    );
+    assert!(
+        cx.debug_bounds("virtual-disk-copy-start").is_some(),
+        "copy start action should be rendered"
+    );
 }
