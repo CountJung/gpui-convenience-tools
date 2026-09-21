@@ -138,8 +138,8 @@ fn presets_are_shared_between_ad_block_and_file_sync(cx: &mut TestAppContext) {
     initialize_components(cx);
     let (view, cx) = cx.add_window_view(|_, _| {
         let mut root = test_app_root(ActivePanel::AdBlock);
-        root.sync_jobs = vec![SyncJob::default()];
-        root.selected_sync_job = Some(0);
+        root.sync.jobs = vec![SyncJob::default()];
+        root.sync.selected_job = Some(0);
         root
     });
 

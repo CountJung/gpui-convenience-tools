@@ -121,7 +121,7 @@ fn render_summary(root: &AppRoot, cx: &Context<AppRoot>) -> AnyElement {
 /// 진행 상황 표시줄은 파일 동기화 패널에만 있어서, 다른 화면에 있으면 동기화가 도는지조차
 /// 알 수 없었다. 대시보드에서 바로 보이게 한다.
 fn sync_badge(root: &AppRoot, cx: &Context<AppRoot>) -> Div {
-    let (label, tone) = match (&root.sync_running, root.sync_enabled) {
+    let (label, tone) = match (&root.sync.running, root.sync.enabled) {
         (Some(running), _) => (format!("동기화 중: {}", running.label), ui::Tone::Info),
         (None, true) => ("파일 동기화: 대기 중".to_string(), ui::Tone::Success),
         (None, false) => ("파일 동기화: 꺼짐".to_string(), ui::Tone::Muted),
@@ -131,13 +131,13 @@ fn sync_badge(root: &AppRoot, cx: &Context<AppRoot>) -> Div {
 
 /// 두 플랫폼이 공유하는 파일 동기화 통계 타일.
 fn sync_tiles(root: &AppRoot, cx: &Context<AppRoot>) -> Vec<AnyElement> {
-    let auto_sync_jobs = root.sync_jobs.iter().filter(|j| j.enabled).count();
-    let failed_syncs = root.sync_status.values().filter(|s| s.failed).count();
+    let auto_sync_jobs = root.sync.jobs.iter().filter(|j| j.enabled).count();
+    let failed_syncs = root.sync.status.values().filter(|s| s.failed).count();
 
     vec![
         stat_tile(
             "자동 동기화",
-            &format!("{auto_sync_jobs} / {}", root.sync_jobs.len()),
+            &format!("{auto_sync_jobs} / {}", root.sync.jobs.len()),
             cx,
         ),
         stat_tile("동기화 실패", &failed_syncs.to_string(), cx),

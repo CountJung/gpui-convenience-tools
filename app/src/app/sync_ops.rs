@@ -9,6 +9,7 @@ use gpui_component::notification::NotificationType;
 use std::sync::atomic::Ordering;
 
 use super::state::PlatformEvent;
+use super::state::SyncJobStatus;
 use super::AppRoot;
 use crate::config::{carry_over_engine_progress, update_config, SyncJob};
 
@@ -18,10 +19,10 @@ impl AppRoot {
     // ─────────────────────────────────────────────
 
     fn persist_sync_jobs_config(&self) {
-        let jobs = self.sync_jobs.clone();
+        let jobs = self.sync.jobs.clone();
 
         #[cfg(test)]
-        if !self.external_side_effects_enabled {
+        if !self.sync.external_side_effects_enabled {
             return;
         }
 
@@ -37,8 +38,8 @@ impl AppRoot {
     }
 
     pub(super) fn persist_sync_jobs(&mut self) {
-        if let Ok(mut state) = self.sync_state.lock() {
-            state.jobs = self.sync_jobs.clone();
+        if let Ok(mut state) = self.sync.shared.lock() {
+            state.jobs = self.sync.jobs.clone();
         }
         self.persist_sync_jobs_config();
     }
@@ -47,15 +48,15 @@ impl AppRoot {
     ///
     /// 다른 폴더를 가리키게 된 커서로 순회를 이어가면 새 원본의 앞부분을 통째로 건너뛴다.
     fn invalidate_resume_cursor(&mut self, id: &str) {
-        if let Ok(mut state) = self.sync_state.lock() {
+        if let Ok(mut state) = self.sync.shared.lock() {
             state.cursors.remove(id);
         }
-        if let Some(job) = self.sync_jobs.iter_mut().find(|job| job.id == id) {
+        if let Some(job) = self.sync.jobs.iter_mut().find(|job| job.id == id) {
             job.resume_cursor = None;
         }
 
         #[cfg(test)]
-        if !self.external_side_effects_enabled {
+        if !self.sync.external_side_effects_enabled {
             return;
         }
 
@@ -83,24 +84,24 @@ impl AppRoot {
 
     /// 전역 스위치 상태를 공유 상태와 설정에 반영한다.
     pub(super) fn apply_sync_enabled(&mut self) {
-        if let Ok(mut state) = self.sync_state.lock() {
-            state.auto_enabled = self.sync_enabled;
+        if let Ok(mut state) = self.sync.shared.lock() {
+            state.auto_enabled = self.sync.enabled;
         }
 
         #[cfg(test)]
-        if !self.external_side_effects_enabled {
+        if !self.sync.external_side_effects_enabled {
             return;
         }
 
-        let enabled = self.sync_enabled;
-        if let Err(err) = update_config(move |cfg| cfg.sync_enabled = enabled) {
+        let enabled = self.sync.enabled;
+            if let Err(err) = update_config(move |cfg| cfg.sync_enabled = enabled) {
             log::error!("동기화 스위치 저장 실패: {err}");
         }
     }
 
     pub(crate) fn add_sync_job(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        self.sync_jobs.push(SyncJob::default());
-        let index = self.sync_jobs.len() - 1;
+        self.sync.jobs.push(SyncJob::default());
+        let index = self.sync.jobs.len() - 1;
         self.persist_sync_jobs();
         self.select_sync_job(index, window, cx);
         self.push_log("INFO", "동기화 작업을 추가했습니다.".to_string());
@@ -113,22 +114,22 @@ impl AppRoot {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        if index >= self.sync_jobs.len() {
+        if index >= self.sync.jobs.len() {
             return;
         }
 
-        let label = self.sync_jobs[index].label();
-        let removed = self.sync_jobs.remove(index);
-        self.sync_status.remove(&removed.id);
+        let label = self.sync.jobs[index].label();
+        let removed = self.sync.jobs.remove(index);
+        self.sync.status.remove(&removed.id);
 
-        self.selected_sync_job = if self.sync_jobs.is_empty() {
+        self.sync.selected_job = if self.sync.jobs.is_empty() {
             None
         } else {
-            Some(index.min(self.sync_jobs.len() - 1))
+            Some(index.min(self.sync.jobs.len() - 1))
         };
 
         self.persist_sync_jobs();
-        if let Some(next) = self.selected_sync_job {
+        if let Some(next) = self.sync.selected_job {
             self.load_sync_inputs(next, window, cx);
         }
         self.push_log("INFO", format!("동기화 작업을 삭제했습니다: {label}"));
@@ -141,10 +142,10 @@ impl AppRoot {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        if index >= self.sync_jobs.len() {
+        if index >= self.sync.jobs.len() {
             return;
         }
-        self.selected_sync_job = Some(index);
+        self.sync.selected_job = Some(index);
         self.load_sync_inputs(index, window, cx);
         cx.notify();
     }
@@ -156,26 +157,26 @@ impl AppRoot {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        let Some(job) = self.sync_jobs.get(index).cloned() else {
+        let Some(job) = self.sync.jobs.get(index).cloned() else {
             return;
         };
 
-        if let Some(input) = self.sync_name_input.as_ref() {
+        if let Some(input) = self.sync.name_input.as_ref() {
             input.update(cx, |state, cx| {
                 state.set_value(job.name.clone(), window, cx)
             });
         }
-        if let Some(input) = self.sync_source_input.as_ref() {
+        if let Some(input) = self.sync.source_input.as_ref() {
             input.update(cx, |state, cx| {
                 state.set_value(job.source.clone(), window, cx)
             });
         }
-        if let Some(input) = self.sync_target_input.as_ref() {
+        if let Some(input) = self.sync.target_input.as_ref() {
             input.update(cx, |state, cx| {
                 state.set_value(job.target.clone(), window, cx)
             });
         }
-        if let Some(input) = self.sync_exclude_input.as_ref() {
+        if let Some(input) = self.sync.exclude_input.as_ref() {
             input.update(cx, |state, cx| {
                 state.set_value(job.exclude_patterns.join("\n"), window, cx)
             });
@@ -189,10 +190,10 @@ impl AppRoot {
         cx: &mut Context<Self>,
         edit: impl FnOnce(&mut SyncJob),
     ) {
-        let Some(index) = self.selected_sync_job else {
+        let Some(index) = self.sync.selected_job else {
             return;
         };
-        let Some(job) = self.sync_jobs.get_mut(index) else {
+        let Some(job) = self.sync.jobs.get_mut(index) else {
             return;
         };
         edit(job);
@@ -205,27 +206,27 @@ impl AppRoot {
     /// 호출자가 공유 상태 갱신 또는 실행 큐 등록과 함께 저장 시점을 결정한다.
     fn capture_sync_inputs(&mut self, index: usize, cx: &mut Context<Self>) -> bool {
         let name = self
-            .sync_name_input
+            .sync.name_input
             .as_ref()
             .map(|i| i.read(cx).value().to_string())
             .unwrap_or_default();
         let source = self
-            .sync_source_input
+            .sync.source_input
             .as_ref()
             .map(|i| i.read(cx).value().to_string())
             .unwrap_or_default();
         let target = self
-            .sync_target_input
+            .sync.target_input
             .as_ref()
             .map(|i| i.read(cx).value().to_string())
             .unwrap_or_default();
         let exclude_patterns = self
-            .sync_exclude_input
+            .sync.exclude_input
             .as_ref()
             .map(|i| parse_exclude_patterns(i.read(cx).value().as_ref()))
             .unwrap_or_default();
 
-        let changed_id = match self.sync_jobs.get_mut(index) {
+        let changed_id = match self.sync.jobs.get_mut(index) {
             Some(job) => {
                 let paths_changed =
                     job.source != source.trim() || job.target != target.trim();
@@ -247,7 +248,7 @@ impl AppRoot {
 
     /// 입력창의 이름·경로·제외 패턴을 선택한 작업에 반영한다.
     pub(crate) fn apply_sync_inputs(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(index) = self.selected_sync_job else {
+        let Some(index) = self.sync.selected_job else {
             return;
         };
         if !self.capture_sync_inputs(index, cx) {
@@ -267,7 +268,7 @@ impl AppRoot {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        if self.selected_sync_job.is_none() {
+        if self.sync.selected_job.is_none() {
             return;
         }
 
@@ -292,11 +293,11 @@ impl AppRoot {
             let picked = path.display().to_string();
 
             let _ = this.update_in(cx, |this, window, cx| {
-                let Some(index) = this.selected_sync_job else {
+                let Some(index) = this.sync.selected_job else {
                     return;
                 };
 
-                let changed_id = this.sync_jobs.get_mut(index).map(|job| {
+                let changed_id = this.sync.jobs.get_mut(index).map(|job| {
                     if is_source {
                         job.source = picked.clone();
                     } else {
@@ -309,9 +310,9 @@ impl AppRoot {
                 }
 
                 let input = if is_source {
-                    this.sync_source_input.clone()
+                    this.sync.source_input.clone()
                 } else {
-                    this.sync_target_input.clone()
+                    this.sync.target_input.clone()
                 };
                 if let Some(input) = input {
                     input.update(cx, |state, cx| state.set_value(picked.clone(), window, cx));
@@ -334,7 +335,7 @@ impl AppRoot {
             return;
         }
 
-        let Some(job) = self.sync_jobs.get(index) else {
+        let Some(job) = self.sync.jobs.get(index) else {
             return;
         };
         if job.source.trim().is_empty() || job.target.trim().is_empty() {
@@ -349,18 +350,18 @@ impl AppRoot {
         }
         let id = job.id.clone();
 
-        if let Ok(mut state) = self.sync_state.lock() {
+        if let Ok(mut state) = self.sync.shared.lock() {
             // 최신 입력 스냅샷과 수동 요청을 한 임계구역에서 공개해 자동 tick이
             // 둘 사이에 끼어 같은 작업을 두 번 실행하지 않게 한다.
-            state.jobs = self.sync_jobs.clone();
+            state.jobs = self.sync.jobs.clone();
             if !state.run_now.contains(&id) {
                 state.run_now.push(id.clone());
             }
         }
         self.persist_sync_jobs_config();
-        self.sync_status.insert(
+        self.sync.status.insert(
             id,
-            super::SyncJobStatus {
+            SyncJobStatus {
                 last_run: None,
                 summary: "실행 요청됨 — 결과를 기다리는 중입니다.".to_string(),
                 failed: false,
@@ -371,11 +372,11 @@ impl AppRoot {
     }
 
     pub(crate) fn request_sync_all(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if let Some(index) = self.selected_sync_job {
+        if let Some(index) = self.sync.selected_job {
             self.capture_sync_inputs(index, cx);
         }
 
-        let count = self.sync_jobs.len();
+        let count = self.sync.jobs.len();
         if count == 0 {
             self.notify_toast(
                 "등록된 동기화 작업이 없습니다",
@@ -386,15 +387,15 @@ impl AppRoot {
             return;
         }
 
-        if let Ok(mut state) = self.sync_state.lock() {
-            state.jobs = self.sync_jobs.clone();
-            state.run_now = self.sync_jobs.iter().map(|job| job.id.clone()).collect();
+        if let Ok(mut state) = self.sync.shared.lock() {
+            state.jobs = self.sync.jobs.clone();
+            state.run_now = self.sync.jobs.iter().map(|job| job.id.clone()).collect();
         }
         self.persist_sync_jobs_config();
-        for job in &self.sync_jobs {
-            self.sync_status.insert(
+        for job in &self.sync.jobs {
+            self.sync.status.insert(
                 job.id.clone(),
-                super::SyncJobStatus {
+                SyncJobStatus {
                     last_run: None,
                     summary: "실행 요청됨 — 결과를 기다리는 중입니다.".to_string(),
                     failed: false,
@@ -415,7 +416,7 @@ impl AppRoot {
     /// 동기화 스레드는 실행 중 공유 뮤텍스를 잡고 있지 않으므로 중지 신호는 원자 플래그로
     /// 보낸다. 이미 복사된 파일은 되돌리지 않고, 대기 중인 수동 요청 큐도 함께 비운다.
     pub(crate) fn request_sync_stop(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if self.sync_running.is_none() {
+        if self.sync.running.is_none() {
             self.notify_toast(
                 "실행 중인 동기화가 없습니다",
                 NotificationType::Warning,
@@ -425,12 +426,12 @@ impl AppRoot {
             return;
         }
 
-        if let Ok(mut state) = self.sync_state.lock() {
+        if let Ok(mut state) = self.sync.shared.lock() {
             state.cancel.store(true, Ordering::Relaxed);
             state.run_now.clear();
         }
 
-        if let Some(running) = self.sync_running.as_mut() {
+        if let Some(running) = self.sync.running.as_mut() {
             running.stopping = true;
         }
 
@@ -440,8 +441,8 @@ impl AppRoot {
     }
 
     pub(crate) fn toggle_sync_failure_suppression(&mut self, key: &str) {
-        if !self.suppressed_sync_failures.remove(key) {
-            self.suppressed_sync_failures.insert(key.to_string());
+        if !self.sync.suppressed_failures.remove(key) {
+            self.sync.suppressed_failures.insert(key.to_string());
         }
     }
 }

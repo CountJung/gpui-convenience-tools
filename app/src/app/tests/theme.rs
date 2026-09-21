@@ -39,7 +39,7 @@ fn assert_sync_notify_switch_toggles(
         (
             theme.mode,
             theme.theme_name().to_string(),
-            view.read(app).sync_notify_enabled,
+            view.read(app).sync.notify_enabled,
         )
     });
     assert_eq!(mode, expected_mode, "theme mode should be applied");
@@ -52,11 +52,11 @@ fn assert_sync_notify_switch_toggles(
     assert!(!initial, "each theme scenario should start switched off");
 
     click_debug_element(cx, "sync-notify-toggle");
-    let checked = cx.update(|_, app| view.read(app).sync_notify_enabled);
+    let checked = cx.update(|_, app| view.read(app).sync.notify_enabled);
     assert!(checked, "clicking the rendered switch should turn it on");
 
     click_debug_element(cx, "sync-notify-toggle");
-    let checked = cx.update(|_, app| view.read(app).sync_notify_enabled);
+    let checked = cx.update(|_, app| view.read(app).sync.notify_enabled);
     assert!(
         !checked,
         "clicking the rendered switch again should turn it off"
@@ -68,7 +68,7 @@ fn rendered_switch_toggles_in_light_dark_and_missing_switch_token_theme(cx: &mut
     initialize_components(cx);
     let (view, cx) = cx.add_window_view(|_, _| {
         let mut root = test_app_root(ActivePanel::FileSync);
-        root.sync_notify_enabled = false;
+        root.sync.notify_enabled = false;
         root
     });
 

@@ -9,6 +9,7 @@ mod theme;
 mod virtual_disk;
 
 use super::*;
+use super::state::SyncRunning;
 use crate::config::{SyncJob, BUNDLED_THEMES};
 use crate::platform::NativeWindowHandle;
 use crate::sync::{SyncFailure, SyncOutcome};
@@ -18,7 +19,7 @@ use gpui::{
 };
 use gpui_component::theme::{ActiveTheme, Theme, ThemeMode, ThemeSet};
 use std::sync::atomic::Ordering as AtomicOrdering;
-use std::{cell::Cell, rc::Rc};
+use std::{cell::Cell, collections::{HashMap, HashSet}, rc::Rc};
 
 const DEFAULT_WINDOW_WIDTH: f32 = 1000.0;
 const DEFAULT_WINDOW_HEIGHT: f32 = 700.0;
@@ -79,31 +80,28 @@ fn test_app_root(active_panel: ActivePanel) -> AppRoot {
             presets: crate::config::default_interval_presets(),
             ..IntervalPicker::default()
         },
-        sys_services: Vec::new(),
-        service_search_query: String::new(),
-        service_search_input: None,
-        svc_scroll_handle: VirtualListScrollHandle::new(),
-        svc_right_scroll: ScrollHandle::default(),
-        pending_delete_service: None,
-        service_filter: ServiceFilter::All,
-        favorite_services: Vec::new(),
-        sync_enabled: true,
-        sync_jobs: Vec::new(),
-        selected_sync_job: None,
-        sync_status: HashMap::new(),
-        sync_failures: Vec::new(),
-        sync_running: None,
-        suppressed_sync_failures: HashSet::new(),
-        sync_notify_enabled: true,
-        sync_name_input: None,
-        sync_source_input: None,
-        sync_target_input: None,
-        sync_exclude_input: None,
-        sync_page_scroll: ScrollHandle::default(),
-        sync_state: Arc::new(Mutex::new(SyncSharedState::default())),
-        external_side_effects_enabled: false,
-        ad_left_scroll: ScrollHandle::default(),
-        ad_right_scroll: ScrollHandle::default(),
+        services: ServiceState {
+            filter: ServiceFilter::All,
+            ..ServiceState::default()
+        },
+        sync: SyncState {
+            enabled: true,
+            jobs: Vec::new(),
+            selected_job: None,
+            status: HashMap::new(),
+            failures: Vec::new(),
+            running: None,
+            suppressed_failures: HashSet::new(),
+            notify_enabled: true,
+            name_input: None,
+            source_input: None,
+            target_input: None,
+            exclude_input: None,
+            page_scroll: ScrollHandle::default(),
+            shared: Arc::new(Mutex::new(SyncSharedState::default())),
+            external_side_effects_enabled: false,
+        },
+        ad_block: AdBlockState::default(),
         virtual_disk: super::virtual_disk_ops::VirtualDiskSession::default(),
         virtual_disk_page_scroll: ScrollHandle::default(),
         log_config: LogConfig::default(),

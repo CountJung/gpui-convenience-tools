@@ -28,7 +28,7 @@ pub fn render(this: &mut AppRoot, window: &mut Window, cx: &mut Context<AppRoot>
     // ensure_service_search_input은 cx를 mut으로 빌리므로 theme() 이전에 호출
     this.ensure_service_search_input(window, cx);
 
-    let right_scroll = this.svc_right_scroll.clone();
+    let right_scroll = this.services.right_scroll.clone();
     let list = render_service_list(this, cx);
     let settings = render_view_settings(this, cx);
 
@@ -42,8 +42,8 @@ pub fn render(this: &mut AppRoot, window: &mut Window, cx: &mut Context<AppRoot>
 }
 
 fn render_service_list(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElement {
-    let pending_delete = this.pending_delete_service.clone();
-    let svc_scroll = this.svc_scroll_handle.clone();
+    let pending_delete = this.services.pending_delete.clone();
+    let svc_scroll = this.services.scroll.clone();
 
     let theme = cx.theme();
 
@@ -51,11 +51,11 @@ fn render_service_list(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElem
     let is_elevated = this.platform.is_elevated();
 
     // ── 검색 + 상태 필터 ──
-    let search = this.service_search_query.to_lowercase();
-    let filter = this.service_filter;
-    let favorites = this.favorite_services.clone();
+    let search = this.services.search_query.to_lowercase();
+    let filter = this.services.filter;
+    let favorites = this.services.favorites.clone();
     let filtered_indices: Rc<Vec<usize>> = Rc::new(
-        this.sys_services
+        this.services.items
             .iter()
             .enumerate()
             .filter(|(_, svc)| {
@@ -75,11 +75,11 @@ fn render_service_list(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElem
             .map(|(ix, _)| ix)
             .collect(),
     );
-    let total_count = this.sys_services.len();
+    let total_count = this.services.items.len();
     let filtered_count = filtered_indices.len();
 
     // ── 서비스 목록 본문 ──
-    let list_body: AnyElement = if this.sys_services.is_empty() {
+    let list_body: AnyElement = if this.services.items.is_empty() {
         div()
             .px_3()
             .py_4()
@@ -114,7 +114,7 @@ fn render_service_list(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElem
                         let Some(&svc_ix) = idx.get(list_ix) else {
                             return div().h(px(88.0));
                         };
-                        let Some(svc) = this.sys_services.get(svc_ix) else {
+                        let Some(svc) = this.services.items.get(svc_ix) else {
                             return div().h(px(88.0));
                         };
 
@@ -331,7 +331,7 @@ fn render_service_list(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElem
                                                                       _ev,
                                                                       _window,
                                                                       cx| {
-                                                                    this.pending_delete_service =
+                                                                    this.services.pending_delete =
                                                                         Some(name_delete.clone());
                                                                     cx.notify();
                                                                 },
@@ -451,7 +451,7 @@ fn render_service_list(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElem
                                                     );
                                                 }
                                             }
-                                            this.pending_delete_service = None;
+                                            this.services.pending_delete = None;
                                             cx.notify();
                                         }),
                                     ),
@@ -462,7 +462,7 @@ fn render_service_list(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElem
                                     ui::Size::Md,
                                     ButtonStyle::secondary(cx),
                                     cx.listener(|this, _ev, _window, cx| {
-                                        this.pending_delete_service = None;
+                                        this.services.pending_delete = None;
                                         cx.notify();
                                     }),
                                 )),
@@ -538,9 +538,9 @@ fn render_view_settings(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyEle
     let border = theme.border;
     let card = theme.secondary;
 
-    let search_input = this.service_search_input.clone();
-    let current_filter = this.service_filter;
-    let favorite_count = this.favorite_services.len();
+    let search_input = this.services.search_input.clone();
+    let current_filter = this.services.filter;
+    let favorite_count = this.services.favorites.len();
     let is_elevated = this.platform.is_elevated();
 
     let mut filter_rows = v_flex().gap_2();
@@ -558,7 +558,7 @@ fn render_view_settings(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyEle
                 .border_color(if is_selected { theme.primary_hover } else { border })
                 .hover(|s| s.bg(theme.secondary_hover))
                 .on_click(cx.listener(move |this, _ev, _window, cx| {
-                    this.service_filter = filter;
+                    this.services.filter = filter;
                     cx.notify();
                 }))
                 .child(

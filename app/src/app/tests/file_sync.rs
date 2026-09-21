@@ -7,7 +7,7 @@ fn file_sync_unified_page_uses_full_width_and_scrolls_to_last_record(cx: &mut Te
     initialize_components(cx);
     let (view, cx) = cx.add_window_view(|_, _| {
         let mut root = test_app_root(ActivePanel::FileSync);
-        root.sync_jobs = (0..12)
+        root.sync.jobs = (0..12)
             .map(|index| SyncJob {
                 name: format!("검증 작업 {index}"),
                 source: format!(r"D:\validation\source-{index}"),
@@ -15,8 +15,8 @@ fn file_sync_unified_page_uses_full_width_and_scrolls_to_last_record(cx: &mut Te
                 ..SyncJob::default()
             })
             .collect();
-        root.selected_sync_job = Some(0);
-        root.sync_failures = (0..12)
+        root.sync.selected_job = Some(0);
+        root.sync.failures = (0..12)
             .map(|index| SyncFailure {
                 path: format!("failure-{index}.txt"),
                 reason: "검증용 공유 위반".to_string(),
@@ -56,14 +56,14 @@ fn file_sync_unified_page_uses_full_width_and_scrolls_to_last_record(cx: &mut Te
         "File Sync sections should fill the viewport width within page padding: \
          viewport={viewport:?}, jobs={job_card:?}"
     );
-    let max_scroll = cx.update(|_, app| view.read(app).sync_page_scroll.max_offset().height);
+    let max_scroll = cx.update(|_, app| view.read(app).sync.page_scroll.max_offset().height);
     assert!(
         max_scroll > px(0.0),
         "compact unified File Sync page should overflow"
     );
 
     wheel_to_end(cx, "file-sync-page", -10000.0);
-    let offset = cx.update(|_, app| view.read(app).sync_page_scroll.offset().y);
+    let offset = cx.update(|_, app| view.read(app).sync.page_scroll.offset().y);
     assert!(
         offset < px(0.0),
         "wheel input should move the unified page scroll offset"
@@ -76,11 +76,11 @@ fn file_sync_exclude_patterns_editor_is_multiline_and_contained(cx: &mut TestApp
     initialize_components(cx);
     let (_view, cx) = cx.add_window_view(|_, _| {
         let mut root = test_app_root(ActivePanel::FileSync);
-        root.sync_jobs = vec![SyncJob {
+        root.sync.jobs = vec![SyncJob {
             exclude_patterns: vec!["*.tmp".to_string(), "cache/**".to_string()],
             ..SyncJob::default()
         }];
-        root.selected_sync_job = Some(0);
+        root.sync.selected_job = Some(0);
         root
     });
 
@@ -148,14 +148,14 @@ fn file_sync_status_bar_stays_visible_at_compact_height_while_running(cx: &mut T
     initialize_components(cx);
     let (view, cx) = cx.add_window_view(|_, _| {
         let mut root = test_app_root(ActivePanel::FileSync);
-        root.sync_jobs = (0..12)
+        root.sync.jobs = (0..12)
             .map(|index| SyncJob {
                 name: format!("검증 작업 {index}"),
                 ..SyncJob::default()
             })
             .collect();
-        root.selected_sync_job = Some(0);
-        root.sync_failures = (0..12)
+        root.sync.selected_job = Some(0);
+        root.sync.failures = (0..12)
             .map(|index| SyncFailure {
                 path: format!("failure-{index}.txt"),
                 reason: "검증용 공유 위반".to_string(),
@@ -177,8 +177,8 @@ fn file_sync_status_bar_stays_visible_at_compact_height_while_running(cx: &mut T
 
     cx.update(|_, app| {
         view.update(app, |root, _| {
-            root.sync_running = Some(SyncRunning {
-                id: root.sync_jobs[0].id.clone(),
+            root.sync.running = Some(SyncRunning {
+                id: root.sync.jobs[0].id.clone(),
                 label: "검증 작업 0".to_string(),
                 current_path: r"docs\report\2026\분기보고서.xlsx".to_string(),
                 copied: 12,
@@ -235,8 +235,8 @@ fn file_sync_stop_button_requests_cancellation_and_clears_pending_queue(cx: &mut
     initialize_components(cx);
     let (view, cx) = cx.add_window_view(|_, _| {
         let mut root = test_app_root(ActivePanel::FileSync);
-        root.sync_jobs = vec![SyncJob::default(), SyncJob::default()];
-        root.selected_sync_job = Some(0);
+        root.sync.jobs = vec![SyncJob::default(), SyncJob::default()];
+        root.sync.selected_job = Some(0);
         root
     });
 
@@ -247,7 +247,7 @@ fn file_sync_stop_button_requests_cancellation_and_clears_pending_queue(cx: &mut
     click_debug_element(cx, "sync-stop");
     cx.update(|_, app| {
         let root = view.read(app);
-        let shared = root.sync_state.lock().expect("sync shared state");
+        let shared = root.sync.shared.lock().expect("sync shared state");
         assert!(
             !shared.cancel.load(AtomicOrdering::Relaxed),
             "an idle stop press must not arm cancellation for the next run"
@@ -257,9 +257,9 @@ fn file_sync_stop_button_requests_cancellation_and_clears_pending_queue(cx: &mut
     // 실행 중 + 대기 큐가 있는 상태로 만든 뒤 중지한다.
     let second_id = cx.update(|_, app| {
         view.update(app, |root, _| {
-            let running_id = root.sync_jobs[0].id.clone();
-            let queued_id = root.sync_jobs[1].id.clone();
-            root.sync_running = Some(SyncRunning {
+            let running_id = root.sync.jobs[0].id.clone();
+            let queued_id = root.sync.jobs[1].id.clone();
+            root.sync.running = Some(SyncRunning {
                 id: running_id,
                 label: "검증 작업".to_string(),
                 current_path: "a.txt".to_string(),
@@ -268,7 +268,7 @@ fn file_sync_stop_button_requests_cancellation_and_clears_pending_queue(cx: &mut
                 failed: 0,
                 stopping: false,
             });
-            root.sync_state
+            root.sync.shared
                 .lock()
                 .expect("sync shared state")
                 .run_now = vec![queued_id.clone()];
@@ -282,13 +282,13 @@ fn file_sync_stop_button_requests_cancellation_and_clears_pending_queue(cx: &mut
     cx.update(|_, app| {
         let root = view.read(app);
         assert!(
-            root.sync_running
+            root.sync.running
                 .as_ref()
                 .expect("still running until the engine reports back")
                 .stopping,
             "the stop press should mark the run as stopping"
         );
-        let shared = root.sync_state.lock().expect("sync shared state");
+        let shared = root.sync.shared.lock().expect("sync shared state");
         assert!(
             shared.cancel.load(AtomicOrdering::Relaxed),
             "the engine cancel flag should be armed"
@@ -305,19 +305,19 @@ fn sync_failures_log_one_summary_line_instead_of_one_entry_per_file(cx: &mut Tes
     initialize_components(cx);
     let (view, cx) = cx.add_window_view(|_, _| {
         let mut root = test_app_root(ActivePanel::FileSync);
-        root.sync_jobs = vec![SyncJob::default()];
-        root.selected_sync_job = Some(0);
+        root.sync.jobs = vec![SyncJob::default()];
+        root.sync.selected_job = Some(0);
         root.app_state.log_entries.clear();
         // 이 테스트는 로그 기록만 검증한다. 실패 토스트는 gpui-component `Root`가 필요해
         // 테스트 창에서 띄울 수 없으므로 끈다.
-        root.sync_notify_enabled = false;
+        root.sync.notify_enabled = false;
         root
     });
 
     cx.simulate_resize(size(px(DEFAULT_WINDOW_WIDTH), px(DEFAULT_WINDOW_HEIGHT)));
     refresh(cx);
 
-    let id = cx.update(|_, app| view.read(app).sync_jobs[0].id.clone());
+    let id = cx.update(|_, app| view.read(app).sync.jobs[0].id.clone());
     let failures: Vec<SyncFailure> = (0..25)
         .map(|index| SyncFailure {
             path: format!("locked-{index}.xlsx"),
@@ -369,7 +369,7 @@ fn sync_failures_log_one_summary_line_instead_of_one_entry_per_file(cx: &mut Tes
             error_lines[0]
         );
         assert_eq!(
-            root.sync_failures.len(),
+            root.sync.failures.len(),
             25,
             "the failure list itself still keeps every recorded entry"
         );
@@ -381,8 +381,8 @@ fn background_sync_event_wakes_render_without_additional_user_input(cx: &mut Tes
     initialize_components(cx);
     let (view, cx) = cx.add_window_view(|_, cx| {
         let mut root = test_app_root(ActivePanel::FileSync);
-        root.sync_jobs = vec![SyncJob::default()];
-        root.selected_sync_job = Some(0);
+        root.sync.jobs = vec![SyncJob::default()];
+        root.sync.selected_job = Some(0);
         AppRoot::start_event_refresh_loop(cx);
         root
     });
@@ -400,7 +400,7 @@ fn background_sync_event_wakes_render_without_additional_user_input(cx: &mut Tes
 
     let (id, tx) = cx.update(|_, app| {
         let root = view.read(app);
-        (root.sync_jobs[0].id.clone(), root.event_tx.clone())
+        (root.sync.jobs[0].id.clone(), root.event_tx.clone())
     });
     tx.send(PlatformEvent::SyncFinished {
         id: id.clone(),
@@ -423,7 +423,7 @@ fn background_sync_event_wakes_render_without_additional_user_input(cx: &mut Tes
     cx.update(|_, app| {
         let status = view
             .read(app)
-            .sync_status
+            .sync.status
             .get(&id)
             .cloned()
             .expect("timer notification should trigger render and consume the event");
@@ -437,8 +437,8 @@ fn file_sync_run_button_saves_current_inputs_and_queues_selected_job(cx: &mut Te
     initialize_components(cx);
     let (view, cx) = cx.add_window_view(|_, _| {
         let mut root = test_app_root(ActivePanel::FileSync);
-        root.sync_jobs = vec![SyncJob::default()];
-        root.selected_sync_job = Some(0);
+        root.sync.jobs = vec![SyncJob::default()];
+        root.sync.selected_job = Some(0);
         root
     });
 
@@ -449,10 +449,10 @@ fn file_sync_run_button_saves_current_inputs_and_queues_selected_job(cx: &mut Te
         let (name, source, target, exclude) = {
             let root = view.read(app);
             (
-                root.sync_name_input.clone().expect("name input"),
-                root.sync_source_input.clone().expect("source input"),
-                root.sync_target_input.clone().expect("target input"),
-                root.sync_exclude_input.clone().expect("exclude patterns input"),
+                root.sync.name_input.clone().expect("name input"),
+                root.sync.source_input.clone().expect("source input"),
+                root.sync.target_input.clone().expect("target input"),
+                root.sync.exclude_input.clone().expect("exclude patterns input"),
             )
         };
         name.update(app, |state, cx| state.set_value("즉시 백업", window, cx));
@@ -471,19 +471,19 @@ fn file_sync_run_button_saves_current_inputs_and_queues_selected_job(cx: &mut Te
 
     cx.update(|_, app| {
         let root = view.read(app);
-        let job = &root.sync_jobs[0];
+        let job = &root.sync.jobs[0];
         assert_eq!(job.name, "즉시 백업");
         assert_eq!(job.source, r"D:\validation\source");
         assert_eq!(job.target, r"E:\validation\target");
         assert_eq!(job.exclude_patterns, vec!["*.tmp", "cache/**"]);
         assert_eq!(
-            root.sync_status
+            root.sync.status
                 .get(&job.id)
                 .expect("queued status")
                 .summary,
             "실행 요청됨 — 결과를 기다리는 중입니다."
         );
-        let shared = root.sync_state.lock().expect("sync shared state");
+        let shared = root.sync.shared.lock().expect("sync shared state");
         assert_eq!(shared.jobs[0].source, job.source);
         assert_eq!(shared.jobs[0].target, job.target);
         assert_eq!(shared.run_now, vec![job.id.clone()]);
@@ -499,13 +499,13 @@ fn file_sync_sections_share_one_width_at_every_window_width(cx: &mut TestAppCont
     initialize_components(cx);
     let (_view, cx) = cx.add_window_view(|_, _| {
         let mut root = test_app_root(ActivePanel::FileSync);
-        root.sync_jobs = vec![SyncJob {
+        root.sync.jobs = vec![SyncJob {
             name: "디스크백업".to_string(),
             source: r"D:\원본".to_string(),
             target: r"E:\대상".to_string(),
             ..SyncJob::default()
         }];
-        root.selected_sync_job = Some(0);
+        root.sync.selected_job = Some(0);
         root
     });
 
@@ -556,10 +556,10 @@ fn sidebar_switch_turns_automatic_sync_off_and_on(cx: &mut TestAppContext) {
     initialize_components(cx);
     let (view, cx) = cx.add_window_view(|_, _| {
         let mut root = test_app_root(ActivePanel::Dashboard);
-        root.sync_jobs = vec![SyncJob::default()];
-        root.selected_sync_job = Some(0);
+        root.sync.jobs = vec![SyncJob::default()];
+        root.sync.selected_job = Some(0);
         // 이 테스트는 상태 전이만 본다. 토스트는 gpui-component `Root`가 필요해 띄울 수 없다.
-        root.sync_notify_enabled = false;
+        root.sync.notify_enabled = false;
         root
     });
 
@@ -568,9 +568,9 @@ fn sidebar_switch_turns_automatic_sync_off_and_on(cx: &mut TestAppContext) {
 
     cx.update(|_, app| {
         let root = view.read(app);
-        assert!(root.sync_enabled, "기본값은 켜짐이다");
+        assert!(root.sync.enabled, "기본값은 켜짐이다");
         assert!(
-            root.sync_state
+            root.sync.shared
                 .lock()
                 .expect("sync shared state")
                 .auto_enabled
@@ -581,10 +581,10 @@ fn sidebar_switch_turns_automatic_sync_off_and_on(cx: &mut TestAppContext) {
 
     cx.update(|_, app| {
         let root = view.read(app);
-        assert!(!root.sync_enabled, "스위치를 누르면 꺼져야 한다");
+        assert!(!root.sync.enabled, "스위치를 누르면 꺼져야 한다");
         assert!(
             !root
-                .sync_state
+                .sync.shared
                 .lock()
                 .expect("sync shared state")
                 .auto_enabled,
@@ -595,9 +595,9 @@ fn sidebar_switch_turns_automatic_sync_off_and_on(cx: &mut TestAppContext) {
     click_debug_element(cx, "global-sync-switch");
     cx.update(|_, app| {
         let root = view.read(app);
-        assert!(root.sync_enabled);
+        assert!(root.sync.enabled);
         assert!(
-            root.sync_state
+            root.sync.shared
                 .lock()
                 .expect("sync shared state")
                 .auto_enabled
@@ -611,13 +611,13 @@ fn changing_the_folders_drops_the_resume_cursor(cx: &mut TestAppContext) {
     initialize_components(cx);
     let (view, cx) = cx.add_window_view(|_, _| {
         let mut root = test_app_root(ActivePanel::FileSync);
-        root.sync_jobs = vec![SyncJob {
+        root.sync.jobs = vec![SyncJob {
             source: r"D:\원본".to_string(),
             target: r"E:\대상".to_string(),
             ..SyncJob::default()
         }];
-        root.selected_sync_job = Some(0);
-        root.sync_notify_enabled = false;
+        root.sync.selected_job = Some(0);
+        root.sync.notify_enabled = false;
         root
     });
 
@@ -626,8 +626,8 @@ fn changing_the_folders_drops_the_resume_cursor(cx: &mut TestAppContext) {
 
     let id = cx.update(|_, app| {
         let root = view.read(app);
-        let id = root.sync_jobs[0].id.clone();
-        root.sync_state
+        let id = root.sync.jobs[0].id.clone();
+        root.sync.shared
             .lock()
             .expect("sync shared state")
             .cursors
@@ -638,7 +638,7 @@ fn changing_the_folders_drops_the_resume_cursor(cx: &mut TestAppContext) {
     // 이름만 바꾸는 저장은 위치를 유지한다.
     cx.update(|window, app| {
         view.update(app, |root, cx| {
-            let name = root.sync_name_input.clone().expect("name input");
+            let name = root.sync.name_input.clone().expect("name input");
             name.update(cx, |state, cx| state.set_value("이름만 변경", window, cx));
         });
     });
@@ -647,7 +647,7 @@ fn changing_the_folders_drops_the_resume_cursor(cx: &mut TestAppContext) {
     cx.update(|_, app| {
         assert!(
             view.read(app)
-                .sync_state
+                .sync.shared
                 .lock()
                 .expect("sync shared state")
                 .cursors
@@ -659,7 +659,7 @@ fn changing_the_folders_drops_the_resume_cursor(cx: &mut TestAppContext) {
     // 원본 폴더를 바꾸면 버린다.
     cx.update(|window, app| {
         view.update(app, |root, cx| {
-            let source = root.sync_source_input.clone().expect("source input");
+            let source = root.sync.source_input.clone().expect("source input");
             source.update(cx, |state, cx| state.set_value(r"D:\다른원본", window, cx));
         });
     });
@@ -670,13 +670,13 @@ fn changing_the_folders_drops_the_resume_cursor(cx: &mut TestAppContext) {
         let root = view.read(app);
         assert!(
             !root
-                .sync_state
+                .sync.shared
                 .lock()
                 .expect("sync shared state")
                 .cursors
                 .contains_key(&id),
             "다른 폴더를 가리키는 커서로 이어서 돌면 새 원본의 앞부분을 통째로 건너뛴다"
         );
-        assert!(root.sync_jobs[0].resume_cursor.is_none());
+        assert!(root.sync.jobs[0].resume_cursor.is_none());
     });
 }

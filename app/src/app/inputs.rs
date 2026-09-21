@@ -59,7 +59,7 @@ impl AppRoot {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        if self.service_search_input.is_some() {
+        if self.services.search_input.is_some() {
             return;
         }
         let input = cx.new(|cx| InputState::new(window, cx).placeholder("서비스 이름 검색"));
@@ -67,24 +67,24 @@ impl AppRoot {
             &input,
             |this: &mut Self, input: Entity<InputState>, ev: &InputEvent, cx| {
                 if let InputEvent::Change = ev {
-                    this.service_search_query = input.read(cx).value().to_string();
+                    this.services.search_query = input.read(cx).value().to_string();
                     cx.notify();
                 }
             },
         );
-        self.service_search_input = Some(input);
+        self.services.search_input = Some(input);
         self.subscriptions.push(subscription);
     }
 
     /// 동기화 작업 편집용 입력 4종을 준비한다.
     pub(crate) fn ensure_sync_inputs(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if self.sync_name_input.is_some() {
+        if self.sync.name_input.is_some() {
             return;
         }
 
         let job = self
-            .selected_sync_job
-            .and_then(|ix| self.sync_jobs.get(ix))
+            .sync.selected_job
+            .and_then(|ix| self.sync.jobs.get(ix))
             .cloned()
             .unwrap_or_default();
 
@@ -116,8 +116,8 @@ impl AppRoot {
             |this: &mut Self, input: Entity<InputState>, ev: &InputEvent, cx| {
                 if let InputEvent::Change = ev {
                     let value = input.read(cx).value().to_string();
-                    if let Some(ix) = this.selected_sync_job {
-                        if let Some(job) = this.sync_jobs.get_mut(ix) {
+                    if let Some(ix) = this.sync.selected_job {
+                        if let Some(job) = this.sync.jobs.get_mut(ix) {
                             job.name = value;
                         }
                         this.persist_sync_jobs();
@@ -127,10 +127,10 @@ impl AppRoot {
             },
         );
 
-        self.sync_name_input = Some(name);
-        self.sync_source_input = Some(source);
-        self.sync_target_input = Some(target);
-        self.sync_exclude_input = Some(exclude);
+        self.sync.name_input = Some(name);
+        self.sync.source_input = Some(source);
+        self.sync.target_input = Some(target);
+        self.sync.exclude_input = Some(exclude);
         self.subscriptions.push(name_sub);
     }
 }

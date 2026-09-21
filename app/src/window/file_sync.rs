@@ -20,7 +20,7 @@ use crate::window::ui::{self, ButtonStyle};
 pub fn render(this: &mut AppRoot, window: &mut Window, cx: &mut Context<AppRoot>) -> AnyElement {
     this.ensure_sync_inputs(window, cx);
 
-    let page_scroll = this.sync_page_scroll.clone();
+    let page_scroll = this.sync.page_scroll.clone();
     let jobs = render_job_list(this, cx);
     let settings = render_job_settings(this, window, cx);
     let failures = render_failures(this, cx);
@@ -74,7 +74,7 @@ fn render_status_bar(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElemen
         .px_3()
         .py_2();
 
-    let Some(running) = this.sync_running.clone() else {
+    let Some(running) = this.sync.running.clone() else {
         return bar
             .child(ui::badge("대기 중", ui::Tone::Muted, ui::Size::Sm, cx))
             .child(
@@ -124,13 +124,13 @@ fn render_job_list(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElement 
     let muted_fg = theme.muted_foreground;
     let border = theme.border;
     let card = theme.secondary;
-    let selected_idx = this.selected_sync_job;
+    let selected_idx = this.sync.selected_job;
 
     let neutral_btn = ButtonStyle::neutral(cx);
     let primary_btn = ButtonStyle::primary(cx);
-    let is_running = this.sync_running.is_some();
+    let is_running = this.sync.running.is_some();
     let stopping = this
-        .sync_running
+        .sync.running
         .as_ref()
         .is_some_and(|running| running.stopping);
     let stop_btn = if is_running {
@@ -141,7 +141,7 @@ fn render_job_list(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElement 
 
     // ── 작업 행 ──
     let mut rows = v_flex();
-    if this.sync_jobs.is_empty() {
+    if this.sync.jobs.is_empty() {
         rows = rows.child(
             div()
                 .px_3()
@@ -150,14 +150,14 @@ fn render_job_list(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElement 
                 .child("등록된 동기화 작업이 없습니다. '새 작업'으로 추가하세요."),
         );
     } else {
-        for (ix, job) in this.sync_jobs.iter().enumerate() {
+        for (ix, job) in this.sync.jobs.iter().enumerate() {
             let is_selected = selected_idx == Some(ix);
             let label = job.label();
             let source = job.source.clone();
             let target = job.target.clone();
             let enabled = job.enabled;
             let interval = job.interval_secs;
-            let status = this.sync_status.get(&job.id).cloned().unwrap_or_default();
+            let status = this.sync.status.get(&job.id).cloned().unwrap_or_default();
 
             rows = rows.child(
                 div()
@@ -294,7 +294,7 @@ fn render_job_settings(
     let primary_btn = ButtonStyle::primary(cx);
     let danger_btn = ButtonStyle::danger(cx);
 
-    let Some(selected) = this.selected_sync_job else {
+    let Some(selected) = this.sync.selected_job else {
         return v_flex()
             .w_full()
             .gap_3()
@@ -312,14 +312,14 @@ fn render_job_settings(
             .into_any_element();
     };
 
-    let Some(job) = this.sync_jobs.get(selected).cloned() else {
+    let Some(job) = this.sync.jobs.get(selected).cloned() else {
         return div().into_any_element();
     };
 
-    let name_input = this.sync_name_input.clone();
-    let source_input = this.sync_source_input.clone();
-    let target_input = this.sync_target_input.clone();
-    let exclude_input = this.sync_exclude_input.clone();
+    let name_input = this.sync.name_input.clone();
+    let source_input = this.sync.source_input.clone();
+    let target_input = this.sync.target_input.clone();
+    let exclude_input = this.sync.exclude_input.clone();
 
     let interval_row = crate::window::interval::render(this, IntervalTarget::Sync, window, cx);
 
@@ -507,16 +507,16 @@ fn render_failures(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElement 
     let neutral_btn = ButtonStyle::neutral(cx);
 
     let mut failures = v_flex().gap_1();
-    if this.sync_failures.is_empty() {
+    if this.sync.failures.is_empty() {
         failures = failures.child(
             div()
                 .text_color(muted_fg)
                 .child("동기화 실패 기록이 없습니다."),
         );
     } else {
-        for (ix, failure) in this.sync_failures.iter().enumerate().take(50) {
+        for (ix, failure) in this.sync.failures.iter().enumerate().take(50) {
             let key = failure.key();
-            let suppressed = this.suppressed_sync_failures.contains(&key);
+            let suppressed = this.sync.suppressed_failures.contains(&key);
             failures = failures.child(
                 h_flex()
                     .debug_selector(move || format!("sync-failure-row-{ix}"))
@@ -559,8 +559,8 @@ fn render_failures(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElement 
         }
     }
 
-    let notify_enabled = this.sync_notify_enabled;
-    let has_failures = !this.sync_failures.is_empty();
+    let notify_enabled = this.sync.notify_enabled;
+    let has_failures = !this.sync.failures.is_empty();
 
     div()
         .debug_selector(|| "file-sync-failures-card".to_string())
@@ -593,7 +593,7 @@ fn render_failures(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElement 
                                             )
                                             .on_click(
                                                 cx.listener(|this, checked: &bool, _window, cx| {
-                                                    this.sync_notify_enabled = *checked;
+                                                    this.sync.notify_enabled = *checked;
                                                     cx.notify();
                                                 }),
                                             ),
@@ -606,7 +606,7 @@ fn render_failures(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElement 
                                         ui::Size::Md,
                                         neutral_btn,
                                         cx.listener(|this, _ev, _window, cx| {
-                                            this.sync_failures.clear();
+                                            this.sync.failures.clear();
                                             cx.notify();
                                         }),
                                     )

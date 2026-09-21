@@ -87,8 +87,8 @@ impl AppRoot {
         match target {
             IntervalTarget::Scan => self.scan_interval_secs,
             IntervalTarget::Sync => self
-                .selected_sync_job
-                .and_then(|ix| self.sync_jobs.get(ix))
+                .sync.selected_job
+                .and_then(|ix| self.sync.jobs.get(ix))
                 .map(|job| job.interval_secs)
                 .unwrap_or_default(),
         }
@@ -302,7 +302,7 @@ impl AppRoot {
         let presets = self.interval_picker.presets.clone();
 
         #[cfg(test)]
-        if !self.external_side_effects_enabled {
+        if !self.sync.external_side_effects_enabled {
             return;
         }
 

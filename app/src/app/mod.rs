@@ -21,6 +21,7 @@ mod interval;
 mod ops;
 mod state;
 mod sync_ops;
+mod ui_state;
 mod virtual_disk_copy;
 mod virtual_disk_ops;
 
@@ -30,8 +31,10 @@ pub(crate) use virtual_disk_copy::{
     VIRTUAL_DISK_KEY_CONTEXT,
 };
 
-pub use state::{ActivePanel, AppState, LogEntry, SyncJobStatus, SyncRunning, TargetApp};
+pub use state::{ActivePanel, AppState, LogEntry, TargetApp};
 use state::{PlatformEvent, ScannerState, SyncSharedState, NAV_SYSTEM, NAV_TOOLS};
+pub use ui_state::ServiceFilter;
+use ui_state::{AdBlockState, ServiceState, SyncState};
 use virtual_disk_ops::VirtualDiskSession;
 
 use gpui::{
@@ -49,7 +52,6 @@ use gpui_component::{
     v_flex, VirtualListScrollHandle, TITLE_BAR_HEIGHT,
 };
 use std::{
-    collections::{HashMap, HashSet},
     sync::{Arc, Mutex},
     time::Duration,
 };
@@ -57,10 +59,8 @@ use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 
 use crate::config::{
     default_interval_presets, load_config, normalize_interval_presets, update_config, LogConfig,
-    SyncJob,
 };
-use crate::platform::{NativePlatform, Platform, SysServiceInfo};
-use crate::sync::SyncFailure;
+use crate::platform::{NativePlatform, Platform};
 use crate::window::{
     ad_block, dashboard, file_sync, log_view, service_mgr, service_view, settings, ui,
     virtual_disk,
@@ -86,40 +86,10 @@ pub struct AppRoot {
     /// 스캔 주기·감시 주기가 공유하는 주기 선택 상태.
     pub(crate) interval_picker: IntervalPicker,
 
-    // ── 서비스 관리 ──
-    pub(crate) sys_services: Vec<SysServiceInfo>,
-    pub(crate) service_search_query: String,
-    pub(crate) service_search_input: Option<Entity<InputState>>,
-    pub(crate) svc_scroll_handle: VirtualListScrollHandle,
-    pub(crate) svc_right_scroll: ScrollHandle,
-    pub(crate) pending_delete_service: Option<String>,
-    pub(crate) service_filter: ServiceFilter,
-    pub(crate) favorite_services: Vec<String>,
-
-    // ── 파일 동기화 ──
-    /// 자동 동기화 전역 스위치. 사이드바에서 바로 끌 수 있다.
-    pub(crate) sync_enabled: bool,
-    pub(crate) sync_jobs: Vec<SyncJob>,
-    pub(crate) selected_sync_job: Option<usize>,
-    /// 작업 ID → 최근 실행 결과. 인덱스 대신 ID로 매칭해 삭제 시 어긋나지 않게 한다.
-    pub(crate) sync_status: HashMap<String, SyncJobStatus>,
-    pub(crate) sync_failures: Vec<SyncFailure>,
-    /// 실행 중인 작업의 진행 상황. 없으면 유휴 상태다.
-    pub(crate) sync_running: Option<SyncRunning>,
-    pub(crate) suppressed_sync_failures: HashSet<String>,
-    pub(crate) sync_notify_enabled: bool,
-    pub(crate) sync_name_input: Option<Entity<InputState>>,
-    pub(crate) sync_source_input: Option<Entity<InputState>>,
-    pub(crate) sync_target_input: Option<Entity<InputState>>,
-    pub(crate) sync_exclude_input: Option<Entity<InputState>>,
-    pub(crate) sync_page_scroll: ScrollHandle,
-    sync_state: Arc<Mutex<SyncSharedState>>,
-    #[cfg(test)]
-    external_side_effects_enabled: bool,
-
-    // ── 광고 차단 패널 ──
-    pub(crate) ad_left_scroll: ScrollHandle,
-    pub(crate) ad_right_scroll: ScrollHandle,
+    // ── 기능별 패널 상태 ──
+    pub(crate) services: ServiceState,
+    pub(crate) sync: SyncState,
+    pub(crate) ad_block: AdBlockState,
 
     // ── VirtualBox 오프라인 디스크 탐색 ──
     pub(crate) virtual_disk: VirtualDiskSession,
@@ -130,16 +100,6 @@ pub struct AppRoot {
 
     sidebar_scroll_handle: ScrollHandle,
     content_scroll_handle: ScrollHandle,
-}
-
-/// 서비스 목록 상태 필터.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
-pub enum ServiceFilter {
-    #[default]
-    All,
-    Running,
-    Stopped,
-    Favorites,
 }
 
 impl AppRoot {
@@ -201,7 +161,7 @@ impl AppRoot {
                     .map(|cursor| (job.id.clone(), cursor))
             })
             .collect();
-        let sync_state = Arc::new(Mutex::new(SyncSharedState {
+        let sync_shared = Arc::new(Mutex::new(SyncSharedState {
             jobs: sync_jobs.clone(),
             auto_enabled: sync_enabled,
             cursors,
@@ -232,7 +192,7 @@ impl AppRoot {
             event_tx.clone(),
             Arc::clone(&scanner_state),
         );
-        Self::spawn_sync_loop(event_tx.clone(), Arc::clone(&sync_state));
+        Self::spawn_sync_loop(event_tx.clone(), Arc::clone(&sync_shared));
 
         let running_processes = platform.list_running_processes().unwrap_or_default();
         let selected_sync_job = (!sync_jobs.is_empty()).then_some(0);
@@ -256,34 +216,29 @@ impl AppRoot {
                 ..IntervalPicker::default()
             },
 
-            sys_services: Vec::new(),
-            service_search_query: String::new(),
-            service_search_input: None,
-            svc_scroll_handle: VirtualListScrollHandle::new(),
-            svc_right_scroll: ScrollHandle::default(),
-            pending_delete_service: None,
-            service_filter: ServiceFilter::All,
-            favorite_services,
-
-            sync_enabled,
-            sync_jobs,
-            selected_sync_job,
-            sync_status: HashMap::new(),
-            sync_failures: Vec::new(),
-            sync_running: None,
-            suppressed_sync_failures: HashSet::new(),
-            sync_notify_enabled: true,
-        sync_name_input: None,
-        sync_source_input: None,
-        sync_target_input: None,
-        sync_exclude_input: None,
-        sync_page_scroll: ScrollHandle::default(),
-            sync_state,
-            #[cfg(test)]
-            external_side_effects_enabled: true,
-
-            ad_left_scroll: ScrollHandle::default(),
-            ad_right_scroll: ScrollHandle::default(),
+            services: ServiceState {
+                favorites: favorite_services,
+                ..ServiceState::default()
+            },
+            sync: SyncState {
+                enabled: sync_enabled,
+                jobs: sync_jobs,
+                selected_job: selected_sync_job,
+                status: Default::default(),
+                failures: Vec::new(),
+                running: None,
+                suppressed_failures: Default::default(),
+                notify_enabled: true,
+                name_input: None,
+                source_input: None,
+                target_input: None,
+                exclude_input: None,
+                page_scroll: ScrollHandle::default(),
+                shared: sync_shared,
+                #[cfg(test)]
+                external_side_effects_enabled: true,
+            },
+            ad_block: AdBlockState::default(),
 
             virtual_disk: VirtualDiskSession::default(),
             virtual_disk_page_scroll: ScrollHandle::default(),
@@ -385,7 +340,7 @@ impl AppRoot {
         self.render_sidebar_switch(
             "global-sync-switch",
             "파일 동기화",
-            self.sync_enabled,
+            self.sync.enabled,
             |this, checked, window, cx| this.set_sync_enabled(checked, window, cx),
             cx,
         )
@@ -555,12 +510,12 @@ impl AppRoot {
                 }
             }
             ActivePanel::Services => {
-                if self.sys_services.is_empty() {
+                if self.services.items.is_empty() {
                     self.refresh_sys_services();
                 }
             }
             ActivePanel::FileSync => {
-                if self.selected_sync_job.is_none() && !self.sync_jobs.is_empty() {
+                if self.sync.selected_job.is_none() && !self.sync.jobs.is_empty() {
                     self.select_sync_job(0, window, cx);
                 }
             }

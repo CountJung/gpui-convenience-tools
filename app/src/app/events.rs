@@ -43,7 +43,7 @@ impl AppRoot {
         cx: &mut Context<Self>,
     ) {
         #[cfg(test)]
-        if !self.external_side_effects_enabled {
+        if !self.sync.external_side_effects_enabled {
             return;
         }
 
@@ -109,7 +109,7 @@ impl AppRoot {
                     );
                 }
                 PlatformEvent::SyncAutoToggled(enabled) => {
-                    self.sync_enabled = enabled;
+                    self.sync.enabled = enabled;
                     self.apply_sync_enabled();
                     self.push_log(
                         "INFO",
@@ -152,7 +152,7 @@ impl AppRoot {
                 }
                 PlatformEvent::SyncStarted { id, label } => {
                     self.push_log("INFO", format!("[{label}] 동기화를 시작했습니다."));
-                    self.sync_running = Some(SyncRunning {
+                    self.sync.running = Some(SyncRunning {
                         id,
                         label,
                         current_path: String::new(),
@@ -171,7 +171,7 @@ impl AppRoot {
                 } => {
                     // 앞선 작업이 끝난 뒤 늦게 도착한 보고는 무시한다.
                     if let Some(running) = self
-                        .sync_running
+                        .sync.running
                         .as_mut()
                         .filter(|running| running.id == id)
                     {
@@ -183,11 +183,11 @@ impl AppRoot {
                 }
                 PlatformEvent::SyncFinished { id, label, outcome } => {
                     if self
-                        .sync_running
+                        .sync.running
                         .as_ref()
                         .is_some_and(|running| running.id == id)
                     {
-                        self.sync_running = None;
+                        self.sync.running = None;
                     }
                     self.handle_sync_finished(id, label, outcome, window, cx);
                 }
@@ -223,11 +223,11 @@ impl AppRoot {
         cx: &mut Context<Self>,
     ) {
         // 실행 중 작업이 삭제됐을 수 있으므로 아직 존재할 때만 상태를 반영한다.
-        if !self.sync_jobs.iter().any(|job| job.id == id) {
+        if !self.sync.jobs.iter().any(|job| job.id == id) {
             return;
         }
 
-        self.sync_status.insert(
+        self.sync.status.insert(
             id,
             SyncJobStatus {
                 last_run: Some(crate::logging::now_hms()),
@@ -251,14 +251,14 @@ impl AppRoot {
         let mut newly_recorded = 0usize;
         for failure in &outcome.failures {
             let key = failure.key();
-            if self.sync_failures.iter().any(|f| f.key() == key) {
+            if self.sync.failures.iter().any(|f| f.key() == key) {
                 continue;
             }
 
-            self.sync_failures.push(failure.clone());
+            self.sync.failures.push(failure.clone());
             newly_recorded += 1;
 
-            if !self.suppressed_sync_failures.contains(&key) {
+            if !self.sync.suppressed_failures.contains(&key) {
                 unsuppressed_new += 1;
             }
         }
@@ -275,13 +275,13 @@ impl AppRoot {
 
         // 기록 상한
         const MAX_TRACKED_FAILURES: usize = 300;
-        if self.sync_failures.len() > MAX_TRACKED_FAILURES {
-            let excess = self.sync_failures.len() - MAX_TRACKED_FAILURES;
-            self.sync_failures.drain(0..excess);
+        if self.sync.failures.len() > MAX_TRACKED_FAILURES {
+            let excess = self.sync.failures.len() - MAX_TRACKED_FAILURES;
+            self.sync.failures.drain(0..excess);
         }
         self.log_scroll_handle.scroll_to_bottom();
 
-        if unsuppressed_new > 0 && self.sync_notify_enabled {
+        if unsuppressed_new > 0 && self.sync.notify_enabled {
             window.push_notification(
                 Notification::new()
                     .message(format!(

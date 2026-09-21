@@ -255,7 +255,7 @@ fn service_rows_keep_names_readable_at_supported_window_widths(cx: &mut TestAppC
 
     cx.update(|_, app| {
         view.update(app, |root, cx| {
-            root.sys_services = vec![SysServiceInfo {
+            root.services.items = vec![SysServiceInfo {
                 name: "LongBackgroundServiceIdentifier".to_string(),
                 display_name: "긴 Windows 백그라운드 서비스 표시 이름".to_string(),
                 status: SysServiceStatus::Running,

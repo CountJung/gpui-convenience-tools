@@ -145,26 +145,26 @@ impl AppRoot {
 
     pub(crate) fn refresh_sys_services(&mut self) {
         match self.platform.list_sys_services() {
-            Ok(services) => self.sys_services = services,
+            Ok(services) => self.services.items = services,
             Err(err) => log::error!("서비스 목록 조회 실패: {err}"),
         }
     }
 
     pub(crate) fn toggle_favorite_service(&mut self, name: &str) {
-        if let Some(pos) = self.favorite_services.iter().position(|n| n == name) {
-            self.favorite_services.remove(pos);
+        if let Some(pos) = self.services.favorites.iter().position(|n| n == name) {
+            self.services.favorites.remove(pos);
         } else {
-            self.favorite_services.push(name.to_string());
+            self.services.favorites.push(name.to_string());
         }
 
-        let favorites = self.favorite_services.clone();
+        let favorites = self.services.favorites.clone();
         if let Err(err) = update_config(move |cfg| cfg.favorite_services = favorites) {
             log::error!("즐겨찾기 저장 실패: {err}");
         }
     }
 
     pub(crate) fn is_favorite_service(&self, name: &str) -> bool {
-        self.favorite_services.iter().any(|n| n == name)
+        self.services.favorites.iter().any(|n| n == name)
     }
 
     /// 서비스 뷰에서 발생하는 동작 결과를 로그 패널에 기록한다.

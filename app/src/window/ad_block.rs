@@ -22,8 +22,8 @@ use crate::window::{balanced_split, scroll_pane, SETTINGS_PANE_MIN_WIDTH};
 const FEATURE_PANE_MIN_WIDTH: gpui::Pixels = px(320.0);
 
 pub fn render(this: &mut AppRoot, window: &mut Window, cx: &mut Context<AppRoot>) -> AnyElement {
-    let left_scroll = this.ad_left_scroll.clone();
-    let right_scroll = this.ad_right_scroll.clone();
+    let left_scroll = this.ad_block.left_scroll.clone();
+    let right_scroll = this.ad_block.right_scroll.clone();
 
     let feature = render_status_and_targets(this, cx);
     let settings = render_settings(this, window, cx);
