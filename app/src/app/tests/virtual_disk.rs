@@ -13,6 +13,51 @@ struct TestGuestSource {
 
 struct ErrorOnNestedDirectorySource;
 
+struct TreeGuestSource;
+
+impl GuestFileSource for TreeGuestSource {
+    fn filesystem(&self) -> GuestFileSystem {
+        GuestFileSystem::ntfs_3_1()
+    }
+
+    fn list_directory(
+        &mut self,
+        directory: &GuestFileEntry,
+    ) -> Result<Vec<GuestFileEntry>, VirtualDiskError> {
+        let file = |path: &str| GuestFileEntry {
+            path: crate::virtual_disk::GuestPath::new(path).unwrap(),
+            kind: GuestFileKind::File,
+            size_bytes: 24,
+            attributes: Default::default(),
+            times: Default::default(),
+        };
+        let folder = |path: &str| GuestFileEntry {
+            path: crate::virtual_disk::GuestPath::new(path).unwrap(),
+            kind: GuestFileKind::Directory,
+            size_bytes: 0,
+            attributes: Default::default(),
+            times: Default::default(),
+        };
+
+        Ok(match directory.path.as_str() {
+            "" => vec![folder("Users")],
+            "Users" => vec![folder("Users/Public")],
+            "Users/Public" => vec![file("Users/Public/report.txt")],
+            _ => Vec::new(),
+        })
+    }
+
+    fn read_at(
+        &mut self,
+        _file: &GuestFileEntry,
+        _offset: u64,
+        buffer: &mut [u8],
+    ) -> Result<usize, VirtualDiskError> {
+        buffer.fill(0);
+        Ok(buffer.len())
+    }
+}
+
 impl GuestFileSource for ErrorOnNestedDirectorySource {
     fn filesystem(&self) -> GuestFileSystem {
         GuestFileSystem::ntfs_3_1()
@@ -142,6 +187,14 @@ fn virtual_disk_panel_registers_navigation_and_renders_read_only_shell(cx: &mut 
         "current guest path should be rendered"
     );
     assert!(
+        cx.debug_bounds("virtual-disk-tree-scroll").is_some(),
+        "folder tree should be rendered"
+    );
+    assert!(
+        cx.debug_bounds("virtual-disk-entry-scroll").is_some(),
+        "file list should be rendered"
+    );
+    assert!(
         cx.debug_bounds("virtual-disk-refresh").is_some(),
         "directory refresh action should be rendered"
     );
@@ -165,6 +218,80 @@ fn virtual_disk_panel_registers_navigation_and_renders_read_only_shell(cx: &mut 
         cx.debug_bounds("virtual-disk-safety-notice").is_some(),
         "read-only safety boundary should be rendered"
     );
+}
+
+#[gpui::test]
+fn virtual_disk_folder_tree_navigates_nested_paths_without_repeated_list_clicks(
+    cx: &mut TestAppContext,
+) {
+    initialize_components(cx);
+    let (view, cx) = cx.add_window_view(|_, _| {
+        let mut root = test_app_root(ActivePanel::VirtualDisk);
+        root.virtual_disk.vdi_path = Some(std::path::PathBuf::from("fixture.vdi"));
+        root.virtual_disk.source = Some(Box::new(TreeGuestSource));
+        root
+    });
+
+    cx.simulate_resize(size(px(DEFAULT_WINDOW_WIDTH), px(DEFAULT_WINDOW_HEIGHT)));
+    refresh(cx);
+    cx.update(|_, app| {
+        view.update(app, |root, cx| root.refresh_virtual_disk_directory(cx));
+    });
+    refresh(cx);
+
+    assert!(cx.debug_bounds("virtual-disk-tree-node-Users").is_some());
+    click_debug_element(cx, "virtual-disk-tree-node-Users");
+
+    let (current_path, entry_count) = cx.update(|_, app| {
+        let root = view.read(app);
+        (
+            root.virtual_disk.current_path.to_string(),
+            root.virtual_disk.entries.len(),
+        )
+    });
+    assert_eq!(current_path, "Users");
+    assert_eq!(entry_count, 1, "tree navigation should load the child folder");
+    assert!(cx.debug_bounds("virtual-disk-tree-node-Users-Public").is_some());
+}
+
+#[gpui::test]
+fn virtual_disk_explorer_keeps_tree_and_file_list_inside_compact_card(
+    cx: &mut TestAppContext,
+) {
+    initialize_components(cx);
+    let (_view, cx) = cx.add_window_view(|_, _| loaded_virtual_disk_root());
+
+    for width in [MIN_SUPPORTED_WINDOW_WIDTH, DEFAULT_WINDOW_WIDTH, 1280.0] {
+        cx.simulate_resize(size(px(width), px(DEFAULT_WINDOW_HEIGHT)));
+        refresh(cx);
+
+        let card = cx
+            .debug_bounds("virtual-disk-directory-card")
+            .expect("directory card should be rendered");
+        let tree = cx
+            .debug_bounds("virtual-disk-tree-scroll")
+            .expect("tree scroll should be rendered");
+        let entries = cx
+            .debug_bounds("virtual-disk-entry-scroll")
+            .expect("entry scroll should be rendered");
+        let card_right = card.origin.x + card.size.width;
+        let card_bottom = card.origin.y + card.size.height;
+
+        assert!(
+            tree.origin.x >= card.origin.x
+                && tree.origin.x + tree.size.width <= card_right
+                && tree.origin.y >= card.origin.y
+                && tree.origin.y + tree.size.height <= card_bottom,
+            "folder tree should stay inside compact directory card: card={card:?}, tree={tree:?}"
+        );
+        assert!(
+            entries.origin.x >= card.origin.x
+                && entries.origin.x + entries.size.width <= card_right
+                && entries.origin.y >= card.origin.y
+                && entries.origin.y + entries.size.height <= card_bottom,
+            "file list should stay inside compact directory card: card={card:?}, entries={entries:?}"
+        );
+    }
 }
 
 #[gpui::test]
@@ -219,7 +346,7 @@ fn virtual_disk_panel_renders_loaded_hidden_entries_and_selects_all_with_ctrl_a(
     assert!(cx.debug_bounds("virtual-disk-entry-0").is_some());
     assert!(cx.debug_bounds("virtual-disk-entry-1").is_some());
 
-    click_debug_element(cx, "virtual-disk-directory-card");
+    click_debug_element(cx, "virtual-disk-entry-0");
     cx.simulate_keystrokes("ctrl-a");
     refresh(cx);
 
@@ -367,6 +494,7 @@ fn virtual_disk_panel_renders_copy_progress_and_issue_summary(cx: &mut TestAppCo
         });
     });
     refresh(cx);
+    wheel_to_end(cx, "virtual-disk-page", -1200.0);
 
     assert!(cx.debug_bounds("virtual-disk-copy-summary").is_some());
     assert!(cx.debug_bounds("virtual-disk-copy-start").is_some());
@@ -374,7 +502,6 @@ fn virtual_disk_panel_renders_copy_progress_and_issue_summary(cx: &mut TestAppCo
         cx.debug_bounds("virtual-disk-issue-suppress-0").is_some(),
         "each copy issue should expose a repeat-notification suppression action"
     );
-
     click_debug_element(cx, "virtual-disk-issue-suppress-0");
     let suppressed = cx.update(|_, app| {
         view.read(app)

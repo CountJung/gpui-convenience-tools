@@ -32,6 +32,7 @@ pub(crate) use virtual_disk_copy::{
     init_virtual_disk_keymap, CopySelected, EnterSelected, ParentDirectory, Refresh, SelectAll,
     VIRTUAL_DISK_KEY_CONTEXT,
 };
+pub(crate) use virtual_disk_ops::GuestDirectoryTreeNode;
 
 pub use state::{ActivePanel, AppState, LogEntry, TargetApp};
 use state::{PlatformEvent, ScannerState, SyncSharedState, NAV_SYSTEM, NAV_TOOLS};

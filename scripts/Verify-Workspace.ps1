@@ -34,6 +34,8 @@ $visualTests = @(
     "virtual_disk_panel_explains_unsupported_partition_state",
     "virtual_disk_panel_renders_loaded_hidden_entries_and_selects_all_with_ctrl_a",
     "virtual_disk_directory_row_double_click_enters_directory_and_refreshes_entries",
+    "virtual_disk_folder_tree_navigates_nested_paths_without_repeated_list_clicks",
+    "virtual_disk_explorer_keeps_tree_and_file_list_inside_compact_card",
     "virtual_disk_panel_renders_copy_progress_and_issue_summary",
     "virtual_disk_panel_dispatches_explorer_shortcuts_when_directory_is_focused"
 )

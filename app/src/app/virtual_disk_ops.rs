@@ -6,7 +6,7 @@
 
 use std::{collections::{BTreeSet, HashSet}, path::PathBuf};
 
-use gpui::{AppContext, Context, Entity, FocusHandle, PathPromptOptions, Window};
+use gpui::{AppContext, Context, Entity, FocusHandle, PathPromptOptions, ScrollHandle, Window};
 use gpui_component::{input::{InputEvent, InputState}, notification::NotificationType};
 
 use crate::virtual_disk::{
@@ -17,6 +17,26 @@ use crate::virtual_disk::{
 
 use super::virtual_disk_copy::VirtualDiskCopyState;
 use super::AppRoot;
+
+/// VDI 탐색기 왼쪽 트리에 표시할 지연 로딩 디렉터리 노드.
+#[derive(Clone, Debug)]
+pub(crate) struct GuestDirectoryTreeNode {
+    pub(crate) entry: GuestFileEntry,
+    pub(crate) children: Vec<GuestFileEntry>,
+    pub(crate) expanded: bool,
+    pub(crate) loaded: bool,
+}
+
+impl GuestDirectoryTreeNode {
+    fn root() -> Self {
+        Self {
+            entry: GuestFileEntry::root(),
+            children: Vec::new(),
+            expanded: true,
+            loaded: false,
+        }
+    }
+}
 
 /// VDE-013에서 사용하는 오프라인 VDI 탐색 세션.
 pub(crate) struct VirtualDiskSession {
@@ -31,6 +51,9 @@ pub(crate) struct VirtualDiskSession {
     pub(crate) entries: Vec<GuestFileEntry>,
     pub(crate) selected_paths: HashSet<GuestPath>,
     pub(crate) selection_anchor: Option<GuestPath>,
+    pub(crate) directory_tree: Vec<GuestDirectoryTreeNode>,
+    pub(crate) tree_scroll_handle: ScrollHandle,
+    pub(crate) entries_scroll_handle: ScrollHandle,
     pub(crate) focus_handle: Option<FocusHandle>,
     pub(crate) copy: VirtualDiskCopyState,
     pub(crate) source: Option<Box<dyn GuestFileSource>>,
@@ -53,6 +76,9 @@ impl Default for VirtualDiskSession {
             entries: Vec::new(),
             selected_paths: HashSet::new(),
             selection_anchor: None,
+            directory_tree: vec![GuestDirectoryTreeNode::root()],
+            tree_scroll_handle: ScrollHandle::default(),
+            entries_scroll_handle: ScrollHandle::default(),
             focus_handle: None,
             copy: VirtualDiskCopyState::default(),
             source: None,
@@ -206,6 +232,7 @@ impl AppRoot {
         self.virtual_disk.source = None;
         self.virtual_disk.vdi_path = None;
         self.virtual_disk.current_path = GuestPath::root();
+        self.virtual_disk.directory_tree = vec![GuestDirectoryTreeNode::root()];
 
         if path_text.is_empty() {
             self.set_virtual_disk_error("VDI 파일 경로를 입력하세요".to_string(), cx);
@@ -268,6 +295,7 @@ impl AppRoot {
                 self.virtual_disk.current_path = initial_guest_path.unwrap_or_else(GuestPath::root);
                 self.virtual_disk.selected_paths.clear();
                 self.virtual_disk.selection_anchor = None;
+                self.virtual_disk.directory_tree = vec![GuestDirectoryTreeNode::root()];
                 self.refresh_virtual_disk_directory(cx);
             }
             Err(error) => {
@@ -289,8 +317,9 @@ impl AppRoot {
             return;
         };
 
+        let current_path = self.virtual_disk.current_path.clone();
         let directory = GuestFileEntry {
-            path: self.virtual_disk.current_path.clone(),
+            path: current_path.clone(),
             kind: GuestFileKind::Directory,
             size_bytes: 0,
             attributes: GuestFileAttributes::default(),
@@ -317,7 +346,8 @@ impl AppRoot {
                 {
                     self.virtual_disk.selection_anchor = None;
                 }
-                self.virtual_disk.entries = entries;
+                self.virtual_disk.entries = entries.clone();
+                self.update_virtual_disk_tree_node(&current_path, &entries);
                 self.virtual_disk.error = None;
             }
             Err(error) => {
@@ -328,6 +358,158 @@ impl AppRoot {
                 self.virtual_disk.selection_anchor = None;
                 self.set_virtual_disk_error(format_virtual_disk_error(&error), cx);
             }
+        }
+    }
+
+    /// 왼쪽 폴더 트리에서 디렉터리를 선택한다. 하위 목록은 처음 선택할 때만 읽는다.
+    pub(crate) fn select_virtual_disk_tree_directory(
+        &mut self,
+        path: GuestPath,
+        cx: &mut Context<Self>,
+    ) {
+        if !self.virtual_disk_tree_node_loaded(&path)
+            && !self.load_virtual_disk_tree_node(&path, cx)
+        {
+            return;
+        }
+
+        if self.virtual_disk.current_path == path {
+            if let Some(node) = self
+                .virtual_disk
+                .directory_tree
+                .iter_mut()
+                .find(|node| node.entry.path == path)
+            {
+                node.expanded = !node.expanded;
+            }
+        } else {
+            if let Some(node) = self
+                .virtual_disk
+                .directory_tree
+                .iter_mut()
+                .find(|node| node.entry.path == path)
+            {
+                node.expanded = true;
+            }
+            self.virtual_disk.current_path = path;
+            self.virtual_disk.selected_paths.clear();
+            self.virtual_disk.selection_anchor = None;
+            self.refresh_virtual_disk_directory(cx);
+        }
+        cx.notify();
+    }
+
+    /// 테스트 fixture처럼 UI 상태에만 목록을 주입한 경우에도 루트 트리를 표시한다.
+    pub(crate) fn ensure_virtual_disk_tree_from_current_entries(&mut self) {
+        let path = self.virtual_disk.current_path.clone();
+        if !self.virtual_disk_tree_node_loaded(&path) {
+            let entries = self.virtual_disk.entries.clone();
+            self.update_virtual_disk_tree_node(&path, &entries);
+        }
+    }
+
+    fn load_virtual_disk_tree_node(&mut self, path: &GuestPath, cx: &mut Context<Self>) -> bool {
+        let Some(source) = self.virtual_disk.source.as_mut() else {
+            self.set_virtual_disk_error("먼저 NTFS 파티션을 선택해야 합니다".to_string(), cx);
+            return false;
+        };
+
+        let directory = GuestFileEntry {
+            path: path.clone(),
+            kind: GuestFileKind::Directory,
+            size_bytes: 0,
+            attributes: GuestFileAttributes::default(),
+            times: Default::default(),
+        };
+        match source.list_directory(&directory) {
+            Ok(entries) => {
+                self.update_virtual_disk_tree_node(path, &entries);
+                true
+            }
+            Err(error) => {
+                self.set_virtual_disk_error(format_virtual_disk_error(&error), cx);
+                false
+            }
+        }
+    }
+
+    fn virtual_disk_tree_node_loaded(&self, path: &GuestPath) -> bool {
+        self.virtual_disk
+            .directory_tree
+            .iter()
+            .find(|node| &node.entry.path == path)
+            .is_some_and(|node| node.loaded)
+    }
+
+    fn update_virtual_disk_tree_node(&mut self, path: &GuestPath, entries: &[GuestFileEntry]) {
+        self.ensure_virtual_disk_tree_path(path);
+        let children = entries
+            .iter()
+            .filter(|entry| entry.is_directory())
+            .cloned()
+            .collect();
+        if let Some(node) = self
+            .virtual_disk
+            .directory_tree
+            .iter_mut()
+            .find(|node| &node.entry.path == path)
+        {
+            node.children = children;
+            node.loaded = true;
+        }
+    }
+
+    fn ensure_virtual_disk_tree_path(&mut self, path: &GuestPath) {
+        if self.virtual_disk.directory_tree.is_empty() {
+            self.virtual_disk
+                .directory_tree
+                .push(GuestDirectoryTreeNode::root());
+        }
+
+        let mut parent_path = GuestPath::root();
+        for component in path.as_str().split('/').filter(|component| !component.is_empty()) {
+            let child_path = parent_path
+                .join(component)
+                .expect("normalized guest path component must be valid");
+            if !self
+                .virtual_disk
+                .directory_tree
+                .iter()
+                .any(|node| node.entry.path == child_path)
+            {
+                self.virtual_disk.directory_tree.push(GuestDirectoryTreeNode {
+                    entry: GuestFileEntry {
+                        path: child_path.clone(),
+                        kind: GuestFileKind::Directory,
+                        size_bytes: 0,
+                        attributes: GuestFileAttributes::default(),
+                        times: Default::default(),
+                    },
+                    children: Vec::new(),
+                    expanded: true,
+                    loaded: false,
+                });
+            }
+
+            let child_entry = self
+                .virtual_disk
+                .directory_tree
+                .iter()
+                .find(|node| node.entry.path == child_path)
+                .map(|node| node.entry.clone())
+                .expect("tree child was inserted");
+            if let Some(parent) = self
+                .virtual_disk
+                .directory_tree
+                .iter_mut()
+                .find(|node| node.entry.path == parent_path)
+            {
+                parent.expanded = true;
+                if !parent.children.iter().any(|entry| entry.path == child_path) {
+                    parent.children.push(child_entry);
+                }
+            }
+            parent_path = child_path;
         }
     }
 
