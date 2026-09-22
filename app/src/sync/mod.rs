@@ -27,6 +27,8 @@ use crate::config::{SymlinkMode, SyncJob};
 pub struct SyncProgress<'a> {
     /// 원본 기준 상대 경로.
     pub current_path: &'a str,
+    /// 이번 실행에서 진행 대상으로 계산된 항목 수.
+    pub total: Option<usize>,
     pub copied: usize,
     pub skipped: usize,
     pub failed: usize,
@@ -41,6 +43,7 @@ pub struct SyncControl<'a> {
     cancel: Option<&'a AtomicBool>,
     on_progress: Option<&'a mut dyn FnMut(SyncProgress<'_>)>,
     resume: Option<Resume>,
+    total: Option<usize>,
 }
 
 impl<'a> SyncControl<'a> {
@@ -57,6 +60,12 @@ impl<'a> SyncControl<'a> {
     /// 진행 상황 콜백을 연결한다.
     pub fn on_progress(mut self, reporter: &'a mut dyn FnMut(SyncProgress<'_>)) -> Self {
         self.on_progress = Some(reporter);
+        self
+    }
+
+    /// 사전 순회에서 계산한 진행 대상 수를 연결한다.
+    pub fn total(mut self, total: Option<usize>) -> Self {
+        self.total = total;
         self
     }
 
@@ -84,6 +93,7 @@ impl<'a> SyncControl<'a> {
         };
         reporter(SyncProgress {
             current_path,
+            total: self.total,
             copied: outcome.copied,
             skipped: outcome.skipped,
             failed: outcome.failures.len() + outcome.truncated_failures,
@@ -359,6 +369,55 @@ pub fn run_sync_job_with_control(job: &SyncJob, control: &mut SyncControl<'_>) -
     outcome
 }
 
+/// 동기화 본 순회 전에 진행률 분모를 계산한다.
+///
+/// 실제 순회와 동일하게 제외 항목·숨김 항목·심볼릭 링크를 한 개의 처리 단위로 세고,
+/// 일반 디렉터리는 내부 항목만 센다. 읽기 권한 등으로 트리를 끝까지 확인할 수 없으면
+/// `None`을 반환해 UI가 부정확한 진행률을 표시하지 않도록 한다.
+pub fn count_sync_entries(job: &SyncJob) -> Option<usize> {
+    let source = Path::new(job.source.trim());
+    if job.source.trim().is_empty() || !source.is_dir() {
+        return None;
+    }
+
+    count_sync_dir(source, source, job)
+}
+
+fn count_sync_dir(source: &Path, root: &Path, job: &SyncJob) -> Option<usize> {
+    let mut entries: Vec<_> = fs::read_dir(source).ok()?.collect::<Result<_, _>>().ok()?;
+    entries.sort_by_key(|entry: &fs::DirEntry| entry.file_name());
+
+    let mut count = 0;
+    for entry in entries {
+        let src_path = entry.path();
+        let relative_path = relative_label(&src_path, root);
+        if job
+            .exclude_patterns
+            .iter()
+            .any(|pattern| matches_exclude_pattern(pattern, &relative_path))
+        {
+            count += 1;
+            continue;
+        }
+
+        let meta = fs::symlink_metadata(&src_path).ok()?;
+        if !job.include_hidden && has_hidden_or_system_attribute(&src_path, &meta) {
+            count += 1;
+            continue;
+        }
+
+        if meta.file_type().is_symlink() {
+            count += 1;
+        } else if meta.is_dir() {
+            count += count_sync_dir(&src_path, root, job)?;
+        } else {
+            count += 1;
+        }
+    }
+
+    Some(count)
+}
+
 /// `source` 하위를 재귀적으로 순회하며 `target`에 반영한다.
 ///
 /// `root`는 실패 메시지에 표시할 상대 경로 계산 기준, `depth`는 이어서 시작 지점을 찾을 때
@@ -444,6 +503,7 @@ fn sync_dir(
 
         if !job.include_hidden && has_hidden_or_system_attribute(&src_path, &meta) {
             outcome.skipped += 1;
+            control.report(&relative_path, outcome);
             continue;
         }
 

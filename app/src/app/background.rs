@@ -18,7 +18,7 @@ use super::state::{PlatformEvent, ScannerState, SyncSharedState};
 use super::AppRoot;
 use super::watch::WatchManager;
 use crate::platform::{AdWindowSnapshot, NativeWindowHandle, Platform};
-use crate::sync::{run_sync_job_with_control, SyncControl, SyncProgress};
+use crate::sync::{count_sync_entries, run_sync_job_with_control, SyncControl, SyncProgress};
 
 /// 진행 상황 이벤트 최소 간격.
 ///
@@ -345,12 +345,14 @@ impl AppRoot {
                         .lock()
                         .ok()
                         .and_then(|state| state.cursors.get(&job.id).cloned());
+                    let total = count_sync_entries(job);
 
                     // 이전 실행에서 남은 중지 요청이 새 작업을 곧바로 끊지 않게 한다.
                     cancel.store(false, Ordering::Relaxed);
                     let _ = event_tx.send(PlatformEvent::SyncStarted {
                         id: job.id.clone(),
                         label: label.clone(),
+                        total,
                     });
 
                     // 진행 위치는 콜백 안에서 갱신하고 실행이 끝난 뒤 읽어야 하므로
@@ -384,6 +386,7 @@ impl AppRoot {
                             let _ = progress_tx.send(PlatformEvent::SyncProgress {
                                 id: progress_id.clone(),
                                 current_path: progress.current_path.to_string(),
+                                total: progress.total,
                                 copied: progress.copied,
                                 skipped: progress.skipped,
                                 failed: progress.failed,
@@ -392,6 +395,7 @@ impl AppRoot {
 
                         let mut control = SyncControl::new()
                             .cancel_flag(&cancel)
+                            .total(total)
                             .on_progress(&mut reporter);
                         if let Some(from) = resume_from.as_deref() {
                             control = control.resume_from(from);

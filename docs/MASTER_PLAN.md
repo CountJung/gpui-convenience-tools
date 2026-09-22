@@ -1130,6 +1130,27 @@ flowchart TD
 `syncs_three_thousand_files_and_reports_elapsed_time`와
 `measures_configured_vdi_directory_walk_passes` 수동 테스트에 측정 경계를 고정했다.
 
+#### D-007 — 사전 순회 총량 이벤트 연결 완료 ✅
+
+- `count_sync_entries`가 실제 동기화와 같은 제외 패턴·숨김/시스템·심볼릭 링크 정책으로
+  처리 단위를 먼저 계산하고, 접근 오류가 있으면 `None`으로 내려 부정확한 분모를 만들지
+  않는다. 동기화 엔진의 `SyncProgress`·백그라운드 `PlatformEvent`·`SyncRunning`에
+  `total`을 전달했다.
+- 숨김 항목도 건너뜀 진행 보고를 남기도록 보강했고, `pre_scan_counts_the_same_processable_entries_as_sync_progress`로 사전 수와 실제 보고 단위가 일치하는지 고정했다.
+
+`cargo test -p gpui-convenience-tools --all-targets --all-features --locked`에서 173 passed·5 ignored를 통과했다.
+
+#### D-008 — 동기화 진행률 바 완료 ✅
+
+- 파일 동기화 하단 고정 상태 표시줄에 `gpui_component::progress::Progress`를 연결했다.
+  총량이 없으면 표시하지 않고, 총량이 0이면 100%, 그 외에는 복사·건너뜀·실패 누계를
+  분모와 비교해 0~100%로 보정한다.
+- `file_sync_status_bar_stays_visible_at_compact_height_while_running`에서 920px 폭·
+  480px 높이 실행 상태의 진행률 바가 상태 표시줄 내부를 벗어나지 않는지 확인했다.
+
+전체 테스트·Clippy `-D warnings`·문서/구조 게이트와 release 시각 검증 결과는
+`VERIFICATION.md`에 기록한다.
+
 #### D-001 — 제외 패턴 설정 스키마 완료 ✅
 
 - `SyncJob`에 `exclude_patterns: Vec<String>`을 추가하고 `#[serde(default)]`로 기존

@@ -70,11 +70,13 @@ pub(crate) enum PlatformEvent {
     SyncStarted {
         id: String,
         label: String,
+        total: Option<usize>,
     },
     /// 실행 중 진행 상황. 백그라운드가 빈도를 제한해 보내므로 파일마다 오지는 않는다.
     SyncProgress {
         id: String,
         current_path: String,
+        total: Option<usize>,
         copied: usize,
         skipped: usize,
         failed: usize,
@@ -141,6 +143,8 @@ pub struct SyncRunning {
     pub label: String,
     /// 마지막으로 보고된 처리 중 파일(원본 기준 상대 경로).
     pub current_path: String,
+    /// 사전 순회에서 계산한 이번 실행의 처리 대상 수.
+    pub total: Option<usize>,
     pub copied: usize,
     pub skipped: usize,
     pub failed: usize,
@@ -155,6 +159,21 @@ impl SyncRunning {
             "복사 {} · 건너뜀 {} · 실패 {}",
             self.copied, self.skipped, self.failed
         )
+    }
+
+    /// 현재까지 보고된 처리 단위 수.
+    pub fn processed(&self) -> usize {
+        self.copied + self.skipped + self.failed
+    }
+
+    /// 진행률 표시줄에 사용할 백분율. 사전 순회가 실패하면 표시하지 않는다.
+    pub fn progress_percent(&self) -> Option<f32> {
+        let total = self.total?;
+        if total == 0 {
+            return Some(100.0);
+        }
+
+        Some((self.processed() as f32 / total as f32 * 100.0).clamp(0.0, 100.0))
     }
 
     /// 하단 상태 표시줄에 넣을 현재 파일 경로.

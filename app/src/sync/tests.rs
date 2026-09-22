@@ -49,6 +49,36 @@ fn count_files_for_measurement(root: &Path) -> usize {
 }
 
 #[test]
+fn pre_scan_counts_the_same_processable_entries_as_sync_progress() {
+    let root = temp_dir("progress-total");
+    let src = root.join("src");
+    let dst = root.join("dst");
+    fs::create_dir_all(src.join("nested")).unwrap();
+    fs::write(src.join("keep.txt"), b"keep").unwrap();
+    fs::write(src.join("skip.tmp"), b"skip").unwrap();
+    fs::write(src.join("nested/inner.txt"), b"inner").unwrap();
+
+    let mut sync_job = job(&src, &dst);
+    sync_job.exclude_patterns = vec!["skip.tmp".to_string()];
+    let total = count_sync_entries(&sync_job).expect("pre-scan should read the fixture");
+    assert_eq!(total, 3, "excluded files remain progress units");
+
+    let mut reports = Vec::new();
+    let mut reporter = |progress: SyncProgress<'_>| {
+        reports.push((progress.total, progress.current_path.to_string()));
+    };
+    let mut control = SyncControl::new().total(Some(total)).on_progress(&mut reporter);
+    let outcome = run_sync_job_with_control(&sync_job, &mut control);
+
+    assert_eq!(outcome.copied, 2);
+    assert_eq!(outcome.skipped, 1);
+    assert_eq!(reports.len(), 3);
+    assert!(reports.iter().all(|(reported_total, _)| *reported_total == Some(3)));
+
+    let _ = fs::remove_dir_all(&root);
+}
+
+#[test]
 fn exclude_glob_matches_single_path_segments() {
     assert!(matches_exclude_pattern("*.tmp", "cache.tmp"));
     assert!(matches_exclude_pattern("cache-??.bin", "cache-ab.bin"));

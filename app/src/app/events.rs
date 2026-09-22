@@ -173,12 +173,13 @@ impl AppRoot {
                         self.push_log("INFO", format!("타겟을 삭제했습니다: {name}"));
                     }
                 }
-                PlatformEvent::SyncStarted { id, label } => {
+                PlatformEvent::SyncStarted { id, label, total } => {
                     self.push_log("INFO", format!("[{label}] 동기화를 시작했습니다."));
                     self.sync.running = Some(SyncRunning {
                         id,
                         label,
                         current_path: String::new(),
+                        total,
                         copied: 0,
                         skipped: 0,
                         failed: 0,
@@ -188,6 +189,7 @@ impl AppRoot {
                 PlatformEvent::SyncProgress {
                     id,
                     current_path,
+                    total,
                     copied,
                     skipped,
                     failed,
@@ -199,6 +201,7 @@ impl AppRoot {
                         .filter(|running| running.id == id)
                     {
                         running.current_path = current_path;
+                        running.total = total;
                         running.copied = copied;
                         running.skipped = skipped;
                         running.failed = failed;

@@ -10,7 +10,7 @@ use gpui::{
     div, px, AnyElement, Context, InteractiveElement, IntoElement, ParentElement,
     StatefulInteractiveElement, Styled, Window,
 };
-use gpui_component::{h_flex, input::Input, theme::ActiveTheme, v_flex};
+use gpui_component::{h_flex, input::Input, progress::Progress, theme::ActiveTheme, v_flex};
 
 use crate::app::{AppRoot, IntervalTarget};
 use crate::config::WatchMode;
@@ -172,23 +172,33 @@ fn render_status_bar(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElemen
         (ui::Tone::Info, "동기화 중")
     };
 
-    bar.child(ui::badge(state_label, tone, ui::Size::Sm, cx))
+    let mut details = v_flex()
+        .flex_1()
+        .min_w_0()
+        .gap_1()
         .child(
-            v_flex()
-                .flex_1()
-                .min_w_0()
-                .child(
-                    div()
-                        .debug_selector(|| "file-sync-current-file".to_string())
-                        .text_color(fg)
-                        .child(running.display_path()),
-                )
-                .child(
-                    div()
-                        .text_color(muted_fg)
-                        .child(format!("{} — {}", running.label, running.counters())),
-                ),
+            div()
+                .debug_selector(|| "file-sync-current-file".to_string())
+                .text_color(fg)
+                .child(running.display_path()),
         )
+        .child(
+            div()
+                .text_color(muted_fg)
+                .child(format!("{} — {}", running.label, running.counters())),
+        );
+
+    if let Some(percent) = running.progress_percent() {
+        details = details.child(
+            div()
+                .debug_selector(|| "file-sync-progress-bar".to_string())
+                .w_full()
+                .child(Progress::new().h(px(6.0)).value(percent)),
+        );
+    }
+
+    bar.child(ui::badge(state_label, tone, ui::Size::Sm, cx))
+        .child(details)
         .into_any_element()
 }
 

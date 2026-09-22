@@ -226,6 +226,7 @@ fn running_path_keeps_the_file_name_when_the_path_is_too_long() {
         id: "job".to_string(),
         label: "백업".to_string(),
         current_path: String::new(),
+        total: None,
         copied: 0,
         skipped: 0,
         failed: 0,
@@ -292,6 +293,7 @@ fn file_sync_status_bar_stays_visible_at_compact_height_while_running(cx: &mut T
                 id: root.sync.jobs[0].id.clone(),
                 label: "검증 작업 0".to_string(),
                 current_path: r"docs\report\2026\분기보고서.xlsx".to_string(),
+                total: Some(354),
                 copied: 12,
                 skipped: 340,
                 failed: 2,
@@ -310,6 +312,9 @@ fn file_sync_status_bar_stays_visible_at_compact_height_while_running(cx: &mut T
     let current_file = cx
         .debug_bounds("file-sync-current-file")
         .expect("current file line should be rendered");
+    let progress_bar = cx
+        .debug_bounds("file-sync-progress-bar")
+        .expect("running progress bar should be rendered");
 
     assert!(
         (status_bar.origin.x - idle_bar.origin.x).abs() <= px(1.0),
@@ -327,6 +332,13 @@ fn file_sync_status_bar_stays_visible_at_compact_height_while_running(cx: &mut T
     assert!(
         current_file.size.width > px(0.0) && current_file.size.height > px(0.0),
         "current file line should occupy space: {current_file:?}"
+    );
+    assert!(
+        progress_bar.size.width > px(0.0)
+            && progress_bar.origin.x >= status_bar.origin.x
+            && progress_bar.origin.x + progress_bar.size.width
+                <= status_bar.origin.x + status_bar.size.width + px(1.0),
+        "progress bar should stay inside the fixed status bar: bar={progress_bar:?}, status={status_bar:?}"
     );
 
     // 스크롤을 끝까지 내려도 표시줄은 같은 자리에 남는다.
@@ -374,6 +386,7 @@ fn file_sync_stop_button_requests_cancellation_and_clears_pending_queue(cx: &mut
                 id: running_id,
                 label: "검증 작업".to_string(),
                 current_path: "a.txt".to_string(),
+                total: Some(3),
                 copied: 3,
                 skipped: 0,
                 failed: 0,
