@@ -247,15 +247,27 @@ fn virtual_disk_folder_tree_navigates_nested_paths_without_repeated_list_clicks(
     assert!(cx.debug_bounds("virtual-disk-tree-node-Users").is_some());
     click_debug_element(cx, "virtual-disk-tree-node-Users");
 
-    let (current_path, entry_count) = cx.update(|_, app| {
+    let (current_path, entries) = cx.update(|_, app| {
         let root = view.read(app);
         (
             root.virtual_disk.current_path.to_string(),
-            root.virtual_disk.entries.len(),
+            root.virtual_disk
+                .entries
+                .iter()
+                .map(|entry| entry.path.to_string())
+                .collect::<Vec<_>>(),
         )
     });
     assert_eq!(current_path, "Users");
-    assert_eq!(entry_count, 1, "tree navigation should load the child folder");
+    assert_eq!(
+        entries,
+        vec!["Users/Public"],
+        "tree navigation should load only immediate child folders"
+    );
+    assert!(
+        !entries.iter().any(|path| path == "Users/Public/report.txt"),
+        "tree navigation must not enumerate descendants before their folder is selected"
+    );
     assert!(cx.debug_bounds("virtual-disk-tree-node-Users-Public").is_some());
 }
 

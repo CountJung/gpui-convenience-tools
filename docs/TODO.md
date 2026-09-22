@@ -46,24 +46,24 @@
 ### O-2. 읽기 전용 디스크 백엔드
 
 ### O-3. 파일 복사 안전성
-- [ ] VDE-012 | 95% | 원본 변경·복사 실패·대상 권한 부족·지원하지 않는 파일을 토스트/미니 팝업과 로그에 기록하고 항목별 알림 억제 기능 제공 — 오류 분류·부분 복사·안정 억제 키 도메인, 읽기·쓰기·flush 실패 시 불완전한 대상 파일 정리, 항목별 상세 로그·미억제 오류 토스트·요약 카드의 억제/재표시 버튼·`AppConfig` 영속화, 실제 VBox 생성 VDI 복사 오류 요약과 GPUI `simulate_click` 억제/재표시 dispatch 테스트 완료; 독립 Visual Reviewer와 실제 릴리스 버튼 조작은 후속
+- [ ] VDE-012 | 95% | VDI 복사 오류·알림 억제 구현 완료 — 남은 일: 독립 Visual Reviewer 확인과 실제 릴리스에서 오류 행의 억제·재표시 버튼 조작
 
 ### O-4. GPUI 탐색기
 
-- [ ] VDE-024 | 90% | VDI 탐색기를 지연 로딩 폴더 트리와 파일 목록의 좌우 탐색 영역으로 개선하고 좁은 화면의 행·카드 크기를 축소 — 폴더 트리 선택으로 중첩 경로를 바로 이동하고, 트리·목록을 내부 스크롤 영역에 배치했으며 목록 행·열 폭을 컴팩트하게 조정; `virtual_disk_folder_tree_navigates_nested_paths_without_repeated_list_clicks`, `virtual_disk_explorer_keeps_tree_and_file_list_inside_compact_card` GPUI 테스트와 전체 169 passed·4 ignored, Clippy 통과; release 캡처 `vde024-tree-920x700-121233.png`, `vde024-tree-1000x700-121200.png`, `vde024-tree-1280x900-121234.png`; 하네스 실제 트리 Click은 좌표 변환으로 상태 전환을 확정하지 못했으며 commit `4af7cc6` push 완료; 독립 Visual Reviewer는 후속
-- [ ] VDE-025 | 90% | VDI 탐색기 폴더 트리·파일명 우선 컬럼 폭을 개선하고 사용자 조정값을 settings.json에 저장·재시작 후 복원 — 트리 기본 폭을 축소하고 150~240px 범위로 제한했으며 파일명 열을 남은 폭으로 우선 배정, 종류·속성·크기 열에 읽을 수 있는 최소 폭을 적용; 속성·크기 조절/기본값 복원 버튼과 트리 스플리터 저장 콜백, 구버전 settings.json 기본값·정규화·round-trip을 추가; VDI 관련 테스트 22개·전체 172 passed·4 ignored·Clippy `-D warnings`, 필수 GPUI 테스트 31개와 구조 57개 파일·22,900줄·최대 946줄 통과; release 캡처 `vde025-final-920x700-scrolled-124559.png`, `vde025-final-1000x700-124600.png`, `vde025-final-capped-tree-1280x900-124829.png`; 실제 스플리터 드래그 입력은 포그라운드 안전 경계로 강행하지 않았으며 commit `195a43e` push 완료; 독립 Visual Reviewer는 후속
+- [ ] VDE-024 | 90% | VDI 탐색기 지연 로딩 구현 완료 — 남은 일: 폴더 선택 시 직계 하위 폴더·파일만 표시하는 실제 선택 E2E와 독립 Visual Reviewer 확인
+- [ ] VDE-025 | 90% | VDI 탐색기 폭 조정·설정 복원 구현 완료 — 남은 일: 실제 스플리터 드래그 후 재시작 복원 확인과 독립 Visual Reviewer 검토
 
-- [ ] VDE-014 | 92% | 탐색기 목록에서 숨김/시스템 항목을 기본 표시하고 폴더 진입·상위 이동·다중 선택·파일 정보 표시 구현 — 목록 행 선택·Ctrl 토글·Shift 범위 선택·폴더 더블클릭·상위 이동·파일 종류/속성/크기와 실제 VBox VDI 숨김/시스템 행 확인 완료; `virtual_disk_directory_row_double_click_enters_directory_and_refreshes_entries` GPUI 이벤트 테스트로 실제 행 `click_count >= 2` 분기와 진입 후 새로고침 경계를 고정했고, 검증 전용 `-InitialGuestPath many_subdirs`로 실제 하위 폴더 진입 상태를 격리 release에서 열어 확인했으며 손상 폴더에서는 이전 목록을 제거하도록 보강함; `shift_range_selection_uses_anchor_in_both_directions` 회귀 테스트와 최신 release 캡처 `vde014-shift-range-release-final-045106.png` 추가; 실제 폴더 진입 Click·Shift/외부 키보드는 포그라운드 안전 차단으로 미검증
-- [ ] VDE-015 | 95% | 선택 항목 복사, 대상 폴더 선택, 진행률·중지·완료 요약을 단일 연속 작업형 `scroll_pane`에 배치 — read-only VDI 재연결 백그라운드 복사, 대상 폴더 입력/선택, 진행 이벤트·중지 요청·완료 요약과 실제 VBox VDI 자동 복사 완료; 최신 release에서 숨김/시스템 포함 17개·937,234바이트와 손상된 `many_subdirs` 실패 사유를 확인했고, 복사 엔진에 청크 전후 취소 확인·읽기·쓰기·flush 실패 시 부분 파일 정리·하위 폴더 즉시 중단과 회귀 테스트를 추가함; 검증 전용 `-VdiPartitionNumber 5` 파티션 선택 경로를 추가해 다중 파티션 VDI를 정확히 지정할 수 있게 했고, 종료된 실제 TACS의 파티션 1 `$Extend`에서 `-CancelAfterMs 250` 중지 요약(`중지됨 · 파일 0개 · 0 B`)과 `600`ms 실행의 `완료 · 파일 8개 · 4.1 MB`를 확인함; 검증 전용 `-ReadDelayMs`로 `$Extend/$RmMetadata/$TxfLog`의 실제 2MiB 파일 복사 중 0바이트 부분 파일 생성과 취소 후 제거를 관찰하고 `중지됨 · 파일 2개 · 64.0 KB` 요약을 확인했지만 자연 속도의 대용량 청크 중지와 외부 릴리스 버튼 조작은 별도 환경 의존 항목으로 남김; 격리 256MB NTFS VHD 생성 시 `diskpart`가 50초 이상 무응답하여 중지했고 VHD·드라이브·잔류 프로세스가 없어 성공 증거로 기록하지 않음
-- [ ] VDE-016 | 85% | 기본 단축키 `Ctrl+C`, `Enter`, `Backspace`, `Ctrl+A`, `F5`를 포커스·선택 상태와 함께 연결 — `VirtualDisk` key context와 목록 포커스, 선택 집합·폴더 진입·상위 이동·새로고침·복사 액션, GPUI 키 디스패치 회귀 테스트와 920/1000/1280px 캡처 완료; 실제 VDI 시드의 `-SelectAllVdi` 선택 상태(16개)까지 확인했으나 외부 키보드 입력은 포그라운드 안전 차단으로 미검증
-- [ ] VDE-017 | 90% | UI는 원본 VDI를 쓰지 않는다는 경고, VM 실행 중 직접 접근 불가 상태, 파티션/파일시스템 미지원 상태를 명확히 표시 — 독립 안전 경계 카드, 실행 중 VM·잠금 VDI 전용 오류 안내, NTFS 3.1 외 파일시스템·미확인 파티션 안내와 GPUI 렌더 회귀 테스트·920/1000/1280px 캡처 완료; 미지원 MBR 파티션 VDI를 export fixture로 생성해 최신 release 앱에서 오류 카드·파티션 경고를 실제 확인하고 파서 단위 테스트도 추가함; `VBoxManage list runningvms` 결과가 비어 있고 등록된 TACS도 `VMState=poweroff`여서 실행 중 VM E2E는 현재 환경에서 수행하지 않음; 독립 Visual Reviewer는 후속
+- [ ] VDE-014 | 92% | 탐색기 목록·선택·폴더 진입 구현 완료 — 남은 일: 실제 폴더 진입·Shift 선택·외부 키보드 E2E
+- [ ] VDE-015 | 95% | VDI 선택 항목 복사·중지·완료 요약 구현 완료 — 남은 일: 자연 속도 대용량 중지와 실제 릴리스 버튼 조작
+- [ ] VDE-016 | 85% | VDI 탐색기 단축키 구현 완료 — 남은 일: 외부 키보드 E2E와 완료 게이트 검증
+- [ ] VDE-017 | 90% | VDI 안전 경계·미지원 상태 안내 구현 완료 — 남은 일: 실행 중 VM 환경 E2E와 독립 Visual Reviewer 확인
 
 ### O-5. 검증·후속 백엔드
 
-- [ ] VDE-022 | 85% | GPT 파티션의 MSR·BitLocker 상태를 구분해 표시하고, 암호화된 오프라인 VDI를 NTFS로 오인하지 않도록 안내 — 실제 `TACS_1.vdi`의 GPT 타입 GUID와 `-FVE-FS-` 부트 시그니처를 읽기 전용으로 확인; `MicrosoftReserved`·`BitLocker` 판정·오류 안내·GPUI release 캡처 완료; commit `6b89a09` push 완료; 독립 Visual Reviewer는 후속
-- [ ] VDE-023 | 80% | VirtualBox 디스크 탐색기의 VDI 경로에 네이티브 파일 열기 대화상자를 연결 — `prompt_for_paths(files=true, directories=false)`로 `찾아보기` 버튼을 추가하고 선택 결과를 입력창에 반영; GPUI bounds와 release 배치 확인; commit `6b89a09` push 완료; 실제 파일 선택 상호작용은 포그라운드 안전 경계로 미수행, 독립 Visual Reviewer는 후속
-- [ ] VDE-019 | 95% | GPUI 자체 테스트와 격리 릴리스 실행으로 실제 파일 목록·숨김/시스템 항목·복사 진행/실패 요약·대상 폴더 복사를 확인 — VirtualBox 7.2.14가 `convertfromraw`로 생성한 표준 VDI와 export 테스트로 재생성한 합성 VDI를 최신 release 앱에서 재검증하고 캡처를 남김; 최신 release 1200×1000 캡처 `continuation-vde019-current-release-040648.png`와 이번 검증의 `continuation-current-vde019-1200x1000-052717.png`, `continuation-current-vde019-920x700-052734.png`에서 안전 경계·NTFS 3.1·숨김/시스템 항목·16개 선택 상태와 compact 폭의 행 경계를 확인; 추가로 `-ExternalVdiPath`와 검증 전용 `-VdiPartitionNumber 5` 경로로 종료된 실제 TACS VDI의 GPT·NTFS 3.1·파티션 5 루트·`$Extend` 복사 요약을 확인하고 `vde019-external-tacs-root-fixed-920x700-053642.png`, `vde019-external-tacs-root-fixed-1200x1000-053659.png`, `vde015-tacs-partition5-root-060904.png`, `vde015-tacs-extend-cancel-600-061151.png`를 남김; 구현 세션의 캡처이며 대용량 파일 중지·외부 키보드·실제 릴리스 오류 억제 버튼 클릭·독립 Visual Reviewer 확인은 후속
-- [ ] VDE-021 | 70% | 공식 `VBoxManage guestcontrol` 명령 계약·read-only 안전 경계·`GuestFileSource` 분리 설계를 `VIRTUAL_DISK_BACKENDS.md`에 기록 완료; 현재 `VBoxManage showvminfo TACS --machinereadable`에서 `VMState=poweroff`이고 Guest Additions·자격 증명 주입 확인 근거가 없어, 격리 VM·Guest Additions 준비 전에는 구현·완료 처리하지 않음
+- [ ] VDE-022 | 85% | GPT MSR·BitLocker 판정 구현 완료 — 남은 일: 독립 Visual Reviewer 확인
+- [ ] VDE-023 | 80% | VDI 경로 파일 선택 대화상자 구현 완료 — 남은 일: 실제 dialog 선택 입력과 독립 Visual Reviewer 확인
+- [ ] VDE-019 | 95% | 실제 VDI 파일 목록·복사 E2E 구현 완료 — 남은 일: 대용량 중지, 외부 키보드, 실제 릴리스 오류 억제 버튼, 독립 Visual Reviewer 확인
+- [ ] VDE-021 | 70% | `VBoxManage guestcontrol` 오프라인 경계 문서화 완료 — 남은 일: 격리 VM·Guest Additions·자격 증명 주입 환경 확보 후 구현 여부 결정
 
 > VDE-021은 필수 오프라인 경로의 선행 작업이다. Guest Control이 추가되더라도 실행 중 VDI
 > 직접 읽기를 기본 경로로 되돌리지 않는다.
@@ -79,11 +79,13 @@
 
 ### D-2. 진행률 바 (선행 완료: 진행 표시·중지는 Phase D-2에서 구현됨)
 
+참고: `D-006`은 파일 동기화 진행률의 사전 스캔 판단 항목이다. 사용자가 요청한 VDI
+탐색기의 폴더별 지연 탐색은 기존 `VDE-024`에서 추적하며, 작업 ID를 재사용하지 않는다.
+
 현재 진행 표시줄은 **누적 개수**만 보여준다. 전체 대비 비율을 내려면 총 파일 수를 알아야
 한다. 아래는 그 확장분만 남긴 것이다.
 
-- [ ] D-006 | 0% | 1단계로 전체 파일 수를 세고 2단계에서 복사 — 사전 스캔 비용(대용량 폴더에서 두 번
-      순회)을 감수할지 먼저 결정한다. 감수하지 않으면 이 항목 전체를 접는다
+- [ ] D-006 | 0% | 파일 동기화 사전 스캔 여부 결정 — 남은 일: 3,000개 기준 사전 스캔 포함 시간을 측정하고 이중 순회 비용 허용 여부를 결정
 - [ ] D-007 | 0% | `SyncProgress`에 `total` 추가하고 백그라운드 이벤트에 전달
 - [ ] D-008 | 0% | 작업 행 또는 하단 표시줄에 진행률 바(`gpui_component::progress`) 표시
 
@@ -93,13 +95,13 @@
 
 ### D-4. 심볼릭 링크 / 정션 처리
 
-- [ ] D-014 | 15% | 현재 안전 정책은 심볼릭 링크·정션을 `Skip`으로 계상한다. 이를 작업별 옵션으로 노출할지와 사용자 경고 범위를 확정하고 구현
-- [ ] D-015 | 70% | `SyncJob`에 `symlink_mode: { Skip, Follow, Recreate }` 스키마 추가 — snake_case 직렬화·구버전 `Skip` 복원·미구현 모드의 명시적 실패 경계와 Windows 회귀 테스트 완료; 실제 `Follow`·`Recreate` 동작은 D-014·D-016 후속
+- [ ] D-014 | 15% | 심볼릭 링크·정션 처리 정책 결정 — 남은 일: `Skip`·`Follow`·`Recreate`의 사용자 노출 범위와 경고 조건 확정
+- [ ] D-015 | 70% | 심볼릭 링크 모드 스키마·미구현 실패 경계 완료 — 남은 일: D-014·D-016 결정 후 `Follow`·`Recreate` 실제 동작 구현
 - [ ] D-016 | 0% | `Recreate`는 Windows에서 관리자 권한 또는 개발자 모드 필요 — 권한 없으면 사유 기록
 
 ### D-5. 동기화 이력
 
-- [ ] D-020 | 95% | 패널에 최근 실행 이력 목록(성공/실패 건수, 소요 시간) — `sync-history.json` 로드·완료 후 새로고침·결과 건수/소요 시간 카드와 GPUI 수용 테스트 구현, `-SeedHistory`·`-InitialPanel FileSync`로 시드된 실제 패널 캡처 완료; 994×702·1280×900 2차 자체 세션에서 이력 카드 경계와 3행 표시를 재확인하고 `d020-second-pass-before-055457.png`, `d020-second-pass-resized-055501.png`를 남겼으며, 최신 release에서도 `next-d020-history-065416.png`·`next-d020-history-1280-065430.png`로 재확인함; 1280×900에서 중지·실패 포함·성공 3행과 결과 건수가 카드 내부에 표시되고 세션 종료 후 프로세스·임시 루트가 0개였음; 독립 Visual Reviewer 확인은 후속
+- [ ] D-020 | 95% | 최근 동기화 이력 카드 구현 완료 — 남은 일: 독립 Visual Reviewer 확인
 
 ---
 
@@ -118,12 +120,7 @@
 
 ## 3. 구조 개선
 
-- [ ] G-001 | 90% | **`ButtonStyle` 덮어쓰기 정리** *(독립, 단독 커밋)*
-      세 패널의 개별 `border`·`hover`·`no_hover` 덮어쓰기와 dead-code 확장 메서드를
-      제거하고 공용 기본값으로 통일 완료; 자동·GPUI 검증 통과, 격리 release 파일 동기화·
-      자동 시작 화면 캡처 완료; 994×702·1280×900 2차 자체 세션에서 카드·안내 문장 경계를
-      재확인하고 `g001-second-pass-before-055522.png`, `g001-second-pass-resized-055525.png`를
-      남김; 독립 Visual Reviewer 확인은 후속
+- [ ] G-001 | 90% | **`ButtonStyle` 덮어쓰기 정리** — 남은 일: 독립 Visual Reviewer 확인
 
 - [ ] K-001 | 0% | **macOS 네이티브 기능 확장** *(선행 완료: Phase K에서 빌드·릴리즈는 구성됨)*
   현재 macOS는 `platform/fallback.rs`로 컴파일과 파일 동기화만 지원한다.
@@ -133,20 +130,8 @@
   - [ ] K-004 | 0% | `.icns` 앱 아이콘 (현재 기본 아이콘으로 배포됨)
   - [ ] K-005 | 0% | 코드 서명·공증 — Apple Developer 계정 확보 시
 
-- [ ] G-003 | 95% | **스플리터 폭 영속화**
-  `ResizableState`의 `sizes()`를 `on_resize`에서 읽어 config에 저장하고 복원한다.
-  기본 폭·범위 보정, 설정 저장·복원, GPUI 드래그 회귀 테스트와 격리 release 복원 캡처 완료;
-  실제 divider 드래그 mouse-up 저장을 위해 검증 하네스에 안전한 `Drag` 입력을 추가했으며,
-  최신 release 1000×700의 시작 화면 캡처 `next-g003-before-065645.png`에서 divider 위치를
-  확인한 뒤 드래그를 시도했지만 포그라운드 안전 검사(`현재 포그라운드=66246`)가 입력을
-  차단했다. 따라서 실제 mouse-up 저장 성공으로 기록하지 않으며, 독립 Visual Reviewer
-  확인도 후속 환경 의존 항목이다.
+- [ ] G-003 | 95% | **스플리터 폭 영속화** — 남은 일: 실제 mouse-up 저장·재시작 복원과 독립 Visual Reviewer 확인
 
-- [ ] G-004 | 0% | **UAC 매니페스트 결정**
-  `app/resources.rc`와 `app/*.exe.manifest`는 현재 빌드에 반영되지 않는 죽은 파일이다.
-  둘 중 하나를 택한다.
-  - (a) 파일을 삭제하고 README에 "관리자 권한은 수동 실행" 명시 — *현재 문서는 이 방향*
-  - (b) `embed-resource`로 임베드하되 `gpui`의 `RT_MANIFEST` 중복을 회피하는 방법 확보
 
 ---
 
@@ -157,7 +142,7 @@
 
 ## 판단·환경 확인이 필요한 보류 항목
 
-<!-- decision-task-ids: D-006,D-007,D-008,D-014,D-015,D-016,VDE-019,VDE-021,D-020,G-001,G-004,K-001,K-002,K-003,K-004,K-005,E-001,E-002,E-003,E-004 -->
+<!-- decision-task-ids: D-006,D-007,D-008,D-014,D-015,D-016,VDE-019,VDE-021,D-020,G-001,K-001,K-002,K-003,K-004,K-005,E-001,E-002,E-003,E-004 -->
 
 - `D-006`~`D-008`: 전체 파일 사전 스캔으로 정확한 진행률을 제공할지, 대용량 폴더의
   이중 순회 비용을 허용할지 사용자·제품 판단이 필요하다. 현재 Windows 임시 폴더의
@@ -178,10 +163,6 @@
 - `D-020`: 시드된 실제 이력 패널 캡처는 완료했지만 독립 Visual Reviewer 확인이 필요하다.
 - `G-001`: 격리 release 파일 동기화·자동 시작 화면 캡처는 완료했지만 독립 Visual Reviewer
   확인이 필요하다.
-- `G-004`: `build.rs`는 현재 `/MANIFEST:NO`만 지정하고 `app/resources.rc`·두 UAC 매니페스트를
-  참조하지 않는 것으로 확인했다. (a) 죽은 파일을 삭제하고 수동 관리자 실행 정책을 유지할지,
-  (b) `embed-resource` 등으로 실제 임베드할지 사용자 선택이 필요하다. 삭제·임베드 모두
-  빌드와 배포 동작을 바꾸므로 선택 전에는 파일을 변경하지 않는다.
 - `E-001`~`E-004`: 신규 기능은 구현 전에 개인정보·권한·전역 동작 범위를 확정해야 한다.
   클립보드 히스토리는 기본 비활성·로컬 보관·텍스트/이미지 보관 한도와 민감정보 제외 정책,
   프로세스 모니터는 강제 종료 권한과 보호 프로세스 정책, 빠른 실행기는 전역 단축키 등록과

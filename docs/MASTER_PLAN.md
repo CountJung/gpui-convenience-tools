@@ -147,6 +147,12 @@ cargo workspace, Hello World 앱 동작 확인
 - `platform/windows.rs`(1,361줄) → `platform/windows/` 6파일 분할
 - 결과: 최대 파일 690줄, 1,000줄 초과 파일 없음
 
+### Phase G-004 — 죽은 관리자 매니페스트 정리 ✅
+
+- `build.rs`가 참조하지 않는 `app/resources.rc`와 두 UAC 매니페스트를 삭제했다.
+- 앱은 자동으로 관리자 권한을 요구하지 않으며, 서비스 관리 등 필요한 작업은 사용자가
+  앱을 관리자 권한으로 직접 실행한다. 이 정책을 `docs/README.md`에 고정했다.
+
 ### Phase G-002 — `AppRoot` 기능 상태 묶음 ✅
 
 `AppRoot`의 GPUI 엔티티 생명주기와 이벤트 채널은 유지하면서 기능별 상태 소유권만 일반
