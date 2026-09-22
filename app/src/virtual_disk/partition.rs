@@ -18,6 +18,11 @@ const MAX_GPT_ARRAY_BYTES: u64 = 64 * 1024 * 1024;
 const MAX_LOGICAL_PARTITIONS: usize = 128;
 const TYPE_PROTECTIVE_MBR: u8 = 0xee;
 const TYPE_EXTENDED_MBR: [u8; 3] = [0x05, 0x0f, 0x85];
+const GPT_TYPE_MICROSOFT_RESERVED: [u8; 16] = [
+    0x16, 0xe3, 0xc9, 0xe3, 0x5c, 0x0b, 0xb8, 0x4d, 0x81, 0x7d, 0xf9, 0x2d, 0xf0, 0x02,
+    0x15, 0xae,
+];
+const BITLOCKER_BOOT_MARKER: &[u8; 8] = b"-FVE-FS-";
 
 /// 파티션 검색에 필요한 읽기 전용 디스크 경계.
 pub trait PartitionSource: Send {
@@ -181,6 +186,7 @@ fn parse_extended_partitions<S: PartitionSource>(
                 PartitionTableKind::Mbr,
                 start,
                 logical.sector_count as u64,
+                None,
             )?);
         }
 
@@ -321,6 +327,8 @@ fn parse_gpt<S: PartitionSource>(
             PartitionTableKind::Gpt,
             start_lba,
             sector_count,
+            (entry.get(..16) == Some(GPT_TYPE_MICROSOFT_RESERVED.as_slice()))
+                .then_some(GuestFileSystem::MicrosoftReserved),
         )?);
     }
     Ok(result)
@@ -469,6 +477,7 @@ fn to_partition<S: PartitionSource>(
         table,
         entry.start_lba as u64,
         entry.sector_count as u64,
+        None,
     )
 }
 
@@ -478,25 +487,45 @@ fn to_partition_at<S: PartitionSource>(
     table: PartitionTableKind,
     start_lba: u64,
     sector_count: u64,
+    filesystem_hint: Option<GuestFileSystem>,
 ) -> Result<VdiPartition, VirtualDiskError> {
     Ok(VdiPartition {
         number,
         table,
         start_lba,
         sector_count,
-        filesystem: detect_filesystem(source, start_lba)?,
+        filesystem: detect_filesystem(source, start_lba, filesystem_hint)?,
     })
 }
 
 fn detect_filesystem<S: PartitionSource>(
     source: &mut S,
     start_lba: u64,
+    filesystem_hint: Option<GuestFileSystem>,
 ) -> Result<Option<GuestFileSystem>, VirtualDiskError> {
     let boot_sector = read_sector_at(source, start_lba)?;
+    Ok(identify_filesystem(
+        &boot_sector,
+        source.sector_size(),
+        filesystem_hint,
+    ))
+}
+
+fn identify_filesystem(
+    boot_sector: &[u8],
+    sector_size: u32,
+    filesystem_hint: Option<GuestFileSystem>,
+) -> Option<GuestFileSystem> {
+    if filesystem_hint == Some(GuestFileSystem::MicrosoftReserved) {
+        return filesystem_hint;
+    }
+    if boot_sector.get(3..11) == Some(BITLOCKER_BOOT_MARKER.as_slice()) {
+        return Some(GuestFileSystem::BitLocker);
+    }
     let is_ntfs = boot_sector.get(3..11) == Some(b"NTFS    ")
-        && le_u16(&boot_sector, 11)? == source.sector_size() as u16
+        && le_u16(boot_sector, 11).ok()? == sector_size as u16
         && boot_sector.get(13).copied().is_some_and(|value| value > 0);
-    Ok(is_ntfs.then_some(GuestFileSystem::ntfs_3_1()))
+    is_ntfs.then_some(GuestFileSystem::ntfs_3_1())
 }
 
 struct MbrEntry {
@@ -696,6 +725,26 @@ mod tests {
         let partitions = discover_partitions(&mut disk).unwrap();
 
         assert_eq!(partitions[0].filesystem, Some(GuestFileSystem::ntfs_3_1()));
+    }
+
+    #[test]
+    fn classifies_bitlocker_and_microsoft_reserved_partitions_explicitly() {
+        let mut bitlocker_boot = vec![0; SECTOR_SIZE];
+        bitlocker_boot[3..11].copy_from_slice(BITLOCKER_BOOT_MARKER);
+        assert_eq!(
+            identify_filesystem(&bitlocker_boot, SECTOR_SIZE as u32, None),
+            Some(GuestFileSystem::BitLocker)
+        );
+
+        let empty_boot = vec![0; SECTOR_SIZE];
+        assert_eq!(
+            identify_filesystem(
+                &empty_boot,
+                SECTOR_SIZE as u32,
+                Some(GuestFileSystem::MicrosoftReserved),
+            ),
+            Some(GuestFileSystem::MicrosoftReserved)
+        );
     }
 
     #[test]

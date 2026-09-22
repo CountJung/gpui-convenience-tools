@@ -128,6 +128,19 @@ fn render_source_card(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyEleme
                 .gap_2()
                 .items_center()
                 .children(input)
+                .child(
+                    div()
+                        .debug_selector(|| "virtual-disk-browse".to_string())
+                        .child(ui::action_button(
+                            "virtual-disk-browse-action",
+                            "찾아보기",
+                            ui::Size::Md,
+                            ButtonStyle::neutral(cx),
+                            cx.listener(|this, _event, window, cx| {
+                                this.pick_virtual_disk_file(window, cx);
+                            }),
+                        )),
+                )
                 .child(ui::action_button(
                     "virtual-disk-open",
                     "VDI 열기",
@@ -584,6 +597,8 @@ fn format_partition_label(partition: &crate::virtual_disk::VdiPartition) -> Stri
     };
     let filesystem = match partition.filesystem {
         Some(GuestFileSystem::Ntfs { major, minor }) => format!("NTFS {major}.{minor}"),
+        Some(GuestFileSystem::BitLocker) => "BitLocker 암호화".to_string(),
+        Some(GuestFileSystem::MicrosoftReserved) => "Microsoft Reserved(MSR)".to_string(),
         None => "미지원/미확인 파일시스템".to_string(),
     };
     format!("파티션 {} · {table} · {filesystem}", partition.number)
@@ -595,6 +610,14 @@ fn partition_support_message(partition: &crate::virtual_disk::VdiPartition) -> O
         Some(GuestFileSystem::Ntfs { major, minor }) => Some(format!(
             "지원하지 않는 파일시스템 버전입니다: NTFS {major}.{minor}. 현재 NTFS 3.1만 탐색할 수 있습니다."
         )),
+        Some(GuestFileSystem::BitLocker) => Some(
+            "BitLocker로 암호화된 파티션입니다. 복구 키를 저장하거나 우회하지 않으며, 복호화된 사본 또는 잠금 해제된 NTFS VDI를 선택해야 합니다."
+                .to_string(),
+        ),
+        Some(GuestFileSystem::MicrosoftReserved) => Some(
+            "Microsoft Reserved(MSR) 영역은 Windows GPT 예약 영역이라 탐색할 게스트 파일이 없습니다."
+                .to_string(),
+        ),
         None => Some(
             "지원하지 않거나 확인할 수 없는 파일시스템입니다. 현재 NTFS 3.1만 탐색할 수 있습니다."
                 .to_string(),

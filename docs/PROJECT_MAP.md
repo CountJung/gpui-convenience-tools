@@ -16,22 +16,22 @@
 | --- | --- | --- |
 | `app/src/virtual_disk/mod.rs` | **구현됨** — `GuestFileSource`·파일 항목·오류 타입·백엔드 경계 | VDE-003 |
 | `app/src/virtual_disk/vdi.rs` | **구현됨** — VDI 1.1 read-only 블록 리더와 잠금·VM 사용·원본 안정성 가드 | VDE-004~005 |
-| `app/src/virtual_disk/partition.rs` | **구현됨** — MBR·EBR·protective MBR·GPT 검색과 CRC·범위 검증 | VDE-006 |
+| `app/src/virtual_disk/partition.rs` | **구현됨** — MBR·EBR·protective MBR·GPT 검색과 CRC·범위 검증, MSR·BitLocker 파티션 상태 식별 | VDE-006·022 |
 | `app/src/virtual_disk/ntfs.rs` | **구현됨** — NTFS 디렉터리 열거·기본 데이터 스트림 읽기·속성 보존·항목별 오류 경계 | VDE-007~008 |
 | `app/src/virtual_disk/path_policy.rs` | **구현됨** — 게스트 경로의 호스트 매핑, 예약 이름·길이·링크 추적 안전 정책 | VDE-009 |
 | `app/src/virtual_disk/copy.rs` | **구현됨** — 선택 파일·폴더의 청크 복사와 건너뜀·덮어쓰기·새 이름 충돌 정책, 메타데이터 결과 집계, 청크 단위 중지와 부분 파일 정리 | VDE-010~011·015 |
 | `app/src/virtual_disk/copy/tests.rs` | **구현됨** — 복사 엔진의 충돌·청크·중지·실패·부분 결과 정리 회귀 테스트 | VDE-010~012·015 |
 | `app/src/virtual_disk/issues.rs` | **구현됨** — 원본 변경·대상 쓰기·지원 불가·메타데이터 오류 분류, 부분 복사 결과와 항목별 억제 키 | VDE-012 |
 | `app/src/virtual_disk/metadata.rs` | **구현됨** — 호스트 파일 속성·타임스탬프 적용과 구조화된 적용 실패 결과 | VDE-011 |
-| `app/src/window/virtual_disk.rs` | VDI 선택·파티션·탐색·파일 행 선택·상위 이동·단축키·진행 UI | VDE-013~017 |
-| `app/src/app/virtual_disk_ops.rs` | **구현됨** — read-only VDI 열기·파티션 검색/선택·게스트 경로 새로고침·폴더 이동·Ctrl 토글/Shift 범위 다중 선택·탐색기 포커스·실행 중/미지원 오류 메시지 | VDE-013~014·016~017 |
+| `app/src/window/virtual_disk.rs` | VDI 선택·네이티브 파일 대화상자·파티션·탐색·파일 행 선택·상위 이동·단축키·진행 UI | VDE-013~017·023 |
+| `app/src/app/virtual_disk_ops.rs` | **구현됨** — read-only VDI 열기·네이티브 VDI 파일 선택·파티션 검색/선택·게스트 경로 새로고침·폴더 이동·Ctrl 토글/Shift 범위 다중 선택·탐색기 포커스·실행 중/미지원 오류 메시지 | VDE-013~014·016~017·023 |
 | `app/src/app/virtual_disk_copy.rs` | **구현됨** — 대상 폴더 입력/선택, read-only VDI 재연결 백그라운드 복사, 진행·중지·완료 요약 이벤트, 탐색기 keymap 등록 | VDE-015~016; 실제 이미지 E2E는 VDE-019 |
 | `docs/VIRTUAL_DISK_BACKENDS.md` | **설계 정본** — 오프라인 VDI 기본 경로와 실행 중 VM `guestcontrol` 후속 백엔드의 분리·명령·안전·검증 경계 | VDE-021 |
 
 안전 경계: 원본 VDI는 read-only로만 열고, 실행 중 VM의 VDI 직접 읽기는 구현하지 않는다.
 실행 중 VM 지원은 후속 `GuestFileSource` 구현으로만 추가한다(VDE-021).
 
-**최종 측정**: 2026-09-22 · `app/src` 총 56개 파일 · 21,453줄
+**최종 측정**: 2026-09-22 · `app/src` 총 56개 파일 · 21,607줄
 
 ## 크기 기준 — 줄 수는 증상이다
 
@@ -45,7 +45,7 @@
 | 800~1,000 | 🟡 경고 | 다음 작업 전에 구조 리팩터링 |
 | 1,000 초과 | 🔴 위반 | **즉시 리팩터링.** 다른 작업보다 우선 |
 
-현재 🔴 위반 **없음**, 🟡 경고 **2개**. 최대 파일은 821줄(`virtual_disk/vdi.rs`)이며, 다음 구조 작업은 `vdi.rs`·`ntfs.rs`의 책임 증가를 먼저 검토한다.
+현재 🔴 위반 **없음**, 🟡 경고 **3개**. 최대 파일은 846줄(`virtual_disk/partition.rs`)이며, 다음 구조 작업은 `partition.rs`·`vdi.rs`·`ntfs.rs`의 책임 증가를 먼저 검토한다.
 줄 수와 무관하게 처리하는 중복 헬퍼는 아래 「중복 헬퍼 추적」에서 관리한다.
 
 `scripts/Assert-ProjectStructure.ps1`가 이 측정값을 자동 대조한다. 소스 파일을 추가·삭제·
@@ -328,6 +328,7 @@ G-001 판단: `muted`는 비활성 의미이므로 테두리와 hover를 추가�
 | 2026-09-21 | `app/virtual_disk_ops.rs`·`window/virtual_disk.rs`·`app/tests/virtual_disk.rs` | VDE-014 탐색기 목록 조작 추가 | VDI 셸에 파일 행 조작과 경로 이동이 없음 | 숨김·시스템 항목을 필터링하지 않는 목록 행, 파일 종류·속성·크기 표시, 폴더 더블클릭, 상위 이동, Ctrl/Shift 선택 집합, 선택 카운트와 GPUI 상위 액션 회귀 테스트, 920/1280px 실제 캡처 | 실제 VDI 파일 행·숨김 항목·범위 선택 상호작용은 VDE-019와 VDE-016에서 검증 |
 | 2026-09-21 | `app/virtual_disk_copy.rs`·`window/virtual_disk.rs`·`app/events.rs` | VDE-015 연속형 복사 작업 연결 | 탐색 목록에 대상 폴더·복사 진행 상태가 없음 | 대상 폴더 입력/네이티브 선택, 작업 스레드의 read-only VDI 재연결, 진행 이벤트·원자 중지 요청·완료/실패 요약, 단일 `scroll_pane` 복사 카드, 1000/920/1280px 실제 캡처 | 실제 이미지 복사 결과와 대용량 디렉터리 중지 세분화는 VDE-019에서 검증 |
 | 2026-09-21 | `app/virtual_disk_ops.rs`·`window/virtual_disk.rs`·`app/tests/virtual_disk.rs` | VDE-017 안전·지원 상태 안내 | 실행 중 VM·잠금·미지원 파일시스템이 일반 읽기 실패와 구분되지 않음 | read-only 안전 경계 카드, 실행 중 VM/잠금 전용 오류, NTFS 3.1 지원 범위 안내, 미지원 파티션 경고, GPUI 상태 렌더 테스트와 920/1000/1280px 실제 캡처 | 실제 VBoxManage 실행 중 VM·미지원 이미지 E2E는 VDE-019에서 검증 |
+| 2026-09-22 | `app/src/virtual_disk/partition.rs`·`app/src/virtual_disk/ntfs.rs`·`app/src/app/virtual_disk_ops.rs`·`app/src/window/virtual_disk.rs`·`docs/VIRTUAL_DISK_BACKENDS.md` | VDE-022·023 TACS VDI 진단과 VDI 파일 선택 | 실제 `TACS_1.vdi`가 열리지만 GPT 파티션이 모두 `미지원/미확인`으로 표시되고 경로를 직접 입력해야 함 | VDI 메타데이터·GPT 타입·`-FVE-FS-` 부트 시그니처를 읽기 전용으로 분석해 MSR·BitLocker 상태를 별도 표시; `PathPromptOptions` 파일 대화상자와 `찾아보기` 버튼 추가; 전체 테스트 163 passed·4 ignored 및 release 캡처 `vde022-final-095347.png` 확인 | 실제 파일 대화상자 선택 입력과 독립 Visual Reviewer는 포그라운드 안전 경계로 후속; 최신 구조 56개 파일·21,607줄·최대 846줄 |
 | 2026-09-21 | `virtual_disk/partition.rs`·`virtual_disk/vdi.rs`·`virtual_disk/ntfs.rs`·`app/testdata/ntfs-testfs1.img` | VDE-018 고정 NTFS/합성 VDI 검증 | 실제 이미지에 연결된 파티션의 파일시스템 판정과 원본 불변성 통합 증거 없음 | MBR 파티션의 NTFS 3.1 부트 섹터 판정, 고정 NTFS read-only 열거, 손상 복사본 거부, 합성 동적 VDI에서 파티션·루트·파일 읽기 및 VDI 바이트 불변성 테스트 | GPUI 파일 행·키보드·복사 UI E2E는 VDE-019에서 검증 |
 | 2026-09-21 | `app/virtual_disk_ops.rs`·`app/tests/virtual_disk.rs` | VDE-019 GPUI 목록·복사 상태 수용 테스트 착수 | 실제 파일 목록을 주입할 UI 테스트 seam과 복사 상태 렌더 검증이 없음 | `GuestFileSource` trait object 테스트 경계, 숨김·시스템 항목 포함 목록 렌더와 Ctrl+A 선택, 복사 진행·중지·실패 요약 카드 GPUI 테스트 2개 추가; 전체 137 passed·4 ignored | 실제 VirtualBox 패널 캡처·foreground 입력·복사 대상 E2E는 VDE-019 잔여 |
 | 2026-09-22 | `app/src/app/mod.rs`·`app/src/app/virtual_disk_ops.rs`·`app/src/app/virtual_disk_copy.rs`·`app/src/virtual_disk/vdi.rs`·`app/src/window/virtual_disk.rs`·`scripts/Invoke-ClaudeVisualCheck.ps1` | VDE-019 격리 합성 VDI 릴리스 E2E 보강 | 기존 하네스가 VirtualDisk 초기 패널과 실제 VDI 시드·복사 대상 검증을 지원하지 않음 | `-SeedVdi`·`-AutoCopyVdi`·`-InitialPanel VirtualDisk`와 검증 전용 환경 변수를 추가하고, 합성 NTFS VDI를 실제 release 앱에서 열어 숨김/시스템 항목 17개·937,234바이트 복사와 손상 항목 사유를 확인; 캡처 2건·전체 152 passed·4 ignored·Clippy 기존 경고 7건·53개 파일·20,690줄 기준 지도 갱신 | 실제 VBox 생성 VDI와 독립 Visual Reviewer는 VDE-019 잔여; 구현 commit `87937dc` push 완료 |

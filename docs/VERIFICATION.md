@@ -22,12 +22,12 @@
 하네스 미지원 상태를 `N/A` 사유 없이 `PASS`로 기록하지 않는다.
 
 최신 품질 게이트 기준은 `cargo check -p gpui-convenience-tools --locked`, 전체 테스트
-161 passed·4 ignored, 표준 `cargo clippy -p gpui-convenience-tools --all-targets --all-features --locked -- -D warnings` exit 0·경고
+163 passed·4 ignored, 표준 `cargo clippy -p gpui-convenience-tools --all-targets --all-features --locked -- -D warnings` exit 0·경고
 0건이다. `scripts/Verify-Workspace.ps1`도 IDE 안전 모드에서 필수 GPUI 테스트 26개와 전체
 테스트를 재실행해 `IDE_VERIFIED`를 출력했다. 실제 데스크톱 표면은 별도 포그라운드 조건이
 필요하므로 같은 실행에서 `DESKTOP_PENDING`으로 분리했다. 전체 `cargo fmt --check`는 기존
 baseline 포맷 차이가 남아 있어 별도 구조 정리 범위로 유지한다.
-이번 실행에서는 `DOCS_VERIFIED active=26 matrix=26`도 먼저 통과해 활성 TODO와 검증
+이번 실행에서는 `DOCS_VERIFIED active=28 matrix=28`도 먼저 통과해 활성 TODO와 검증
 매트릭스의 일대일 대응을 확인했다.
 
 ## 작업마다 적용하는 순서
@@ -122,6 +122,8 @@ SHA-256을 기록한다. 다른 검증자의 독립 검토가 요구되는 UI �
 
 | ID | 프로필 | B | T | E | V | R | C | 증거 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| VDE-022 | RUST | [x] | [x] | [x] | [ ] | [x] | [ ] | 실제 `D:\VMMachine\win11\TACS\TACS_1.vdi`를 읽기 전용으로 대조해 `VDI normal (base)`, `dynamic default`, GPT 1번 MSR, 2번 `-FVE-FS-` BitLocker를 확인; `classifies_bitlocker_and_microsoft_reserved_partitions_explicitly`, `encrypted_partition_error_explains_the_offline_boundary`, 전체 테스트 163 passed·4 ignored, release 캡처 `target/visual-validation/captures/vde022-final-095347.png`에서 MSR·BitLocker 라벨과 안내를 확인; 독립 Visual Reviewer와 커밋·푸시는 후속 |
+| VDE-023 | GPUI | [x] | [x] | [ ] | [x] | [x] | [ ] | `gpui::PathPromptOptions { files: true, directories: false, multiple: false }` 기반 네이티브 파일 선택 버튼과 경로 입력 반영 구현, `virtual_disk_panel_registers_navigation_and_renders_read_only_shell`에서 `virtual-disk-browse` bounds 확인, release 캡처 `target/visual-validation/captures/vde022-final-095347.png`에서 `찾아보기` 배치 확인; 실제 대화상자 열기·선택 입력은 포그라운드 안전 경계로 미수행, 커밋·푸시는 후속 |
 | VDE-012 | E2E | [x] | [x] | [x] | [ ] | [x] | [x] | `cargo check -p gpui-convenience-tools --locked`; 최신 전체 `cargo test --all-targets --all-features --locked` 160 passed·4 ignored; `virtual_disk::copy::tests::collecting_copy_errors_removes_partial_output_and_keeps_issue`로 원본 단축 읽기 실패 뒤 부분 대상 파일 제거와 원본 `SourceChanged` 사유 보존을 확인하고, 오류 행 selector·억제 키 저장/재로드·미억제 토스트 게이트와 `virtual_disk_panel_renders_copy_progress_and_issue_summary`의 GPUI `simulate_click` 억제/재표시 dispatch를 검증; 실제 VBox 생성 VDI 릴리스 복사에서 `many_subdirs` 손상 사유·17개 파일 부분 결과를 확인; 독립 Visual Reviewer와 실제 릴리스 버튼 조작은 잔여 |
 | VDE-014 | GPUI | [x] | [x] | [ ] | [x] | [x] | [x] | `cargo check -p gpui-convenience-tools --locked`; `cargo test --all-targets --all-features` (161 passed, 4 ignored); `virtual_disk_directory_row_double_click_enters_directory_and_refreshes_entries`가 실제 렌더 행에 `MouseDown/MouseUp click_count=2`를 전달해 폴더 진입·새로고침·오류 목록 제거를 확인하고, `shift_range_selection_uses_anchor_in_both_directions`로 순방향·역방향 Shift 범위 선택과 기준점 소실 경계를 확인했으며 GPUI 셸 테스트에 상위 이동 액션 경계를 포함; `virtual_disk_clears_stale_entries_when_directory_refresh_fails`로 손상 하위 폴더 진입 시 이전 목록 제거 확인; 최종 release 1200×1000 캡처 `target/visual-validation/captures/vde014-initial-guest-path-many-subdirs-final-042633.png`에서 현재 경로·손상 사유·빈 목록 확인; 최신 release 캡처 `target/visual-validation/captures/vde014-shift-range-release-final-045106.png`에서 16개 선택·숨김/시스템 행·카드 경계를 확인; 실제 폴더 진입 Click과 Shift 마우스 입력은 포그라운드 안전 검사에서 차단되어 E2E 성공으로 기록하지 않음; 세션 종료 후 프로세스 0·세션 루트 0 |
 | VDE-015 | GPUI | [x] | [x] | [x] | [x] | [x] | [x] | `cargo check -p gpui-convenience-tools --locked`; 최신 전체 `cargo test --all-targets --all-features --locked` 161 passed·4 ignored; `virtual_disk_copy` 백그라운드 이벤트·대상 입력·진행/중지/완료 카드 GPUI 경계 테스트, `virtual_disk::copy::tests::cancellation_stops_between_chunks_and_removes_partial_file`의 청크 경계 중지·부분 대상 파일 제거, `virtual_disk::copy::tests::collecting_copy_errors_removes_partial_output_and_keeps_issue`의 원본 단축 읽기 실패 정리를 확인; 릴리즈 `CLAUDE_LOCAL` 1000×700·920×700·1280×700 캡처 `target/visual-validation/captures/vde015-copy-card-1000-113840-203852.png`, `vde015-copy-card-920-113852-203905.png`, `vde015-copy-card-1280-113852-203905.png`; 최신 표준 VDI 자동 복사 캡처 `target/visual-validation/captures/vde015-continuation-autocopy-1850-035033.png`에서 파일 17개·915.3KB·실패 1개 요약 확인, 격리 대상 `-Force` 재검사 17개·937,234바이트와 손상 `many_subdirs` 사유 확인; 종료된 TACS VDI의 `$Extend/$RmMetadata/$TxfLog`를 `-ReadDelayMs 1000 -CancelAfterMs 2200`으로 실행해 실제 2MiB 파일 복사 중 0바이트 부분 파일 생성·취소 후 제거와 `중지됨 · 파일 2개 · 64.0 KB`를 확인하고 캡처 `target/visual-validation/captures/vde015-txf-log-slow-chunk-before-cancel-062617.png`, `target/visual-validation/captures/vde015-txf-log-slow-chunk-after-cancel-062619.png`를 남김; 원본 길이 85,269,151,744바이트·VM poweroff·세션 종료 후 process/session 0; 256MB NTFS VHD fixture 생성은 `diskpart` 50초 무응답으로 중지되어 VHD·드라이브·잔류 프로세스가 없음을 확인했으며 자연 속도 대용량 VDI 중지·독립 Visual Reviewer는 후속 |

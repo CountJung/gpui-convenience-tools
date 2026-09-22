@@ -18,6 +18,29 @@
 - `copyto`, `mkdir`, `rm`, `rmdir`, `mv`는 이 앱의 실행 중 VM 읽기 기능에서 호출하지 않는다.
   게스트에서 호스트로 가져오는 `copyfrom`만 허용한다.
 
+## 실제 VDI 진단 결과
+
+2026-09-22 현재 `D:\VMMachine\win11\TACS\TACS_1.vdi`는 `VBoxManage showmediuminfo`에서
+`VDI normal (base)`, `dynamic default`, `Encryption: disabled`로 확인됐다. 부모 VDI가
+필요한 차등 이미지나 VirtualBox 암호화 문제가 아니며, 등록 VM `TACS`도 `poweroff` 상태다.
+원본 VDI의 GPT 파티션 부트 영역을 읽기 전용으로 확인한 결과는 다음과 같다.
+
+```mermaid
+flowchart TD
+    vdi["TACS_1.vdi<br/>VDI normal base · dynamic"] --> gpt["GPT"]
+    gpt --> msr["파티션 1<br/>Microsoft Reserved(MSR)"]
+    gpt --> fve["파티션 2<br/>-FVE-FS- · BitLocker"]
+    msr --> nofiles["탐색할 게스트 파일 없음"]
+    fve --> locked["키 없이는 오프라인 NTFS 탐색 불가"]
+    ntfs["NTFS 3.1 파티션"] --> browse["현재 앱의 오프라인 탐색 경로"]
+```
+
+따라서 이 파일이 열리지 않는 원인은 VDI 컨테이너가 아니라 파일시스템 경계다. 기존
+탐색기는 NTFS 3.1 부트 시그니처만 인식해 MSR과 BitLocker를 모두
+`미지원/미확인 파일시스템`으로 표시했으므로, VDE-022에서 두 상태를 구분해 안내한다.
+BitLocker 복구 키를 앱에 저장하거나 암호화를 우회하지 않으며, 파일을 복사하려면
+복호화된 NTFS VDI 또는 별도 잠금 해제·검증 경로가 필요하다.
+
 ## 백엔드 분리
 
 ```mermaid

@@ -130,6 +130,10 @@ fn virtual_disk_panel_registers_navigation_and_renders_read_only_shell(cx: &mut 
         "VDI path input should be rendered"
     );
     assert!(
+        cx.debug_bounds("virtual-disk-browse").is_some(),
+        "native VDI file picker should be rendered"
+    );
+    assert!(
         cx.debug_bounds("virtual-disk-partitions-card").is_some(),
         "partition selection card should be rendered"
     );

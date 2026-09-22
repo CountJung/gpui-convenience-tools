@@ -59,6 +59,8 @@
 
 ### O-5. 검증·후속 백엔드
 
+- [ ] VDE-022 | 85% | GPT 파티션의 MSR·BitLocker 상태를 구분해 표시하고, 암호화된 오프라인 VDI를 NTFS로 오인하지 않도록 안내 — 실제 `TACS_1.vdi`의 GPT 타입 GUID와 `-FVE-FS-` 부트 시그니처를 읽기 전용으로 확인; `MicrosoftReserved`·`BitLocker` 판정·오류 안내·GPUI release 캡처 완료; 독립 Visual Reviewer와 커밋·푸시는 후속
+- [ ] VDE-023 | 80% | VirtualBox 디스크 탐색기의 VDI 경로에 네이티브 파일 열기 대화상자를 연결 — `prompt_for_paths(files=true, directories=false)`로 `찾아보기` 버튼을 추가하고 선택 결과를 입력창에 반영; GPUI bounds와 release 배치 확인; 실제 파일 선택 상호작용은 포그라운드 안전 경계로 미수행, 독립 Visual Reviewer와 커밋·푸시는 후속
 - [ ] VDE-019 | 95% | GPUI 자체 테스트와 격리 릴리스 실행으로 실제 파일 목록·숨김/시스템 항목·복사 진행/실패 요약·대상 폴더 복사를 확인 — VirtualBox 7.2.14가 `convertfromraw`로 생성한 표준 VDI와 export 테스트로 재생성한 합성 VDI를 최신 release 앱에서 재검증하고 캡처를 남김; 최신 release 1200×1000 캡처 `continuation-vde019-current-release-040648.png`와 이번 검증의 `continuation-current-vde019-1200x1000-052717.png`, `continuation-current-vde019-920x700-052734.png`에서 안전 경계·NTFS 3.1·숨김/시스템 항목·16개 선택 상태와 compact 폭의 행 경계를 확인; 추가로 `-ExternalVdiPath`와 검증 전용 `-VdiPartitionNumber 5` 경로로 종료된 실제 TACS VDI의 GPT·NTFS 3.1·파티션 5 루트·`$Extend` 복사 요약을 확인하고 `vde019-external-tacs-root-fixed-920x700-053642.png`, `vde019-external-tacs-root-fixed-1200x1000-053659.png`, `vde015-tacs-partition5-root-060904.png`, `vde015-tacs-extend-cancel-600-061151.png`를 남김; 구현 세션의 캡처이며 대용량 파일 중지·외부 키보드·실제 릴리스 오류 억제 버튼 클릭·독립 Visual Reviewer 확인은 후속
 - [ ] VDE-021 | 70% | 공식 `VBoxManage guestcontrol` 명령 계약·read-only 안전 경계·`GuestFileSource` 분리 설계를 `VIRTUAL_DISK_BACKENDS.md`에 기록 완료; 현재 `VBoxManage showvminfo TACS --machinereadable`에서 `VMState=poweroff`이고 Guest Additions·자격 증명 주입 확인 근거가 없어, 격리 VM·Guest Additions 준비 전에는 구현·완료 처리하지 않음
 

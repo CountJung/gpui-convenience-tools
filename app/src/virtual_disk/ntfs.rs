@@ -162,9 +162,19 @@ impl<S: PartitionSource> NtfsGuestFileSource<S> {
     /// 파티션의 시작 LBA부터 정확한 파티션 길이만 읽어 NTFS를 연다.
     pub fn open(source: S, partition: VdiPartition) -> Result<Self, VirtualDiskError> {
         if partition.filesystem != Some(GuestFileSystem::ntfs_3_1()) {
+            let detail = match partition.filesystem {
+                Some(GuestFileSystem::BitLocker) => {
+                    "BitLocker로 암호화된 파티션이라 복구 키 없이는 파일을 열 수 없습니다"
+                }
+                Some(GuestFileSystem::MicrosoftReserved) => {
+                    "Microsoft Reserved(MSR) 예약 영역에는 탐색할 게스트 파일이 없습니다"
+                }
+                Some(GuestFileSystem::Ntfs { .. }) => "지원하지 않는 NTFS 버전입니다",
+                None => "NTFS 파티션으로 식별되지 않은 파티션입니다",
+            };
             return Err(VirtualDiskError::UnsupportedFormat {
                 kind: UnsupportedFormatKind::FileSystem,
-                detail: "NTFS 파티션으로 식별되지 않은 파티션입니다".to_string(),
+                detail: detail.to_string(),
             });
         }
 

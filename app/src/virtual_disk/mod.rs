@@ -107,6 +107,10 @@ pub struct VdiPartition {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum GuestFileSystem {
     Ntfs { major: u8, minor: u8 },
+    /// Windows BitLocker로 암호화된 파티션이다. 복호화 키 없이는 파일 목록을 열 수 없다.
+    BitLocker,
+    /// Windows GPT의 Microsoft Reserved 영역이다. 게스트 파일을 담지 않는다.
+    MicrosoftReserved,
 }
 
 impl GuestFileSystem {

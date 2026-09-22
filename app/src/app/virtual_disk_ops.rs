@@ -6,7 +6,7 @@
 
 use std::{collections::{BTreeSet, HashSet}, path::PathBuf};
 
-use gpui::{AppContext, Context, Entity, FocusHandle, Window};
+use gpui::{AppContext, Context, Entity, FocusHandle, PathPromptOptions, Window};
 use gpui_component::{input::{InputEvent, InputState}, notification::NotificationType};
 
 use crate::virtual_disk::{
@@ -148,6 +148,46 @@ impl AppRoot {
         );
         self.virtual_disk.path_input = Some(input);
         self.subscriptions.push(subscription);
+    }
+
+    /// 네이티브 파일 열기 대화상자에서 VDI 경로를 입력창에 채운다.
+    ///
+    /// 파일을 고르는 것과 실제 VDI를 여는 동작을 분리해, 사용자가 선택 결과를
+    /// 확인한 뒤 명시적으로 읽기 전용 검사를 시작할 수 있게 한다.
+    pub(crate) fn pick_virtual_disk_file(
+        &mut self,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let receiver = cx.prompt_for_paths(PathPromptOptions {
+            files: true,
+            directories: false,
+            multiple: false,
+            prompt: Some("VirtualBox VDI 파일 선택".into()),
+        });
+
+        cx.spawn_in(window, async move |this, cx| {
+            let Ok(Ok(Some(paths))) = receiver.await else {
+                return;
+            };
+            let Some(path) = paths.into_iter().next() else {
+                return;
+            };
+            let picked = path.display().to_string();
+
+            let _ = this.update_in(cx, |this, window, cx| {
+                this.virtual_disk.path_text = picked.clone();
+                if let Some(input) = this.virtual_disk.path_input.clone() {
+                    input.update(cx, |state, cx| state.set_value(picked.clone(), window, cx));
+                }
+                this.push_log(
+                    "INFO",
+                    format!("VirtualBox VDI 파일을 선택했습니다: {picked}"),
+                );
+                cx.notify();
+            });
+        })
+        .detach();
     }
 
     /// 입력된 VDI를 read-only로 열고 파티션 목록을 검색한다.
@@ -381,6 +421,18 @@ fn format_virtual_disk_error(error: &VirtualDiskError) -> String {
         VirtualDiskError::UnsupportedFormat {
             kind: UnsupportedFormatKind::FileSystem,
             detail,
+        } if detail.contains("BitLocker") => format!(
+            "BitLocker로 암호화된 파티션은 오프라인 파일 탐색을 지원하지 않습니다. 복구 키를 저장하거나 우회하지 않으며, 복호화된 사본을 선택하세요. ({detail})"
+        ),
+        VirtualDiskError::UnsupportedFormat {
+            kind: UnsupportedFormatKind::FileSystem,
+            detail,
+        } if detail.contains("Microsoft Reserved") => format!(
+            "Microsoft Reserved(MSR) 예약 영역에는 탐색할 게스트 파일이 없습니다. ({detail})"
+        ),
+        VirtualDiskError::UnsupportedFormat {
+            kind: UnsupportedFormatKind::FileSystem,
+            detail,
         } => format!(
             "지원하지 않는 파일시스템입니다. 현재 오프라인 탐색은 NTFS 3.1만 지원합니다. ({detail})"
         ),
@@ -435,6 +487,18 @@ mod tests {
 
         assert!(message.contains("지원하지 않는 파일시스템"));
         assert!(message.contains("NTFS 3.1"));
+    }
+
+    #[test]
+    fn encrypted_partition_error_explains_the_offline_boundary() {
+        let message = format_virtual_disk_error(&VirtualDiskError::UnsupportedFormat {
+            kind: UnsupportedFormatKind::FileSystem,
+            detail: "BitLocker로 암호화된 파티션이라 복구 키 없이는 파일을 열 수 없습니다".to_string(),
+        });
+
+        assert!(message.contains("BitLocker"));
+        assert!(message.contains("복호화된 사본"));
+        assert!(message.contains("복구 키를 저장하거나 우회하지 않으며"));
     }
 }
 
