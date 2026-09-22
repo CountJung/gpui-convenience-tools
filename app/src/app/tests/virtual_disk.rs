@@ -195,6 +195,10 @@ fn virtual_disk_panel_registers_navigation_and_renders_read_only_shell(cx: &mut 
         "file list should be rendered"
     );
     assert!(
+        cx.debug_bounds("virtual-disk-layout-controls").is_some(),
+        "file list layout controls should be rendered"
+    );
+    assert!(
         cx.debug_bounds("virtual-disk-refresh").is_some(),
         "directory refresh action should be rendered"
     );
@@ -239,6 +243,7 @@ fn virtual_disk_folder_tree_navigates_nested_paths_without_repeated_list_clicks(
     });
     refresh(cx);
 
+    wheel_to_end(cx, "virtual-disk-page", -600.0);
     assert!(cx.debug_bounds("virtual-disk-tree-node-Users").is_some());
     click_debug_element(cx, "virtual-disk-tree-node-Users");
 
@@ -291,7 +296,76 @@ fn virtual_disk_explorer_keeps_tree_and_file_list_inside_compact_card(
                 && entries.origin.y + entries.size.height <= card_bottom,
             "file list should stay inside compact directory card: card={card:?}, entries={entries:?}"
         );
+        let tree_width = tree.size.width;
+        assert!(
+            tree_width <= px(220.0),
+            "default folder tree should prioritize the file list: tree={tree:?}"
+        );
     }
+}
+
+#[gpui::test]
+fn virtual_disk_layout_controls_update_and_reset_readable_column_widths(
+    cx: &mut TestAppContext,
+) {
+    initialize_components(cx);
+    let (view, cx) = cx.add_window_view(|_, _| loaded_virtual_disk_root());
+
+    cx.simulate_resize(size(px(DEFAULT_WINDOW_WIDTH), px(DEFAULT_WINDOW_HEIGHT)));
+    refresh(cx);
+
+    let before = cx.update(|_, app| {
+        let root = view.read(app);
+        (
+            root.virtual_disk.layout.attributes_width,
+            root.virtual_disk.layout.size_width,
+        )
+    });
+    click_debug_element(cx, "virtual-disk-layout-attributes-increase");
+    click_debug_element(cx, "virtual-disk-layout-size-increase");
+    let increased = cx.update(|_, app| {
+        let root = view.read(app);
+        (
+            root.virtual_disk.layout.attributes_width,
+            root.virtual_disk.layout.size_width,
+        )
+    });
+    assert_eq!(increased.0, before.0 + 8.0);
+    assert_eq!(increased.1, before.1 + 8.0);
+
+    click_debug_element(cx, "virtual-disk-layout-reset");
+    let reset = cx.update(|_, app| view.read(app).virtual_disk.layout.clone());
+    assert_eq!(reset, Default::default());
+}
+
+#[gpui::test]
+fn virtual_disk_tree_width_setting_is_clamped_and_persisted(cx: &mut TestAppContext) {
+    initialize_components(cx);
+    let (view, cx) = cx.add_window_view(|_, _| loaded_virtual_disk_root());
+
+    cx.simulate_resize(size(px(DEFAULT_WINDOW_WIDTH), px(DEFAULT_WINDOW_HEIGHT)));
+    refresh(cx);
+
+    cx.update(|_, app| {
+        view.update(app, |root, cx| {
+            root.set_virtual_disk_tree_width(228.0, cx);
+        });
+    });
+    refresh(cx);
+
+    let width = cx.update(|_, app| view.read(app).virtual_disk.layout.tree_width);
+    assert!(
+        (width - 228.0).abs() < f32::EPSILON,
+        "tree divider width should be retained in the session layout: {width}"
+    );
+
+    cx.update(|_, app| {
+        view.update(app, |root, cx| {
+            root.set_virtual_disk_tree_width(999.0, cx);
+        });
+    });
+    let clamped = cx.update(|_, app| view.read(app).virtual_disk.layout.tree_width);
+    assert_eq!(clamped, 240.0);
 }
 
 #[gpui::test]
@@ -343,8 +417,10 @@ fn virtual_disk_panel_renders_loaded_hidden_entries_and_selects_all_with_ctrl_a(
     cx.simulate_resize(size(px(DEFAULT_WINDOW_WIDTH), px(DEFAULT_WINDOW_HEIGHT)));
     refresh(cx);
 
+    wheel_to_end(cx, "virtual-disk-page", -600.0);
     assert!(cx.debug_bounds("virtual-disk-entry-0").is_some());
     assert!(cx.debug_bounds("virtual-disk-entry-1").is_some());
+    assert!(cx.debug_bounds("virtual-disk-column-attributes").is_some());
 
     click_debug_element(cx, "virtual-disk-entry-0");
     cx.simulate_keystrokes("ctrl-a");

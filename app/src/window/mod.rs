@@ -10,11 +10,11 @@ pub mod ui;
 pub mod virtual_disk;
 
 use gpui::{
-    div, AnyElement, InteractiveElement, IntoElement, ParentElement, Pixels, ScrollHandle,
-    StatefulInteractiveElement, Styled,
+    div, AnyElement, App, Entity, InteractiveElement, IntoElement, ParentElement, Pixels,
+    ScrollHandle, StatefulInteractiveElement, Styled, Window,
 };
 use gpui_component::{
-    resizable::{h_resizable, resizable_panel},
+    resizable::{h_resizable, resizable_panel, ResizableState},
     scroll::{Scrollbar, ScrollbarShow},
 };
 
@@ -35,6 +35,48 @@ pub fn balanced_split(
         .child(
             resizable_panel()
                 .size_range(left_min_width..Pixels::MAX)
+                .child(
+                    div()
+                        .debug_selector(move || format!("{id}-left-pane"))
+                        .size_full()
+                        .min_w_0()
+                        .min_h_0()
+                        .overflow_x_hidden()
+                        .child(left),
+                ),
+        )
+        .child(
+            resizable_panel()
+                .size_range(right_min_width..Pixels::MAX)
+                .child(
+                    div()
+                        .debug_selector(move || format!("{id}-right-pane"))
+                        .size_full()
+                        .min_w_0()
+                        .min_h_0()
+                        .overflow_x_hidden()
+                        .child(right),
+                ),
+        )
+        .into_any_element()
+}
+
+/// 초기 좌측 폭을 지정하고, 드래그가 끝났을 때 호출할 저장 콜백을 가진 수평 스플리터.
+pub fn resizable_split(
+    id: &'static str,
+    left_size: Pixels,
+    left_width_range: std::ops::Range<Pixels>,
+    right_min_width: Pixels,
+    left: AnyElement,
+    right: AnyElement,
+    on_resize: impl Fn(&Entity<ResizableState>, &mut Window, &mut App) + 'static,
+) -> AnyElement {
+    h_resizable(id)
+        .on_resize(on_resize)
+        .child(
+            resizable_panel()
+                .size(left_size)
+                .size_range(left_width_range)
                 .child(
                     div()
                         .debug_selector(move || format!("{id}-left-pane"))

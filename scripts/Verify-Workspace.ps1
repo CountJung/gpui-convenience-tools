@@ -36,6 +36,8 @@ $visualTests = @(
     "virtual_disk_directory_row_double_click_enters_directory_and_refreshes_entries",
     "virtual_disk_folder_tree_navigates_nested_paths_without_repeated_list_clicks",
     "virtual_disk_explorer_keeps_tree_and_file_list_inside_compact_card",
+    "virtual_disk_layout_controls_update_and_reset_readable_column_widths",
+    "virtual_disk_tree_width_setting_is_clamped_and_persisted",
     "virtual_disk_panel_renders_copy_progress_and_issue_summary",
     "virtual_disk_panel_dispatches_explorer_shortcuts_when_directory_is_focused"
 )

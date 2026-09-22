@@ -31,7 +31,7 @@
 안전 경계: 원본 VDI는 read-only로만 열고, 실행 중 VM의 VDI 직접 읽기는 구현하지 않는다.
 실행 중 VM 지원은 후속 `GuestFileSource` 구현으로만 추가한다(VDE-021).
 
-**최종 측정**: 2026-09-22 · `app/src` 총 56개 파일 · 22,488줄
+**최종 측정**: 2026-09-22 · `app/src` 총 57개 파일 · 22,900줄
 
 ## 크기 기준 — 줄 수는 증상이다
 
@@ -45,7 +45,7 @@
 | 800~1,000 | 🟡 경고 | 다음 작업 전에 구조 리팩터링 |
 | 1,000 초과 | 🔴 위반 | **즉시 리팩터링.** 다른 작업보다 우선 |
 
-현재 🔴 위반 **없음**, 🟡 경고 **6개**. 최대 파일은 920줄(`config.rs`)이며, 다음 구조 작업은 `config.rs`·`virtual_disk_ops.rs`·`virtual_disk.rs`·`partition.rs`·`vdi.rs`·`ntfs.rs`의 책임 증가를 먼저 검토한다.
+현재 🔴 위반 **없음**, 🟡 경고 **6개**. 최대 파일은 946줄(`config.rs`)이며, 다음 구조 작업은 `config.rs`·`virtual_disk.rs`·`virtual_disk_ops.rs`·`partition.rs`·`vdi.rs`·`ntfs.rs`의 책임 증가를 먼저 검토한다.
 줄 수와 무관하게 처리하는 중복 헬퍼는 아래 「중복 헬퍼 추적」에서 관리한다.
 
 `scripts/Assert-ProjectStructure.ps1`가 이 측정값을 자동 대조한다. 소스 파일을 추가·삭제·
@@ -73,7 +73,8 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | --- | ---: | --- |
 | `main.rs` | 133 | 진입점 — 로거 설치 → 테마 시드 → 윈도우 오픈, `--service`/`--tray` 플래그 분기 |
 | `theme.rs` | 143 | 테마 모드 적용과 스위치 팔레트 최소 대비 보정·번들 테마 감사 테스트 |
-| `config.rs` | 920 | `AppConfig`·`SyncJob`·`WatchMode`·`SymlinkMode`·`LogConfig`·`VirtualDiskConfig`·주기 프리셋·사이드바 폭·VDI 오류 억제 키 정의, 실행파일 옆 `settings.json` 우선 저장·구버전 AppData fallback·검증 데이터 루트 오버라이드 |
+| `config.rs` | 946 | `AppConfig`·`SyncJob`·`WatchMode`·`SymlinkMode`·`LogConfig`·`VirtualDiskConfig`·주기 프리셋·사이드바 폭·VDI 오류 억제 키 정의, 실행파일 옆 `settings.json` 우선 저장·구버전 AppData fallback·검증 데이터 루트 오버라이드 |
+| `config_layout.rs` | 103 | VDI 탐색기 트리·파일명 우선 열 폭 설정, 기본값·최소/최대 보정·구버전 역직렬화 기본값 |
 | `logging.rs` | 560 | 롤링 파일 로거 (`log::Log` 구현, 테스트용 출력 경로 주입) |
 | `sync_history.rs` | 223 | 동기화 완료 이력의 JSON 배열 저장·순서 보장·손상 파일 보존·개수/기간 보존·최신 목록 로드·소요 시간 계산 |
 | `util.rs` | 139 | 도메인 주인이 없는 순수 헬퍼 — `format_interval`·`interval_to_secs`·`TimeUnit` |
@@ -102,7 +103,7 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `mod.rs` | 673 | 폴더 동기화 엔진 (UI 비의존 순수 로직) — 진행 보고·중지·이어서 시작·제외 glob·심볼릭 링크 모드 경계 포함 |
 | `tests.rs` | 676 | 복사·건너뜀·심볼릭 링크 안전 건너뜀·미구현 모드 실패 경계·읽기 전용 대상 덮어쓰기·미러 삭제·실패 사유·진행 보고·중지·이어서 시작·제외 glob 단위 테스트 |
 
-### 앱 루트 (`app/src/app/`) — 4,928줄 / 13파일
+### 앱 루트 (`app/src/app/`) — 4,978줄 / 13파일
 
 `app.rs`(1,798줄)를 책임별로 분할한 결과다.
 
@@ -122,7 +123,7 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `watch.rs` | 303 | `notify` 재귀 watcher 소유·작업별 변경 이벤트 전달·2초 quiet debounce·감시 실패 중복 억제·작업 변경 시 정리 |
 | `validation.rs` | 112 | 릴리스 화면 검증 전용 초기 패널·VDI·파티션·게스트 경로·자동 중지·읽기 지연 시드·설정 화면; 사용자 설정에는 저장하지 않는 격리 입력 |
 
-### GPUI 회귀 테스트 (`app/src/app/tests/`) — 2,283줄 / 6파일
+### GPUI 회귀 테스트 (`app/src/app/tests/`) — 2,359줄 / 6파일
 
 테스트는 시나리오별 6개 파일로 나뉘며, 픽스처는 `mod.rs`가 단독 소유하고 하위 모듈은
 `use super::*`로 가져다 쓴다.
@@ -134,9 +135,9 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `interval.rs` | 226 | 주기 드롭다운·프리셋 추가/삭제·패널 간 공유 |
 | `mod.rs` | 191 | 공용 픽스처 (`test_app_root`·`TestPlatform`·`refresh`·`click_debug_element` 등) |
 | `theme.rs` | 85 | 테마 전환과 스위치 가시성 |
-| `virtual_disk.rs` | 553 | VirtualBox 탐색 네비게이션·VDI 입력·파티션 카드·현재 경로·지연 로딩 폴더 트리·컴팩트 트리/목록 경계·상위 이동·실제 목록·숨김/시스템 전체 선택·복사 진행/실패 요약·오류 억제 버튼 dispatch·키보드 단축키·손상 하위 폴더의 stale 목록 제거·안전/미지원 상태·새로고침 렌더 경계 |
+| `virtual_disk.rs` | 629 | VirtualBox 탐색 네비게이션·VDI 입력·파티션 카드·현재 경로·지연 로딩 폴더 트리·컴팩트 트리/목록 경계·열 폭 조절·상위 이동·실제 목록·숨김/시스템 전체 선택·복사 진행/실패 요약·오류 억제 버튼 dispatch·키보드 단축키·손상 하위 폴더의 stale 목록 제거·안전/미지원 상태·새로고침 렌더 경계 |
 
-### 패널 (`app/src/window/`) — 4,439줄 / 11파일
+### 패널 (`app/src/window/`) — 4,595줄 / 11파일
 
 | 파일 | 줄 | 책임 |
 | --- | ---: | --- |
@@ -149,8 +150,8 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `dashboard.rs` | 161 | 개요 — 전체 상태 요약과 최근 활동 (플랫폼별 요약 카드 + 동기화 상태 배지) |
 | `interval.rs` | 154 | 주기 선택 렌더 — 드롭다운 + (값·단위·추가) 행 + 등록된 프리셋 목록 |
 | `log_view.rs` | 110 | 시스템 — 화면 로그 가상 리스트와 로그 파일 현황 |
-| `mod.rs` | 107 | 패널 모듈 선언 + `balanced_split`·`scroll_pane` 레이아웃 헬퍼 |
-| `virtual_disk.rs` | 829 | 편의 기능 — VDI 경로 입력·파티션 선택·지연 로딩 폴더 트리·게스트 현재 경로·행 선택·폴더/상위 이동·컴팩트 좌우 탐색 영역·단축키 포커스·안전/미지원 상태·대상 폴더·복사 진행·오류 요약 억제/재표시·목록 새로고침·검증 자동 스크롤 |
+| `mod.rs` | 149 | 패널 모듈 선언 + 균형/초기 폭 지정 스플리터·`scroll_pane` 레이아웃 헬퍼 |
+| `virtual_disk.rs` | 943 | 편의 기능 — VDI 경로 입력·파티션 선택·지연 로딩 폴더 트리·게스트 현재 경로·행 선택·폴더/상위 이동·컴팩트 좌우 탐색 영역·사용자 조정 폭·단축키 포커스·안전/미지원 상태·대상 폴더·복사 진행·오류 요약 억제/재표시·목록 새로고침·검증 자동 스크롤 |
 
 ### 플랫폼 (`app/src/platform/`) — 2,390줄 / 8파일
 
@@ -387,6 +388,7 @@ G-001 판단: `muted`는 비활성 의미이므로 테두리와 hover를 추가�
 | 2026-09-22 | `scripts/Invoke-ClaudeVisualCheck.ps1`·`docs/TODO.md`·`docs/VERIFICATION.md` | D-020 최신 release 자체 시각 검증 | 기존 시드 캡처만으로 현재 release의 좁은 폭·넓은 폭 이력 카드 상태를 다시 확인할 필요가 있음 | `-SeedHistory -InitialPanel FileSync`로 994×702·1280×900을 순차 실행·캡처; 1280×900에서 중지·실패 포함·성공 3행과 건수·소요 시간 표시를 확인하고 `next-d020-history-065416.png`·`next-d020-history-1280-065430.png`를 남김, 세션 종료 후 프로세스와 임시 루트 0개 | 같은 구현 세션의 자체 시각 검증이며 독립 Visual Reviewer 확인은 후속 |
 | 2026-09-22 | `app/src/config.rs`·`app/src/app/mod.rs`·`app/src/app/ops.rs`·`app/src/app/validation.rs`·`app/src/app/virtual_disk_ops.rs`·`app/src/window/settings.rs`·`scripts/Invoke-ClaudeVisualCheck.ps1` | C-001 실행파일 옆 사용자 설정파일 | AppData의 `config.json`은 사용자가 찾기 어렵고 VDI 마지막 입력값은 재시작 후 사라짐 | 실행파일 옆 `settings.json` 우선 로드·저장, 구버전 AppData fallback, 격리 환경 override, `VirtualDiskConfig` 입력값 복원, 설정 저장·파일 위치 열기 버튼, 창 닫기·Drop 저장과 회귀 테스트 추가; 전체 167 passed·4 ignored·Clippy `-D warnings` 통과; release 설정 화면 1000×700 캡처 `target/visual-validation/captures/c001-settings-1000x700-111818.png`와 920×700 캡처 `target/visual-validation/captures/c001-settings-920x700-111840.png` 확인; 구조 56개 파일·22,003줄·최대 920줄 |
 | 2026-09-22 | `app/src/app/virtual_disk_ops.rs`·`app/src/window/virtual_disk.rs`·`app/src/app/tests/virtual_disk.rs`·`scripts/Verify-Workspace.ps1` | VDE-024 지연 로딩 폴더 트리와 컴팩트 탐색 영역 | 단일 파일 목록만 있어 깊은 폴더를 열 때 반복 클릭이 필요하고, 큰 행·카드가 페이지 스크롤을 빠르게 늘림 | `GuestDirectoryTreeNode` 기반 폴더 트리, 좌우 `balanced_split`, 내부 트리·목록 스크롤, 행·열·카드 크기 축소와 GPUI 중첩 경로·카드 경계 테스트를 추가; 전체 169 passed·4 ignored·Clippy `-D warnings`; release 920×700·1000×700·1280×900 캡처를 남겼고 실제 트리 Click은 좌표 변환으로 확정하지 않아 GPUI 이벤트 테스트 근거로 분리; commit `4af7cc6` push 완료; 현재 구조 56개 파일·22,488줄·최대 920줄 |
+| 2026-09-22 | `app/src/config_layout.rs`·`app/src/window/mod.rs`·`app/src/window/virtual_disk.rs`·`app/src/app/ops.rs`·`app/src/app/tests/virtual_disk.rs`·`.github/skills/gpui-visual-check/SKILL.md` | VDE-025 컬럼 폭 우선 배치와 레이아웃 영속화 | 스플리터가 폴더 트리를 과도하게 넓히고 파일명·속성·크기 열의 고정 폭이 읽기 영역을 압박하며, 사용자 조정값이 재시작 후 사라질 수 있음 | 트리 150~240px 제한·초기 폭 180px, 파일명 남은 폭 우선, 보조 열 최소 폭·조절 버튼·기본값 복원, `settings.json` 저장/복원·구버전 기본값, 리스트/그리드 컬럼 폭 규칙을 공통 지침과 시각 검증 스킬에 추가; 전체 172 passed·4 ignored·Clippy `-D warnings`, release 920×700·1000×700·1280×900 캡처; 현재 구조 57개 파일·22,900줄·최대 946줄 |
 | 2026-07-29 | 편의 기능 스플리터 3곳 | 공용 레이아웃 승격 | 패널별 고정 초기 폭 | `window::balanced_split` | 설정 pane 과도 축소 방지, 양쪽 가용폭 사용 |
 | 2026-07-29 | `app.rs` | 책임 단위 분할 + 재배치 | 1,798 | `app/` 7파일 (최대 564) | 대시보드·로그 렌더는 소유가 잘못돼 있어 `window/`로 이동 |
 | 2026-07-29 | `platform/windows.rs` | 책임 단위 분할 + 승격 | 1,361 | `platform/windows/` 6파일 (최대 344) | `wide_null`을 `windows/mod.rs`로 **공용 승격** |

@@ -8,6 +8,7 @@
 
 mod app;
 mod config;
+mod config_layout;
 mod logging;
 mod platform;
 mod sync;

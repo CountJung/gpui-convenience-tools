@@ -8,7 +8,11 @@ use gpui_component::notification::NotificationType;
 
 use super::state::{PlatformEvent, TargetApp};
 use super::AppRoot;
-use crate::config::{carry_over_engine_progress, update_config, LogConfig, VirtualDiskConfig};
+use crate::config::{
+    carry_over_engine_progress, normalize_virtual_disk_attributes_width,
+    normalize_virtual_disk_size_width, normalize_virtual_disk_tree_width, update_config, LogConfig,
+    VirtualDiskConfig,
+};
 
 impl AppRoot {
     /// 현재 화면의 사용자 조정값을 한 번에 저장한다.
@@ -44,6 +48,7 @@ impl AppRoot {
                 .map(|partition| partition.number),
             last_guest_path: Some(self.virtual_disk.current_path.to_string()),
             last_target_path: non_empty_string(&self.virtual_disk.copy.target_path_text),
+            layout: self.virtual_disk.layout.clone(),
         };
 
         update_config(move |config| {
@@ -61,6 +66,48 @@ impl AppRoot {
         })?;
 
         Ok(())
+    }
+
+    pub(crate) fn set_virtual_disk_tree_width(&mut self, width: f32, cx: &mut Context<Self>) {
+        self.virtual_disk.layout.tree_width = normalize_virtual_disk_tree_width(width);
+        self.persist_virtual_disk_layout();
+        cx.notify();
+    }
+
+    pub(crate) fn adjust_virtual_disk_attributes_width(
+        &mut self,
+        delta: f32,
+        cx: &mut Context<Self>,
+    ) {
+        let width = self.virtual_disk.layout.attributes_width + delta;
+        self.virtual_disk.layout.attributes_width = normalize_virtual_disk_attributes_width(width);
+        self.persist_virtual_disk_layout();
+        cx.notify();
+    }
+
+    pub(crate) fn adjust_virtual_disk_size_width(&mut self, delta: f32, cx: &mut Context<Self>) {
+        let width = self.virtual_disk.layout.size_width + delta;
+        self.virtual_disk.layout.size_width = normalize_virtual_disk_size_width(width);
+        self.persist_virtual_disk_layout();
+        cx.notify();
+    }
+
+    pub(crate) fn reset_virtual_disk_layout(&mut self, cx: &mut Context<Self>) {
+        self.virtual_disk.layout = Default::default();
+        self.persist_virtual_disk_layout();
+        cx.notify();
+    }
+
+    fn persist_virtual_disk_layout(&self) {
+        #[cfg(test)]
+        if !self.sync.external_side_effects_enabled {
+            return;
+        }
+
+        let layout = self.virtual_disk.layout.clone();
+        if let Err(err) = update_config(move |config| config.virtual_disk.layout = layout) {
+            log::warn!("VDI 탐색기 레이아웃 저장 실패: {err}");
+        }
     }
 
     // ─────────────────────────────────────────────

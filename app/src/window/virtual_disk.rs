@@ -8,18 +8,22 @@ use gpui::{
     div, px, AnyElement, ClickEvent, Context, InteractiveElement, IntoElement, ParentElement,
     StatefulInteractiveElement, Styled, Window,
 };
-use gpui_component::{h_flex, input::Input, theme::ActiveTheme, v_flex};
+use gpui_component::{h_flex, input::Input, theme::ActiveTheme, v_flex, PixelsExt};
 
 use crate::app::{
     AppRoot, CopySelected, EnterSelected, GuestDirectoryTreeNode, ParentDirectory, Refresh,
     SelectAll,
     VIRTUAL_DISK_KEY_CONTEXT,
 };
+use crate::config::{
+    normalize_virtual_disk_attributes_width, normalize_virtual_disk_kind_width,
+    normalize_virtual_disk_size_width, normalize_virtual_disk_tree_width,
+};
 use crate::virtual_disk::{
     GuestFileAttributes, GuestFileKind, GuestFileSystem, PartitionTableKind,
 };
 
-use super::{balanced_split, scroll_pane};
+use super::{resizable_split, scroll_pane};
 use super::ui::{self, ButtonStyle};
 
 pub fn render(this: &mut AppRoot, window: &mut Window, cx: &mut Context<AppRoot>) -> AnyElement {
@@ -245,6 +249,8 @@ fn render_directory_card(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyEl
     let entries = render_directory_entries(this, &focus_handle, cx);
     let theme = cx.theme();
     let explorer_focus_handle = focus_handle.clone();
+    let tree_width = normalize_virtual_disk_tree_width(this.virtual_disk.layout.tree_width);
+    let layout_owner = cx.entity();
     let explorer = div()
         .id("virtual-disk-explorer-focus")
         .w_full()
@@ -253,12 +259,22 @@ fn render_directory_card(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyEl
         .on_click(cx.listener(move |_this, _event, window, _cx| {
             window.focus(&explorer_focus_handle);
         }))
-        .child(balanced_split(
+        .child(resizable_split(
             "virtual-disk-explorer",
-            px(220.0),
-            px(360.0),
+            px(tree_width),
+            px(150.0)..px(240.0),
+            px(440.0),
             tree,
             entries,
+            move |state, _window, app| {
+                let Some(width) = state.read(app).sizes().first().map(|size| size.as_f32())
+                else {
+                    return;
+                };
+                layout_owner.update(app, |this, cx| {
+                    this.set_virtual_disk_tree_width(width, cx);
+                });
+            },
         ));
 
     v_flex()
@@ -348,7 +364,71 @@ fn render_directory_card(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyEl
                 .text_color(theme.muted_foreground)
                 .child("Enter 폴더 열기 · Backspace 상위 · Ctrl+A 전체 선택 · F5 새로고침"),
         )
+        .child(render_directory_layout_controls(this, cx))
         .child(explorer)
+        .into_any_element()
+}
+
+fn render_directory_layout_controls(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElement {
+    let theme = cx.theme();
+    let layout = &this.virtual_disk.layout;
+    let tree_width = layout.tree_width.round();
+    let attributes_width = layout.attributes_width.round();
+    let size_width = layout.size_width.round();
+
+    h_flex()
+        .debug_selector(|| "virtual-disk-layout-controls".to_string())
+        .w_full()
+        .min_w_0()
+        .gap_1()
+        .items_center()
+        .text_color(theme.muted_foreground)
+        .child(div().child(format!("폭 · 트리 {tree_width}px")))
+        .child(div().debug_selector(|| "virtual-disk-layout-attributes-decrease".to_string()).child(ui::action_button(
+            "virtual-disk-layout-attributes-decrease-action",
+            format!("속성 - ({attributes_width:.0})"),
+            ui::Size::Sm,
+            ButtonStyle::neutral(cx),
+            cx.listener(|this, _event, _window, cx| {
+                this.adjust_virtual_disk_attributes_width(-8.0, cx);
+            }),
+        )))
+        .child(div().debug_selector(|| "virtual-disk-layout-attributes-increase".to_string()).child(ui::action_button(
+            "virtual-disk-layout-attributes-increase-action",
+            "속성 +",
+            ui::Size::Sm,
+            ButtonStyle::neutral(cx),
+            cx.listener(|this, _event, _window, cx| {
+                this.adjust_virtual_disk_attributes_width(8.0, cx);
+            }),
+        )))
+        .child(div().debug_selector(|| "virtual-disk-layout-size-decrease".to_string()).child(ui::action_button(
+            "virtual-disk-layout-size-decrease-action",
+            format!("크기 - ({size_width:.0})"),
+            ui::Size::Sm,
+            ButtonStyle::neutral(cx),
+            cx.listener(|this, _event, _window, cx| {
+                this.adjust_virtual_disk_size_width(-8.0, cx);
+            }),
+        )))
+        .child(div().debug_selector(|| "virtual-disk-layout-size-increase".to_string()).child(ui::action_button(
+            "virtual-disk-layout-size-increase-action",
+            "크기 +",
+            ui::Size::Sm,
+            ButtonStyle::neutral(cx),
+            cx.listener(|this, _event, _window, cx| {
+                this.adjust_virtual_disk_size_width(8.0, cx);
+            }),
+        )))
+        .child(div().debug_selector(|| "virtual-disk-layout-reset".to_string()).child(ui::action_button(
+            "virtual-disk-layout-reset-action",
+            "기본값",
+            ui::Size::Sm,
+            ButtonStyle::secondary(cx),
+            cx.listener(|this, _event, _window, cx| {
+                this.reset_virtual_disk_layout(cx);
+            }),
+        )))
         .into_any_element()
 }
 
@@ -467,6 +547,10 @@ fn render_directory_entries(
     cx: &mut Context<AppRoot>,
 ) -> AnyElement {
     let theme = cx.theme();
+    let kind_width = normalize_virtual_disk_kind_width(this.virtual_disk.layout.kind_width);
+    let attributes_width =
+        normalize_virtual_disk_attributes_width(this.virtual_disk.layout.attributes_width);
+    let size_width = normalize_virtual_disk_size_width(this.virtual_disk.layout.size_width);
     let mut entries = v_flex().w_full().min_w_0().gap_1();
 
     if this.virtual_disk.source.is_none() {
@@ -492,10 +576,31 @@ fn render_directory_entries(
                 .px_2()
                 .py_1()
                 .text_color(theme.muted_foreground)
-                .child(div().flex_1().min_w_0().child("이름"))
-                .child(div().w(px(44.0)).flex_shrink_0().child("종류"))
-                .child(div().w(px(84.0)).flex_shrink_0().child("속성"))
-                .child(div().w(px(76.0)).flex_shrink_0().child("크기")),
+                .child(div().flex_1().min_w(px(140.0)).child("이름"))
+                .child(
+                    div()
+                        .debug_selector(|| "virtual-disk-column-kind".to_string())
+                        .w(px(kind_width))
+                        .min_w(px(kind_width))
+                        .flex_shrink_0()
+                        .child("종류"),
+                )
+                .child(
+                    div()
+                        .debug_selector(|| "virtual-disk-column-attributes".to_string())
+                        .w(px(attributes_width))
+                        .min_w(px(attributes_width))
+                        .flex_shrink_0()
+                        .child("속성"),
+                )
+                .child(
+                    div()
+                        .debug_selector(|| "virtual-disk-column-size".to_string())
+                        .w(px(size_width))
+                        .min_w(px(size_width))
+                        .flex_shrink_0()
+                        .child("크기"),
+                ),
         );
         for (index, entry) in this.virtual_disk.entries.iter().enumerate() {
             let is_directory = matches!(entry.kind, GuestFileKind::Directory);
@@ -544,25 +649,33 @@ fn render_directory_entries(
                     .child(
                         div()
                             .flex_1()
-                            .min_w_0()
+                            .min_w(px(140.0))
                             .overflow_hidden()
                             .whitespace_nowrap()
                             .text_color(theme.foreground)
                             .child(name),
                     )
-                    .child(ui::badge(
-                        kind_label,
-                        if is_directory {
-                            ui::Tone::Info
-                        } else {
-                            ui::Tone::Muted
-                        },
-                        ui::Size::Sm,
-                        cx,
-                    ))
                     .child(
                         div()
-                            .w(px(84.0))
+                            .w(px(kind_width))
+                            .min_w(px(kind_width))
+                            .flex_shrink_0()
+                            .overflow_hidden()
+                            .child(ui::badge(
+                                kind_label,
+                                if is_directory {
+                                    ui::Tone::Info
+                                } else {
+                                    ui::Tone::Muted
+                                },
+                                ui::Size::Sm,
+                                cx,
+                            )),
+                    )
+                    .child(
+                        div()
+                            .w(px(attributes_width))
+                            .min_w(px(attributes_width))
                             .flex_shrink_0()
                             .overflow_hidden()
                             .whitespace_nowrap()
@@ -571,7 +684,8 @@ fn render_directory_entries(
                     )
                     .child(
                         div()
-                            .w(px(76.0))
+                            .w(px(size_width))
+                            .min_w(px(size_width))
                             .flex_shrink_0()
                             .overflow_hidden()
                             .whitespace_nowrap()

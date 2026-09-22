@@ -4,6 +4,10 @@ use serde::{Deserialize, Serialize};
 use std::{fs, path::PathBuf, process::Command};
 
 use crate::app::TargetApp;
+pub use crate::config_layout::{
+    normalize_virtual_disk_attributes_width, normalize_virtual_disk_kind_width,
+    normalize_virtual_disk_size_width, normalize_virtual_disk_tree_width, VirtualDiskLayoutConfig,
+};
 
 /// 앱 셸 사이드바의 기본 폭과 허용 범위.
 pub const DEFAULT_SIDEBAR_WIDTH: f32 = 240.0;
@@ -266,7 +270,7 @@ fn default_true() -> bool {
 ///
 /// VDI를 자동으로 열거나 파티션을 자동 선택하지는 않는다. 앱 시작 시 입력창에만
 /// 복원하고, 사용자가 `VDI 열기`와 파티션 선택을 명시적으로 수행해야 다시 검사한다.
-#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
 pub struct VirtualDiskConfig {
     #[serde(default)]
     pub last_vdi_path: Option<String>,
@@ -276,6 +280,8 @@ pub struct VirtualDiskConfig {
     pub last_guest_path: Option<String>,
     #[serde(default)]
     pub last_target_path: Option<String>,
+    #[serde(default)]
+    pub layout: VirtualDiskLayoutConfig,
 }
 
 // ─────────────────────────────────────────────
@@ -663,6 +669,10 @@ mod tests {
         assert_eq!(config.sidebar_width, DEFAULT_SIDEBAR_WIDTH);
         assert!(config.virtual_disk_suppressed_issue_keys.is_empty());
         assert_eq!(config.virtual_disk, VirtualDiskConfig::default());
+        assert_eq!(
+            config.virtual_disk.layout,
+            VirtualDiskLayoutConfig::default()
+        );
     }
 
     #[test]
@@ -703,6 +713,12 @@ mod tests {
                 last_partition_number: Some(5),
                 last_guest_path: Some("/Users/Public".to_string()),
                 last_target_path: Some(r"D:\Recovered".to_string()),
+                layout: VirtualDiskLayoutConfig {
+                    tree_width: 204.0,
+                    kind_width: 72.0,
+                    attributes_width: 132.0,
+                    size_width: 108.0,
+                },
             },
             ..AppConfig::default()
         };
@@ -721,6 +737,16 @@ mod tests {
         assert_eq!(normalize_sidebar_width(480.0), MAX_SIDEBAR_WIDTH);
         assert_eq!(normalize_sidebar_width(f32::NAN), DEFAULT_SIDEBAR_WIDTH);
         assert_eq!(normalize_sidebar_width(320.0), 320.0);
+    }
+
+    #[test]
+    fn virtual_disk_layout_widths_are_normalized_to_readable_ranges() {
+        assert_eq!(normalize_virtual_disk_tree_width(100.0), 150.0);
+        assert_eq!(normalize_virtual_disk_tree_width(400.0), 240.0);
+        assert_eq!(normalize_virtual_disk_tree_width(f32::NAN), 180.0);
+        assert_eq!(normalize_virtual_disk_attributes_width(80.0), 96.0);
+        assert_eq!(normalize_virtual_disk_size_width(200.0), 144.0);
+        assert_eq!(normalize_virtual_disk_kind_width(72.0), 72.0);
     }
 
     /// 구버전 SyncJob에는 id가 없으므로 ensure_id로 채워야 한다.

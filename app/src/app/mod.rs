@@ -280,6 +280,7 @@ impl AppRoot {
                         .unwrap_or_default(),
                     ..Default::default()
                 },
+                layout: virtual_disk_config.layout.clone(),
                 suppressed_issue_keys: virtual_disk_suppressed_issue_keys,
                 ..VirtualDiskSession::default()
             },
