@@ -395,3 +395,40 @@ fn sidebar_wheel_scroll_reaches_last_navigation_item(cx: &mut TestAppContext) {
          viewport={viewport:?}, settings={settings:?}"
     );
 }
+
+#[gpui::test]
+fn settings_page_keeps_user_config_actions_inside_the_card(cx: &mut TestAppContext) {
+    initialize_components(cx);
+    let (_view, cx) = cx.add_window_view(|_, _| test_app_root(ActivePanel::Settings));
+    cx.simulate_resize(size(px(DEFAULT_WINDOW_WIDTH), px(DEFAULT_WINDOW_HEIGHT)));
+    refresh(cx);
+
+    let content = cx
+        .debug_bounds("content-area")
+        .expect("settings content should be rendered");
+    let card = cx
+        .debug_bounds("settings-user-config-card")
+        .expect("user config card should be rendered");
+    let save = cx
+        .debug_bounds("save-settings")
+        .expect("save settings action should be rendered");
+    let open = cx
+        .debug_bounds("open-settings-file")
+        .expect("open settings action should be rendered");
+
+    let content_right = content.origin.x + content.size.width;
+    let card_right = card.origin.x + card.size.width;
+    let save_right = save.origin.x + save.size.width;
+    let open_right = open.origin.x + open.size.width;
+    assert!(
+        card.origin.x >= content.origin.x && card_right <= content_right,
+        "user config card should stay inside content: content={content:?}, card={card:?}"
+    );
+    assert!(
+        save.origin.x >= card.origin.x
+            && save_right <= card_right
+            && open.origin.x >= card.origin.x
+            && open_right <= card_right,
+        "settings actions should stay inside the card: card={card:?}, save={save:?}, open={open:?}"
+    );
+}

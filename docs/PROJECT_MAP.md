@@ -31,7 +31,7 @@
 안전 경계: 원본 VDI는 read-only로만 열고, 실행 중 VM의 VDI 직접 읽기는 구현하지 않는다.
 실행 중 VM 지원은 후속 `GuestFileSource` 구현으로만 추가한다(VDE-021).
 
-**최종 측정**: 2026-09-22 · `app/src` 총 56개 파일 · 21,607줄
+**최종 측정**: 2026-09-22 · `app/src` 총 56개 파일 · 22,003줄
 
 ## 크기 기준 — 줄 수는 증상이다
 
@@ -45,7 +45,7 @@
 | 800~1,000 | 🟡 경고 | 다음 작업 전에 구조 리팩터링 |
 | 1,000 초과 | 🔴 위반 | **즉시 리팩터링.** 다른 작업보다 우선 |
 
-현재 🔴 위반 **없음**, 🟡 경고 **3개**. 최대 파일은 846줄(`virtual_disk/partition.rs`)이며, 다음 구조 작업은 `partition.rs`·`vdi.rs`·`ntfs.rs`의 책임 증가를 먼저 검토한다.
+현재 🔴 위반 **없음**, 🟡 경고 **4개**. 최대 파일은 920줄(`config.rs`)이며, 다음 구조 작업은 `config.rs`·`partition.rs`·`vdi.rs`·`ntfs.rs`의 책임 증가를 먼저 검토한다.
 줄 수와 무관하게 처리하는 중복 헬퍼는 아래 「중복 헬퍼 추적」에서 관리한다.
 
 `scripts/Assert-ProjectStructure.ps1`가 이 측정값을 자동 대조한다. 소스 파일을 추가·삭제·
@@ -73,7 +73,7 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | --- | ---: | --- |
 | `main.rs` | 133 | 진입점 — 로거 설치 → 테마 시드 → 윈도우 오픈, `--service`/`--tray` 플래그 분기 |
 | `theme.rs` | 143 | 테마 모드 적용과 스위치 팔레트 최소 대비 보정·번들 테마 감사 테스트 |
-| `config.rs` | 751 | `AppConfig`·`SyncJob`·`WatchMode`·`SymlinkMode`·`LogConfig`·주기 프리셋·사이드바 폭·VDI 오류 억제 키 정의, 동기화 제외 패턴 스키마, `update_config` 단일 저장 경로, 데이터 루트 오버라이드 |
+| `config.rs` | 920 | `AppConfig`·`SyncJob`·`WatchMode`·`SymlinkMode`·`LogConfig`·`VirtualDiskConfig`·주기 프리셋·사이드바 폭·VDI 오류 억제 키 정의, 실행파일 옆 `settings.json` 우선 저장·구버전 AppData fallback·검증 데이터 루트 오버라이드 |
 | `logging.rs` | 560 | 롤링 파일 로거 (`log::Log` 구현, 테스트용 출력 경로 주입) |
 | `sync_history.rs` | 223 | 동기화 완료 이력의 JSON 배열 저장·순서 보장·손상 파일 보존·개수/기간 보존·최신 목록 로드·소요 시간 계산 |
 | `util.rs` | 139 | 도메인 주인이 없는 순수 헬퍼 — `format_interval`·`interval_to_secs`·`TimeUnit` |
@@ -102,27 +102,27 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `mod.rs` | 673 | 폴더 동기화 엔진 (UI 비의존 순수 로직) — 진행 보고·중지·이어서 시작·제외 glob·심볼릭 링크 모드 경계 포함 |
 | `tests.rs` | 676 | 복사·건너뜀·심볼릭 링크 안전 건너뜀·미구현 모드 실패 경계·읽기 전용 대상 덮어쓰기·미러 삭제·실패 사유·진행 보고·중지·이어서 시작·제외 glob 단위 테스트 |
 
-### 앱 루트 (`app/src/app/`) — 4,482줄 / 13파일
+### 앱 루트 (`app/src/app/`) — 4,644줄 / 13파일
 
 `app.rs`(1,798줄)를 책임별로 분할한 결과다.
 
 | 파일 | 줄 | 책임 |
 | --- | ---: | --- |
-| `mod.rs` | 748 | `AppRoot` 정의·생성자·동기화 이력 초기 로드·백그라운드 UI wake·사이드바(전역 스위치 2개 포함)·폭/VDI 억제 설정 복원·최상위 레이아웃 |
+| `mod.rs` | 778 | `AppRoot` 정의·생성자·동기화 이력 초기 로드·백그라운드 UI wake·사이드바(전역 스위치 2개 포함)·폭/VDI 억제 설정 복원·최상위 레이아웃·종료 저장 |
 | `sync_ops.rs` | 457 | 파일 동기화 작업 조작 (추가·삭제·선택·이름·경로·제외 패턴 입력 저장·수동 실행 큐·중지·전역 스위치·커서 무효화) |
 | `interval.rs` | 313 | 주기 선택 상태(`IntervalPicker`)와 조작 — 프리셋 추가·삭제·드롭다운 동기화 |
 | `events.rs` | 326 | `PlatformEvent` 채널 소비, 진행 상태·동기화 이력·감시 실패 강등 반영, 로그·토스트 유틸 |
 | `background.rs` | 459 | 스캔 스레드와 동기화 스레드 (다중 광고 창 추적·복원·진행 이벤트 빈도 제한·중지·실행 위치·동기화 이력 영속화·실시간 watcher 연동) |
 | `state.rs` | 262 | 순수 데이터 타입 (`AppState`, `PlatformEvent`, `SyncRunning`, `ActivePanel`, 감시 실패 강등 이벤트, 타깃별 `NAV_*`) |
-| `ops.rs` | 195 | 광고 차단·서비스 관리·로그 설정 조작 |
+| `ops.rs` | 252 | 광고 차단·서비스 관리·로그 설정 조작·사용자 설정 일괄 저장 |
 | `inputs.rs` | 136 | 입력 위젯(`InputState`) 지연 생성과 값 동기화 — 파일 동기화 제외 패턴 멀티라인 편집기 포함 |
 | `ui_state.rs` | 79 | `ServiceState`·`SyncState`·`AdBlockState`와 최근 동기화 이력 — 단일 `AppRoot` 엔티티가 소유하는 기능별 UI 상태 묶음 |
-| `virtual_disk_ops.rs` | 629 | VDI 경로 입력·read-only 열기·파티션 검색/선택·게스트 목록 새로고침·폴더 이동·Ctrl 토글/Shift 범위 다중 선택·포커스·stale 목록 제거를 포함한 안전 오류 안내·항목별 반복 알림 억제 저장 |
+| `virtual_disk_ops.rs` | 704 | VDI 경로 입력·read-only 열기·파티션 검색/선택·게스트 목록 새로고침·폴더 이동·Ctrl 토글/Shift 범위 다중 선택·포커스·stale 목록 제거를 포함한 안전 오류 안내·항목별 반복 알림 억제 저장·마지막 경로 복원 |
 | `virtual_disk_copy.rs` | 564 | VDI 대상 폴더 입력·선택, 백그라운드 read-only 복사, 청크 단위 중지 요청, 진행·중지·완료 요약·항목별 오류 로그·미억제 토스트 게이트·탐색기 keymap·검증 자동 복사·검증 자동 중지·검증 전용 읽기 지연 |
 | `watch.rs` | 303 | `notify` 재귀 watcher 소유·작업별 변경 이벤트 전달·2초 quiet debounce·감시 실패 중복 억제·작업 변경 시 정리 |
-| `validation.rs` | 111 | 릴리스 화면 검증 전용 초기 패널·VDI·파티션·게스트 경로·자동 중지·읽기 지연 시드; 사용자 설정에는 저장하지 않는 격리 입력 |
+| `validation.rs` | 112 | 릴리스 화면 검증 전용 초기 패널·VDI·파티션·게스트 경로·자동 중지·읽기 지연 시드·설정 화면; 사용자 설정에는 저장하지 않는 격리 입력 |
 
-### GPUI 회귀 테스트 (`app/src/app/tests/`) — 2,057줄 / 6파일
+### GPUI 회귀 테스트 (`app/src/app/tests/`) — 2,094줄 / 6파일
 
 테스트는 시나리오별 6개 파일로 나뉘며, 픽스처는 `mod.rs`가 단독 소유하고 하위 모듈은
 `use super::*`로 가져다 쓴다.
@@ -130,19 +130,19 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | 파일 | 줄 | 책임 |
 | --- | ---: | --- |
 | `file_sync.rs` | 794 | 동기화 조작·진행 표시줄·중지·로그 요약·최근 이력 카드·섹션 너비·전역 스위치·커서 무효화·제외 패턴·감시 방식 UI 경계·저장 연결 |
-| `layout.rs` | 397 | 사이드바·스플리터·카드 경계·divider drag·스크롤 |
+| `layout.rs` | 434 | 사이드바·스플리터·카드 경계·divider drag·스크롤·사용자 설정 저장 카드 |
 | `interval.rs` | 226 | 주기 드롭다운·프리셋 추가/삭제·패널 간 공유 |
 | `mod.rs` | 191 | 공용 픽스처 (`test_app_root`·`TestPlatform`·`refresh`·`click_debug_element` 등) |
 | `theme.rs` | 85 | 테마 전환과 스위치 가시성 |
 | `virtual_disk.rs` | 364 | VirtualBox 탐색 네비게이션·VDI 입력·파티션 카드·현재 경로·상위 이동·실제 목록·숨김/시스템 전체 선택·복사 진행/실패 요약·오류 억제 버튼 dispatch·키보드 단축키·손상 하위 폴더의 stale 목록 제거·안전/미지원 상태·새로고침 렌더 경계 |
 
-### 패널 (`app/src/window/`) — 4,146줄 / 11파일
+### 패널 (`app/src/window/`) — 4,237줄 / 11파일
 
 | 파일 | 줄 | 책임 |
 | --- | ---: | --- |
 | `service_mgr.rs` | 670 | 편의 기능 — Windows 서비스 (목록/제어 ↔ 검색·필터·권한) |
 | `file_sync.rs` | 727 | 편의 기능 — 파일 동기화 (작업 목록 → 설정·제외 패턴·감시 방식 → 실패 기록·최근 실행 이력 + 하단 고정 진행 표시줄) |
-| `settings.rs` | 444 | 전역 설정 — 테마 선택·로그 보관 정책 |
+| `settings.rs` | 535 | 전역 설정 — 사용자 설정파일 경로·저장/열기·테마 선택·로그 보관 정책 |
 | `ad_block.rs` | 502 | 편의 기능 — 웹뷰 광고 차단 (상태·타겟 ↔ 스캔 주기·프로세스 추가·카드 경계) |
 | `service_view.rs` | 317 | 시스템 — 자동 시작(작업 스케줄러) 등록·삭제·즉시 실행 |
 | `ui.rs` | 327 | **공용 UI 프리미티브** — 배지·액션 버튼·토글 스위치·통계 타일·설정 행·선택 칩·로그 레벨 칸·폭 경계 |
@@ -385,6 +385,7 @@ G-001 판단: `muted`는 비활성 의미이므로 테두리와 hover를 추가�
 | 2026-09-22 | `app/build.rs`·`app/resources.rc`·`app/*.exe.manifest`·`docs/TODO.md`·`docs/VERIFICATION.md` | G-004 UAC 매니페스트 선택 경계 확인 | 매니페스트 파일은 `requireAdministrator`를 선언하지만 `build.rs`는 `/MANIFEST:NO`만 지정하고 해당 파일을 참조하지 않음 | 삭제(a)와 실제 임베드(b)의 갈림길을 사용자 판단 항목으로 등록하고, 삭제·임베드 전에는 파일을 변경하지 않음; `rg` 읽기 전용 점검으로 근거 기록 | 제품의 권한 상승 정책과 배포 방식 확정 전에는 죽은 파일 삭제나 매니페스트 임베드를 수행하지 않음 |
 | 2026-09-22 | `app/src/sync/tests.rs`·`docs/TODO.md`·`docs/VERIFICATION.md` | D-006 대량 파일 비용 측정 | 정확한 진행률 사전 스캔은 복사 순회를 한 번 더 수행하므로 비용 근거가 필요함 | 무시된 3,000개 파일 성능 테스트를 실제 임시 폴더에서 실행해 1회 복사 3.633초·826 files/sec 확인; 사전 스캔 비용은 아직 별도 측정하지 않아 사용자 판단 항목으로 유지 | 사전 스캔 도입 여부와 허용 가능한 대용량 지연은 제품 결정 후 D-007·D-008로 진행 |
 | 2026-09-22 | `scripts/Invoke-ClaudeVisualCheck.ps1`·`docs/TODO.md`·`docs/VERIFICATION.md` | D-020 최신 release 자체 시각 검증 | 기존 시드 캡처만으로 현재 release의 좁은 폭·넓은 폭 이력 카드 상태를 다시 확인할 필요가 있음 | `-SeedHistory -InitialPanel FileSync`로 994×702·1280×900을 순차 실행·캡처; 1280×900에서 중지·실패 포함·성공 3행과 건수·소요 시간 표시를 확인하고 `next-d020-history-065416.png`·`next-d020-history-1280-065430.png`를 남김, 세션 종료 후 프로세스와 임시 루트 0개 | 같은 구현 세션의 자체 시각 검증이며 독립 Visual Reviewer 확인은 후속 |
+| 2026-09-22 | `app/src/config.rs`·`app/src/app/mod.rs`·`app/src/app/ops.rs`·`app/src/app/validation.rs`·`app/src/app/virtual_disk_ops.rs`·`app/src/window/settings.rs`·`scripts/Invoke-ClaudeVisualCheck.ps1` | C-001 실행파일 옆 사용자 설정파일 | AppData의 `config.json`은 사용자가 찾기 어렵고 VDI 마지막 입력값은 재시작 후 사라짐 | 실행파일 옆 `settings.json` 우선 로드·저장, 구버전 AppData fallback, 격리 환경 override, `VirtualDiskConfig` 입력값 복원, 설정 저장·파일 위치 열기 버튼, 창 닫기·Drop 저장과 회귀 테스트 추가; 전체 167 passed·4 ignored·Clippy `-D warnings` 통과; release 설정 화면 1000×700 캡처 `target/visual-validation/captures/c001-settings-1000x700-111818.png`와 920×700 캡처 `target/visual-validation/captures/c001-settings-920x700-111840.png` 확인; 구조 56개 파일·22,003줄·최대 920줄 |
 | 2026-07-29 | 편의 기능 스플리터 3곳 | 공용 레이아웃 승격 | 패널별 고정 초기 폭 | `window::balanced_split` | 설정 pane 과도 축소 방지, 양쪽 가용폭 사용 |
 | 2026-07-29 | `app.rs` | 책임 단위 분할 + 재배치 | 1,798 | `app/` 7파일 (최대 564) | 대시보드·로그 렌더는 소유가 잘못돼 있어 `window/`로 이동 |
 | 2026-07-29 | `platform/windows.rs` | 책임 단위 분할 + 승격 | 1,361 | `platform/windows/` 6파일 (최대 344) | `wide_null`을 `windows/mod.rs`로 **공용 승격** |

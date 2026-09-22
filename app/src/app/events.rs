@@ -35,7 +35,7 @@ impl AppRoot {
         self.log_scroll_handle.scroll_to_bottom();
     }
 
-    pub(super) fn notify_toast(
+    pub(crate) fn notify_toast(
         &self,
         message: &'static str,
         kind: NotificationType,

@@ -63,7 +63,7 @@ use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 
 use crate::config::{
     default_interval_presets, load_config, normalize_interval_presets, normalize_sidebar_width,
-    update_config, LogConfig, DEFAULT_SIDEBAR_WIDTH,
+    update_config, LogConfig, VirtualDiskConfig, DEFAULT_SIDEBAR_WIDTH,
 };
 use crate::platform::{NativePlatform, Platform};
 use crate::window::{
@@ -120,12 +120,14 @@ impl AppRoot {
         let mut sync_enabled = true;
         let mut sidebar_width = DEFAULT_SIDEBAR_WIDTH;
         let mut virtual_disk_suppressed_issue_keys = BTreeSet::new();
+        let mut virtual_disk_config = VirtualDiskConfig::default();
         let initial_sync_history = crate::sync_history::load_recent(20).unwrap_or_else(|err| {
             log::warn!("동기화 이력 불러오기 실패: {err:#}");
             Vec::new()
         });
 
         if let Ok(Some(cfg)) = load_config() {
+            virtual_disk_config = cfg.virtual_disk.clone();
             sync_enabled = cfg.sync_enabled;
             sidebar_width = normalize_sidebar_width(cfg.sidebar_width);
             virtual_disk_suppressed_issue_keys.extend(
@@ -261,6 +263,22 @@ impl AppRoot {
             ad_block: AdBlockState::default(),
 
             virtual_disk: VirtualDiskSession {
+                path_text: virtual_disk_config
+                    .last_vdi_path
+                    .clone()
+                    .unwrap_or_default(),
+                initial_guest_path: virtual_disk_config
+                    .last_guest_path
+                    .as_deref()
+                    .and_then(|path| crate::virtual_disk::GuestPath::new(path).ok()),
+                initial_guest_path_partition_number: virtual_disk_config.last_partition_number,
+                copy: virtual_disk_copy::VirtualDiskCopyState {
+                    target_path_text: virtual_disk_config
+                        .last_target_path
+                        .clone()
+                        .unwrap_or_default(),
+                    ..Default::default()
+                },
                 suppressed_issue_keys: virtual_disk_suppressed_issue_keys,
                 ..VirtualDiskSession::default()
             },
@@ -429,6 +447,9 @@ impl AppRoot {
                             .text_color(theme.danger_foreground)
                     })
                     .on_click(cx.listener(|this, _, window, cx| {
+                        if let Err(err) = this.save_current_config() {
+                            log::error!("창 닫기 전 설정 저장 실패: {err:#}");
+                        }
                         #[cfg(target_os = "windows")]
                         {
                             if let Err(err) = hide_main_window_to_tray() {
@@ -741,6 +762,15 @@ impl Render for AppRoot {
                         ),
                     ),
             )
+    }
+}
+
+#[cfg(not(test))]
+impl Drop for AppRoot {
+    fn drop(&mut self) {
+        if let Err(err) = self.save_current_config() {
+            log::error!("앱 종료 시 설정 저장 실패: {err:#}");
+        }
     }
 }
 

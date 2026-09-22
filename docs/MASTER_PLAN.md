@@ -126,6 +126,19 @@ cargo workspace, Hello World 앱 동작 확인
 - 사용하지 않던 `window/dashboard.rs`, `target_list.rs`, `log_view.rs` 제거
 - 문서 전면 개편, 공통 개발 지침 정본과 에이전트 어댑터 분리
 
+### Phase C-001 — 사용자 설정 파일 저장 경로 개선 ✅
+
+- 사용자가 확인·수정할 수 있는 설정은 실행파일 옆 `settings.json`을 우선 사용하고,
+  구버전 AppData `config.json`을 읽을 수 있도록 호환 경계를 유지했다.
+- 실행파일 폴더에 쓸 수 없을 때는 AppData fallback으로 저장하며,
+  `GPUI_CONVENIENCE_TOOLS_DATA_DIR`는 검증 환경에서만 기존 `config.json` 경계를 유지한다.
+- 설정 화면에 현재 경로, `설정 저장`, `파일 위치 열기`를 제공하고 창 닫기와 앱 Drop 시 현재
+  설정·VDI 경로를 저장한다. VDI의 마지막 경로·파티션·게스트 경로·대상 경로도 재시작 후
+  복원한다.
+- `cargo test --all-targets --all-features --locked` 167 passed·4 ignored, Clippy
+  `-D warnings`, `Assert-ProjectDocs.ps1`, `Assert-ProjectStructure.ps1`, `Verify-Workspace.ps1`
+  를 통과했다. 릴리스 화면 증거는 `docs/VERIFICATION.md`의 C-001 행을 참조한다.
+
 ### Phase G — 1,000줄 규칙 도입과 구조 분할 ✅
 
 - 지침에 「파일 크기 기준(1,000줄 규칙)」과 「프로젝트 맵 관리 기준」 추가

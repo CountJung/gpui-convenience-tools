@@ -181,6 +181,7 @@ G-003의 실제 divider 드래그 경로는 검증 하네스에 `-Action Drag -X
 
 | ID | 프로필 | B | T | E | V | R | C | 증거 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| C-001 | E2E | [x] | [x] | [x] | [x] | [x] | [x] | 실행파일 옆 `settings.json` 우선 경로·구버전 AppData `config.json` fallback·`GPUI_CONVENIENCE_TOOLS_DATA_DIR` 격리 경계와 `VirtualDiskConfig` 왕복을 구현; 정상 실행 경로가 실행파일 옆 `settings.json`을 가리키는 회귀 테스트와 설정 테스트 전용 환경 잠금 추가; GPUI `settings_page_keeps_user_config_actions_inside_the_card` 통과; 설정 화면에 현재 경로·`설정 저장`·`파일 위치 열기`를 추가했고 창 닫기/Drop 저장 경계를 연결; 전체 167 passed·4 ignored, Clippy `-D warnings` 통과, `DOCS_VERIFIED active=28 matrix=28`, `STRUCTURE_VERIFIED files=56 lines=22003 max=920 path=app/src/config.rs warnings=4`; release 설정 화면 1000×700 `target/visual-validation/captures/c001-settings-1000x700-111818.png`, 920×700 `c001-settings-920x700-111840.png`, VDI 입력 복원 `c001-vdi-restored-1000x700-112034.png`; commit/push는 후속 |
 | AD-001 | RUST | [x] | [x] | — | — | [x] | [x] | `platform::windows::window_ops::tests` 3개 통과; `cargo check --locked` 통과; 최상위 소유/도구 팝업만 후보화, 상태 저장·0×0 동작은 후속 AD-002·AD-003 |
 | AD-002 | RUST | [x] | [x] | — | — | [x] | [x] | `window_ops::tests` 5개 통과; `cargo check --locked`; `Verify-AdWindowState.ps1 -ProcessId 26440`로 KakaoTalk/WebView2 관련 PID·창 상태를 읽기 전용 확인; 실제 사용자 창 조작은 수행하지 않음 |
 | AD-003 | RUST | [x] | [x] | — | — | [x] | [x] | `window_ops::tests` 7개 통과(전용 0×0 fixture 포함); `cargo check --locked`; `SetWindowPos` 0×0·`EnableWindow(FALSE)`·원상 복원 검증; 사용자 PID 26440은 읽기 전용 상태 확인만 수행 |

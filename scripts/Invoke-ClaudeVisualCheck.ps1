@@ -73,7 +73,7 @@ param(
     [int]$VdiPartitionNumber,
 
     # Start 전용. 검증 전용 환경 변수로 패널 전환 입력 없이 특정 화면을 연다.
-    [ValidateSet("Dashboard", "FileSync", "VirtualDisk", "AutoStart")]
+    [ValidateSet("Dashboard", "FileSync", "VirtualDisk", "AutoStart", "Settings")]
     [string]$InitialPanel = "Dashboard",
 
     [string]$Name = "capture",
@@ -445,6 +445,9 @@ switch ($Action) {
             }
             elseif ($InitialPanel -eq "AutoStart") {
                 $env:GPUI_CONVENIENCE_TOOLS_INITIAL_PANEL = "auto_start"
+            }
+            elseif ($InitialPanel -eq "Settings") {
+                $env:GPUI_CONVENIENCE_TOOLS_INITIAL_PANEL = "settings"
             }
             if ($null -ne $validationVdiPath) {
                 $env:GPUI_CONVENIENCE_TOOLS_VALIDATION_VDI_PATH = $validationVdiPath

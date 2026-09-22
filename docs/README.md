@@ -95,12 +95,16 @@ pwsh -NoProfile -File .\scripts\Verify-AdWindowState.ps1 `
 
 ## 저장 위치
 
-모든 사용자 데이터는 `%APPDATA%\gpui-convenience-tools\` 아래에 있다.
+사용자가 확인·수정하는 설정은 기본적으로 실행파일 옆 `settings.json`에 저장한다. 로그·테마·실행
+이력 같은 앱 데이터와 실행파일 옆 저장이 불가능한 경우의 fallback 설정은
+`%APPDATA%\gpui-convenience-tools\` 아래에 둔다. `GPUI_CONVENIENCE_TOOLS_DATA_DIR`가
+설정된 검증 환경에서는 해당 경로를 우선 사용한다.
 
 ```mermaid
 flowchart TD
+    exe["실행파일 폴더\\settings.json<br/>사용자 확인·수정 설정"]
     root["%APPDATA%\\gpui-convenience-tools\\"]
-    root --> config["config.json<br/>타겟 앱 · 동기화 · 테마 · 로그 설정"]
+    root --> config["config.json<br/>구버전 호환·쓰기 실패 fallback"]
     root --> themes["themes\\<br/>번들 테마 JSON 21종"]
     root --> logs["logs\\"]
     logs --> current["app.log<br/>현재 로그"]

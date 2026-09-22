@@ -10,9 +10,9 @@ use gpui_component::{
 };
 
 use crate::app::AppRoot;
-use crate::config::save_theme_selection;
+use crate::config::{effective_config_path, open_config_file, save_theme_selection};
 use crate::theme::change_theme;
-use crate::window::ui;
+use crate::window::ui::{self, ButtonStyle, Size};
 
 /// 로그 보관 설정 프리셋.
 const MAX_FILES_PRESETS: [u32; 5] = [3, 5, 10, 20, 50];
@@ -347,6 +347,97 @@ pub fn render(this: &mut AppRoot, window: &mut Window, cx: &mut Context<AppRoot>
             div()
                 .text_color(muted_fg)
                 .child("각 편의 기능의 동작 설정은 해당 기능 페이지 오른쪽 영역에 있습니다."),
+        )
+        .child(
+            div()
+                .debug_selector(|| "settings-user-config-card".to_string())
+                .rounded_lg()
+                .bg(bg_card)
+                .border_1()
+                .border_color(border)
+                .p_4()
+                .child(
+                    v_flex()
+                        .gap_3()
+                        .child(div().text_color(fg).child("사용자 설정 파일"))
+                        .child(div().text_color(muted_fg).child(
+                            "사용자가 확인·수정해도 되는 설정을 실행파일 옆 settings.json에 저장합니다. 직접 수정한 값은 앱을 다시 시작하면 반영됩니다.",
+                        ))
+                        .child(
+                            div()
+                                .min_w_0()
+                                .overflow_hidden()
+                                .text_color(muted_fg)
+                                .child(format!(
+                                    "현재 경로: {}",
+                                    effective_config_path().display()
+                                )),
+                        )
+                        .child(
+                            h_flex()
+                                .gap_2()
+                                .flex_wrap()
+                                .child(div().debug_selector(|| "save-settings".to_string()).child(
+                                    ui::action_button(
+                                        "save-settings-button",
+                                        "설정 저장",
+                                        Size::Md,
+                                        ButtonStyle::primary(cx),
+                                        cx.listener(|this, _event, window, cx| {
+                                            match this.save_current_config() {
+                                                Ok(()) => this.notify_toast(
+                                                    "설정을 저장했습니다",
+                                                    gpui_component::notification::NotificationType::Success,
+                                                    window,
+                                                    cx,
+                                                ),
+                                                Err(err) => {
+                                                    log::error!("설정 저장 실패: {err:#}");
+                                                    this.notify_toast(
+                                                        "설정 저장에 실패했습니다. 로그를 확인하세요",
+                                                        gpui_component::notification::NotificationType::Error,
+                                                        window,
+                                                        cx,
+                                                    );
+                                                }
+                                            }
+                                            cx.notify();
+                                        }),
+                                    ),
+                                ))
+                                .child(div().debug_selector(|| "open-settings-file".to_string()).child(
+                                    ui::action_button(
+                                        "open-settings-file-button",
+                                        "파일 위치 열기",
+                                        Size::Md,
+                                        ButtonStyle::secondary(cx),
+                                        cx.listener(|this, _event, window, cx| {
+                                            let result = this
+                                                .save_current_config()
+                                                .and_then(|()| open_config_file());
+                                            match result {
+                                                Ok(()) => this.notify_toast(
+                                                    "설정 파일 위치를 열었습니다",
+                                                    gpui_component::notification::NotificationType::Info,
+                                                    window,
+                                                    cx,
+                                                ),
+                                                Err(err) => {
+                                                    log::error!("설정 파일 열기 실패: {err:#}");
+                                                    this.notify_toast(
+                                                        "설정 파일을 열지 못했습니다. 로그를 확인하세요",
+                                                        gpui_component::notification::NotificationType::Error,
+                                                        window,
+                                                        cx,
+                                                    );
+                                                }
+                                            }
+                                            cx.notify();
+                                        }),
+                                    ),
+                                )),
+                        ),
+                ),
         )
         .child(render_log_settings(this, cx))
         .child(

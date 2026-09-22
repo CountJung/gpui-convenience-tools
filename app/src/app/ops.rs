@@ -8,9 +8,61 @@ use gpui_component::notification::NotificationType;
 
 use super::state::{PlatformEvent, TargetApp};
 use super::AppRoot;
-use crate::config::{update_config, LogConfig};
+use crate::config::{carry_over_engine_progress, update_config, LogConfig, VirtualDiskConfig};
 
 impl AppRoot {
+    /// 현재 화면의 사용자 조정값을 한 번에 저장한다.
+    ///
+    /// 각 입력 이벤트도 기존처럼 즉시 저장하지만, 설정 화면의 명시적 저장 버튼과
+    /// 창 닫기 직전에는 이 경로를 사용해 마지막 입력값까지 놓치지 않는다.
+    pub(crate) fn save_current_config(&self) -> anyhow::Result<()> {
+        #[cfg(test)]
+        if !self.sync.external_side_effects_enabled {
+            return Ok(());
+        }
+
+        let service_enabled = self.app_state.is_active;
+        let targets = self.app_state.targets.clone();
+        let scan_interval_secs = self.scan_interval_secs;
+        let favorite_services = self.services.favorites.clone();
+        let sync_enabled = self.sync.enabled;
+        let mut sync_jobs = self.sync.jobs.clone();
+        let sidebar_width = self.sidebar_width;
+        let suppressed_issue_keys = self
+            .virtual_disk
+            .suppressed_issue_keys
+            .iter()
+            .cloned()
+            .collect::<Vec<_>>();
+        let log_config = self.log_config.clone();
+        let virtual_disk = VirtualDiskConfig {
+            last_vdi_path: non_empty_string(&self.virtual_disk.path_text),
+            last_partition_number: self
+                .virtual_disk
+                .selected_partition
+                .and_then(|index| self.virtual_disk.partitions.get(index))
+                .map(|partition| partition.number),
+            last_guest_path: Some(self.virtual_disk.current_path.to_string()),
+            last_target_path: non_empty_string(&self.virtual_disk.copy.target_path_text),
+        };
+
+        update_config(move |config| {
+            carry_over_engine_progress(&config.sync_jobs, &mut sync_jobs);
+            config.service_enabled = service_enabled;
+            config.targets = targets;
+            config.scan_interval_secs = scan_interval_secs;
+            config.favorite_services = favorite_services;
+            config.sync_enabled = sync_enabled;
+            config.sync_jobs = sync_jobs;
+            config.sidebar_width = sidebar_width;
+            config.virtual_disk_suppressed_issue_keys = suppressed_issue_keys;
+            config.log = log_config;
+            config.virtual_disk = virtual_disk;
+        })?;
+
+        Ok(())
+    }
+
     // ─────────────────────────────────────────────
     // 광고 차단 상태 조작
     // ─────────────────────────────────────────────
@@ -192,4 +244,9 @@ impl AppRoot {
         self.push_log("INFO", "로그 설정을 변경했습니다.".to_string());
         cx.notify();
     }
+}
+
+fn non_empty_string(value: &str) -> Option<String> {
+    let value = value.trim();
+    (!value.is_empty()).then(|| value.to_string())
 }

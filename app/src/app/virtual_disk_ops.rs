@@ -22,6 +22,8 @@ use super::AppRoot;
 pub(crate) struct VirtualDiskSession {
     pub(crate) path_text: String,
     pub(crate) path_input: Option<Entity<InputState>>,
+    pub(crate) initial_guest_path: Option<GuestPath>,
+    pub(crate) initial_guest_path_partition_number: Option<u32>,
     pub(crate) vdi_path: Option<PathBuf>,
     pub(crate) partitions: Vec<VdiPartition>,
     pub(crate) selected_partition: Option<usize>,
@@ -42,6 +44,8 @@ impl Default for VirtualDiskSession {
         Self {
             path_text: String::new(),
             path_input: None,
+            initial_guest_path: None,
+            initial_guest_path_partition_number: None,
             vdi_path: None,
             partitions: Vec::new(),
             selected_partition: None,
@@ -240,6 +244,7 @@ impl AppRoot {
         let Some(partition) = self.virtual_disk.partitions.get(index).cloned() else {
             return;
         };
+        let partition_number = partition.number;
         let Some(path) = self.virtual_disk.vdi_path.clone() else {
             self.set_virtual_disk_error("먼저 VDI를 열어야 합니다".to_string(), cx);
             return;
@@ -254,7 +259,13 @@ impl AppRoot {
             Ok(source) => {
                 self.virtual_disk.source = Some(Box::new(source));
                 self.virtual_disk.selected_partition = Some(index);
-                self.virtual_disk.current_path = GuestPath::root();
+                let initial_guest_path = (self
+                    .virtual_disk
+                    .initial_guest_path_partition_number
+                    == Some(partition_number))
+                .then(|| self.virtual_disk.initial_guest_path.take())
+                .flatten();
+                self.virtual_disk.current_path = initial_guest_path.unwrap_or_else(GuestPath::root);
                 self.virtual_disk.selected_paths.clear();
                 self.virtual_disk.selection_anchor = None;
                 self.refresh_virtual_disk_directory(cx);

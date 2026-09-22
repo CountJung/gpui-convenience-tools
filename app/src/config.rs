@@ -1,7 +1,7 @@
 use anyhow::Result;
 use gpui_component::theme::ThemeMode;
 use serde::{Deserialize, Serialize};
-use std::{fs, path::PathBuf};
+use std::{fs, path::PathBuf, process::Command};
 
 use crate::app::TargetApp;
 
@@ -52,6 +52,9 @@ pub struct AppConfig {
     /// 로그 롤링 파일 설정.
     #[serde(default)]
     pub log: LogConfig,
+    /// VirtualBox 디스크 탐색에서 사용자가 마지막으로 선택한 입력값.
+    #[serde(default)]
+    pub virtual_disk: VirtualDiskConfig,
 }
 
 fn default_scan_interval_secs() -> u32 {
@@ -259,6 +262,22 @@ fn default_true() -> bool {
     true
 }
 
+/// VirtualBox 디스크 탐색의 사용자 조정 가능한 마지막 입력값.
+///
+/// VDI를 자동으로 열거나 파티션을 자동 선택하지는 않는다. 앱 시작 시 입력창에만
+/// 복원하고, 사용자가 `VDI 열기`와 파티션 선택을 명시적으로 수행해야 다시 검사한다.
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+pub struct VirtualDiskConfig {
+    #[serde(default)]
+    pub last_vdi_path: Option<String>,
+    #[serde(default)]
+    pub last_partition_number: Option<u32>,
+    #[serde(default)]
+    pub last_guest_path: Option<String>,
+    #[serde(default)]
+    pub last_target_path: Option<String>,
+}
+
 // ─────────────────────────────────────────────
 // 로그 롤링 설정
 // ─────────────────────────────────────────────
@@ -328,6 +347,7 @@ impl Default for AppConfig {
             sidebar_width: DEFAULT_SIDEBAR_WIDTH,
             virtual_disk_suppressed_issue_keys: Vec::new(),
             log: LogConfig::default(),
+            virtual_disk: VirtualDiskConfig::default(),
         }
     }
 }
@@ -403,6 +423,8 @@ pub(crate) const BUNDLED_THEMES: [(&str, &str); 21] = [
 
 /// 데이터 루트를 사용자 프로필 밖으로 돌리는 환경 변수. 시각 검증 하네스 전용이다.
 pub const DATA_DIR_ENV: &str = "GPUI_CONVENIENCE_TOOLS_DATA_DIR";
+const SETTINGS_FILE_NAME: &str = "settings.json";
+const LEGACY_CONFIG_FILE_NAME: &str = "config.json";
 
 /// `%APPDATA%/gpui-convenience-tools` (Windows 기준) 데이터 루트.
 ///
@@ -421,8 +443,53 @@ pub fn data_dir() -> PathBuf {
         .join("gpui-convenience-tools")
 }
 
+/// 사용자가 직접 확인·수정할 수 있는 공개 설정파일 경로.
 pub fn config_path() -> PathBuf {
-    data_dir().join("config.json")
+    if has_data_dir_override() {
+        return data_dir().join(LEGACY_CONFIG_FILE_NAME);
+    }
+
+    executable_dir()
+        .map(|dir| dir.join(SETTINGS_FILE_NAME))
+        .unwrap_or_else(|| data_dir().join(SETTINGS_FILE_NAME))
+}
+
+/// 실행파일 옆 공개 설정파일을 사용할 수 없을 때의 사용자 데이터 경로.
+pub fn fallback_config_path() -> PathBuf {
+    data_dir().join(LEGACY_CONFIG_FILE_NAME)
+}
+
+/// 실제로 설정을 읽거나 저장할 경로.
+pub fn effective_config_path() -> PathBuf {
+    let primary = config_path();
+    if has_data_dir_override() || !fallback_config_path().exists() {
+        return primary;
+    }
+
+    let fallback = fallback_config_path();
+    if !primary.exists() {
+        return fallback;
+    }
+
+    let primary_modified = fs::metadata(&primary).and_then(|metadata| metadata.modified());
+    let fallback_modified = fs::metadata(&fallback).and_then(|metadata| metadata.modified());
+    if fallback_modified.ok() > primary_modified.ok() {
+        fallback
+    } else {
+        primary
+    }
+}
+
+fn executable_dir() -> Option<PathBuf> {
+    std::env::current_exe()
+        .ok()
+        .and_then(|path| path.parent().map(PathBuf::from))
+}
+
+fn has_data_dir_override() -> bool {
+    std::env::var_os(DATA_DIR_ENV)
+        .filter(|value| !value.is_empty())
+        .is_some()
 }
 
 pub fn themes_path() -> PathBuf {
@@ -432,6 +499,30 @@ pub fn themes_path() -> PathBuf {
 /// 롤링 로그 파일이 쌓이는 디렉터리.
 pub fn logs_path() -> PathBuf {
     data_dir().join("logs")
+}
+
+/// 현재 공개 설정파일을 기본 편집기로 연다.
+pub fn open_config_file() -> Result<()> {
+    let path = effective_config_path();
+
+    #[cfg(target_os = "windows")]
+    {
+        Command::new("explorer.exe")
+            .arg(format!("/select,{}", path.display()))
+            .spawn()?;
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        Command::new("open").arg(&path).spawn()?;
+    }
+
+    #[cfg(all(unix, not(target_os = "macos")))]
+    {
+        Command::new("xdg-open").arg(&path).spawn()?;
+    }
+
+    Ok(())
 }
 
 pub fn ensure_bundled_themes() -> Result<PathBuf> {
@@ -449,27 +540,46 @@ pub fn ensure_bundled_themes() -> Result<PathBuf> {
 }
 
 pub fn save_config(config: &AppConfig) -> Result<()> {
-    let path = config_path();
-
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent)?;
-    }
-
     let json = serde_json::to_string_pretty(config)?;
-    fs::write(path, json)?;
-    Ok(())
+    let primary = config_path();
+    match write_config_file(&primary, &json) {
+        Ok(()) => Ok(()),
+        Err(primary_error) if !has_data_dir_override() => {
+            let fallback = fallback_config_path();
+            log::warn!(
+                "실행파일 옆 설정파일을 저장할 수 없어 AppData fallback을 사용합니다: {} ({primary_error})",
+                primary.display()
+            );
+            write_config_file(&fallback, &json).map_err(|fallback_error| {
+                anyhow::anyhow!(
+                    "설정 저장 실패: 실행파일 옆 {} ({primary_error}); AppData {} ({fallback_error})",
+                    primary.display(),
+                    fallback.display()
+                )
+            })
+        }
+        Err(error) => Err(error),
+    }
 }
 
 pub fn load_config() -> Result<Option<AppConfig>> {
-    let path = config_path();
-
+    let path = effective_config_path();
     if !path.exists() {
         return Ok(None);
     }
 
-    let data = fs::read_to_string(path)?;
+    let data = fs::read_to_string(&path)?;
     let config = serde_json::from_str::<AppConfig>(&data)?;
     Ok(Some(config))
+}
+
+fn write_config_file(path: &std::path::Path, json: &str) -> Result<()> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+
+    fs::write(path, json)?;
+    Ok(())
 }
 
 /// 저장된 설정을 읽어 수정한 뒤 다시 저장한다.
@@ -495,13 +605,17 @@ pub fn save_theme_selection(mode: ThemeMode, theme_name: &str) -> Result<()> {
 mod tests {
     use super::*;
 
+    static DATA_DIR_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
     struct IsolatedDataDir {
         previous: Option<std::ffi::OsString>,
         path: PathBuf,
+        _lock: std::sync::MutexGuard<'static, ()>,
     }
 
     impl IsolatedDataDir {
         fn new(name: &str) -> Self {
+            let lock = DATA_DIR_LOCK.lock().expect("lock isolated config environment");
             let path = std::env::temp_dir().join(format!(
                 "gct-config-test-{name}-{}",
                 std::process::id()
@@ -510,7 +624,11 @@ mod tests {
             fs::create_dir_all(&path).expect("create isolated config directory");
             let previous = std::env::var_os(DATA_DIR_ENV);
             std::env::set_var(DATA_DIR_ENV, &path);
-            Self { previous, path }
+            Self {
+                previous,
+                path,
+                _lock: lock,
+            }
         }
     }
 
@@ -544,6 +662,57 @@ mod tests {
         assert_eq!(config.log.max_files, default_max_files());
         assert_eq!(config.sidebar_width, DEFAULT_SIDEBAR_WIDTH);
         assert!(config.virtual_disk_suppressed_issue_keys.is_empty());
+        assert_eq!(config.virtual_disk, VirtualDiskConfig::default());
+    }
+
+    #[test]
+    fn isolated_override_keeps_settings_path_outside_the_executable_directory() {
+        let data_dir = IsolatedDataDir::new("isolated-settings-path");
+
+        assert_eq!(config_path(), data_dir.path.join(LEGACY_CONFIG_FILE_NAME));
+        assert_eq!(effective_config_path(), config_path());
+    }
+
+    #[test]
+    fn normal_runtime_path_uses_settings_json_next_to_the_executable() {
+        let _lock = DATA_DIR_LOCK.lock().expect("lock config environment");
+        let previous = std::env::var_os(DATA_DIR_ENV);
+        std::env::remove_var(DATA_DIR_ENV);
+
+        let expected_parent = std::env::current_exe()
+            .expect("current executable")
+            .parent()
+            .expect("executable parent")
+            .to_path_buf();
+        let path = config_path();
+
+        if let Some(previous) = previous {
+            std::env::set_var(DATA_DIR_ENV, previous);
+        }
+
+        assert_eq!(path.file_name().and_then(|name| name.to_str()), Some(SETTINGS_FILE_NAME));
+        assert_eq!(path.parent(), Some(expected_parent.as_path()));
+    }
+
+    #[test]
+    fn virtual_disk_settings_round_trip() {
+        let _data_dir = IsolatedDataDir::new("virtual-disk-settings");
+        let config = AppConfig {
+            virtual_disk: VirtualDiskConfig {
+                last_vdi_path: Some(r"D:\VM\Windows.vdi".to_string()),
+                last_partition_number: Some(5),
+                last_guest_path: Some("/Users/Public".to_string()),
+                last_target_path: Some(r"D:\Recovered".to_string()),
+            },
+            ..AppConfig::default()
+        };
+
+        save_config(&config).expect("save VirtualBox settings");
+        let restored = load_config()
+            .expect("load VirtualBox settings")
+            .expect("VirtualBox settings exist");
+
+        assert_eq!(restored.virtual_disk, config.virtual_disk);
     }
 
     #[test]
