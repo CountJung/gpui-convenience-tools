@@ -31,6 +31,23 @@ fn job(source: &Path, target: &Path) -> SyncJob {
     }
 }
 
+fn count_files_for_measurement(root: &Path) -> usize {
+    let mut pending = vec![root.to_path_buf()];
+    let mut files = 0;
+    while let Some(directory) = pending.pop() {
+        for entry in fs::read_dir(directory).expect("read measurement directory") {
+            let entry = entry.expect("read measurement entry");
+            let file_type = entry.file_type().expect("read measurement file type");
+            if file_type.is_dir() {
+                pending.push(entry.path());
+            } else if file_type.is_file() {
+                files += 1;
+            }
+        }
+    }
+    files
+}
+
 #[test]
 fn exclude_glob_matches_single_path_segments() {
     assert!(matches_exclude_pattern("*.tmp", "cache.tmp"));
@@ -542,9 +559,14 @@ fn syncs_three_thousand_files_and_reports_elapsed_time() {
         .unwrap();
     }
 
+    let prescan_started = Instant::now();
+    let prescan_files = count_files_for_measurement(&src);
+    let prescan_elapsed = prescan_started.elapsed();
+    assert_eq!(prescan_files, FILE_COUNT);
+
     let started = Instant::now();
     let outcome = run_sync_job(&job(&src, &dst));
-    let elapsed = started.elapsed();
+    let sync_elapsed = started.elapsed();
     assert_eq!(
         outcome.copied, FILE_COUNT,
         "failures: {:?}",
@@ -552,9 +574,11 @@ fn syncs_three_thousand_files_and_reports_elapsed_time() {
     );
     assert!(!outcome.has_failures());
     println!(
-        "3,000개 파일 1회 동기화: {:.3}초 ({:.0} files/sec)",
-        elapsed.as_secs_f64(),
-        FILE_COUNT as f64 / elapsed.as_secs_f64()
+        "3,000개 파일 사전 순회: {:.3}초; 실제 동기화: {:.3}초; 합계: {:.3}초; 추가 비용: {:.1}%",
+        prescan_elapsed.as_secs_f64(),
+        sync_elapsed.as_secs_f64(),
+        (prescan_elapsed + sync_elapsed).as_secs_f64(),
+        prescan_elapsed.as_secs_f64() / sync_elapsed.as_secs_f64() * 100.0
     );
 
     let _ = fs::remove_dir_all(&root);

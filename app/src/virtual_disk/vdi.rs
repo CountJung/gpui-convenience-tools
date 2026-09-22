@@ -756,6 +756,92 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "실제 종료 VDI 경로를 GPUI_CONVENIENCE_TOOLS_VDI_PERF_IMAGE로 주입한다"]
+    fn measures_configured_vdi_directory_walk_passes() {
+        use std::time::Instant;
+
+        let Some(path) = std::env::var_os("GPUI_CONVENIENCE_TOOLS_VDI_PERF_IMAGE") else {
+            return;
+        };
+        let path = PathBuf::from(path);
+        let partition_number = std::env::var("GPUI_CONVENIENCE_TOOLS_VDI_PERF_PARTITION")
+            .ok()
+            .and_then(|value| value.parse::<u32>().ok())
+            .unwrap_or(5);
+        let options = VdiSafetyOptions::from_environment();
+
+        let measure_pass = || {
+            let started = Instant::now();
+            let mut reader = VdiReader::open_with_options(&path, &options).unwrap();
+            let partitions = discover_partitions(&mut reader).unwrap();
+            let partition = partitions
+                .iter()
+                .find(|partition| {
+                    partition.number == partition_number
+                        && partition.filesystem == Some(GuestFileSystem::ntfs_3_1())
+                })
+                .cloned()
+                .unwrap_or_else(|| {
+                    panic!(
+                        "NTFS 파티션을 찾지 못했습니다: 요청 번호={partition_number}, 파티션={partitions:?}"
+                    )
+                });
+            let mut source = NtfsGuestFileSource::open(reader, partition).unwrap();
+            let mut files = 0usize;
+            let mut directories = 0usize;
+            let mut reparses = 0usize;
+            let root = source.root().unwrap();
+            measure_guest_directory(
+                &mut source,
+                &root,
+                &mut files,
+                &mut directories,
+                &mut reparses,
+            )
+            .unwrap();
+            (started.elapsed(), files, directories, reparses)
+        };
+
+        let first = measure_pass();
+        let second = measure_pass();
+        println!(
+            "VDI 파일 트리 사전 순회: 1회 {:.3}초, 2회 {:.3}초, 합계 {:.3}초; 파일 {}개, 폴더 {}개, reparse {}개",
+            first.0.as_secs_f64(),
+            second.0.as_secs_f64(),
+            (first.0 + second.0).as_secs_f64(),
+            first.1,
+            first.2,
+            first.3
+        );
+        assert_eq!((first.1, first.2, first.3), (second.1, second.2, second.3));
+    }
+
+    fn measure_guest_directory<S: GuestFileSource>(
+        source: &mut S,
+        directory: &crate::virtual_disk::GuestFileEntry,
+        files: &mut usize,
+        directories: &mut usize,
+        reparses: &mut usize,
+    ) -> Result<(), VirtualDiskError> {
+        for entry in source.list_directory(directory)? {
+            if entry.is_directory() {
+                if entry
+                    .attributes
+                    .contains(crate::virtual_disk::GuestFileAttributes::REPARSE_POINT)
+                {
+                    *reparses += 1;
+                    continue;
+                }
+                *directories += 1;
+                measure_guest_directory(source, &entry, files, directories, reparses)?;
+            } else {
+                *files += 1;
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
     fn reads_unsupported_partition_fixture_without_claiming_ntfs() {
         let path = write_unsupported_partition_vdi_fixture();
         let mut reader = VdiReader::open(&path).unwrap();
