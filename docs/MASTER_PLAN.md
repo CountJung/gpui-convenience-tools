@@ -1149,7 +1149,9 @@ flowchart TD
   480px 높이 실행 상태의 진행률 바가 상태 표시줄 내부를 벗어나지 않는지 확인했다.
 
 전체 테스트·Clippy `-D warnings`·문서/구조 게이트와 release 시각 검증 결과는
-`VERIFICATION.md`에 기록한다.
+`VERIFICATION.md`에 기록한다. 실제 격리 release 동기화 중 캡처
+`target/visual-validation/captures/d008-progress-running-1000x700-205653.png`에서
+진행 중 상태와 진행률 바를 확인했고, 세션 종료 후 프로세스·임시 세션 루트는 0개였다.
 
 #### D-001 — 제외 패턴 설정 스키마 완료 ✅
 

@@ -22,12 +22,12 @@
 하네스 미지원 상태를 `N/A` 사유 없이 `PASS`로 기록하지 않는다.
 
 최신 품질 게이트 기준은 `cargo check -p gpui-convenience-tools --locked`, 전체 테스트
-163 passed·4 ignored, 표준 `cargo clippy -p gpui-convenience-tools --all-targets --all-features --locked -- -D warnings` exit 0·경고
-0건이다. `scripts/Verify-Workspace.ps1`도 IDE 안전 모드에서 필수 GPUI 테스트 26개와 전체
+173 passed·5 ignored, 표준 `cargo clippy -p gpui-convenience-tools --all-targets --all-features --locked -- -D warnings` exit 0·경고
+0건이다. `scripts/Verify-Workspace.ps1`도 IDE 안전 모드에서 필수 GPUI 테스트 31개와 전체
 테스트를 재실행해 `IDE_VERIFIED`를 출력했다. 실제 데스크톱 표면은 별도 포그라운드 조건이
 필요하므로 같은 실행에서 `DESKTOP_PENDING`으로 분리했다. 전체 `cargo fmt --check`는 기존
 baseline 포맷 차이가 남아 있어 별도 구조 정리 범위로 유지한다.
-이번 실행에서는 `DOCS_VERIFIED active=28 matrix=28`도 먼저 통과해 활성 TODO와 검증
+이번 실행에서는 `DOCS_VERIFIED active=26 matrix=26`도 먼저 통과해 활성 TODO와 검증
 매트릭스의 일대일 대응을 확인했다.
 
 ## 작업마다 적용하는 순서
@@ -191,6 +191,9 @@ G-003의 실제 divider 드래그 경로는 검증 하네스에 `-Action Drag -X
 | D-002 | RUST | [x] | [x] | — | — | [x] | [x] | `sync::tests` glob 전용 3개 통과; `*`·`?`는 단일 경로 조각, 독립 `**`는 0개 이상 하위 폴더, `/`·`\\` 구분자 정규화 확인; `cargo test --all-targets --all-features --locked` 통과 |
 | D-003 | RUST | [x] | [x] | — | — | [x] | [x] | `excluded_files_are_not_copied_and_count_as_skipped`, `excluded_directories_are_not_created_or_removed_by_mirror_deletes` 통과; 상대 경로 glob 적용, `skipped` 계상, 제외 디렉터리의 하위 순회·미러 삭제 보호 확인; 전체 테스트 통과 |
 | D-005 | RUST | [x] | [x] | — | — | [x] | [x] | 제외 파일 2개가 대상에 복사되지 않고 `skipped=2`가 되는 회귀 테스트와 제외 디렉터리 보호 테스트 통과; `cargo test --all-targets --all-features --locked` 통과 |
+| D-006 | RUST | [x] | [x] | — | — | [x] | [x] | 3,000개 파일 3회 측정에서 사전 순회 `0.003초`, 실제 동기화 `3.262~3.308초`, 추가 비용 약 `0.1%`; 종료 TACS `TACS.vdi` NTFS 파티션 1의 읽기 전용 트리 1회 `0.524초`·2회 `0.127초`; 사전 순회 채택 결정과 수동 측정 테스트 고정; `git diff --check` 통과 |
+| D-007 | RUST | [x] | [x] | — | — | [x] | [x] | `count_sync_entries`·`SyncProgress.total`·백그라운드 이벤트 전달 구현; `pre_scan_counts_the_same_processable_entries_as_sync_progress` 통과; `cargo check --locked`, 전체 173 passed·5 ignored, Clippy `-D warnings`, 문서·구조 게이트 통과; commit `4e29479` push 완료 |
+| D-008 | E2E | [x] | [x] | [x] | [x] | [x] | [x] | `file_sync_status_bar_stays_visible_at_compact_height_while_running`에서 920×480 bounds와 진행률 바 포함을 확인; 전체 173 passed·5 ignored, 필수 GPUI 31개, Clippy `-D warnings`; release 실제 동기화 중 캡처 `target/visual-validation/captures/d008-progress-running-1000x700-205653.png`에서 `동기화 중`, `복사 6135 · 건너뜀 4000 · 실패 0`과 진행률 바 확인; 세션 종료 후 process/session 0, commit `4e29479` push 완료 |
 | D-004 | E2E | [x] | [x] | [x] | [x] | [x] | [x] | `file_sync_exclude_patterns_editor_is_multiline_and_contained`로 920/994/1280px 입력 영역의 멀티라인 높이·설정 카드 내부 경계 확인; `file_sync_run_button_saves_current_inputs_and_queues_selected_job`로 공백·빈 줄 정리와 줄바꿈 입력의 저장·실행 연결 확인; 격리 릴리즈 캡처는 `target/visual-validation/captures/d4-exclude-patterns-994-editor-visible-170031.png`, `d4-exclude-patterns-1280-editor-visible-170018.png`; 커밋·푸시 완료 |
 | VDE-020 | DOCS | — | — | — | — | [x] | [x] | `PROJECT_MAP.md`의 50개 Rust 파일·19,486줄·모듈별 책임/줄 수와 `MASTER_PLAN.md` Phase O-18 이력을 실측 갱신; `git diff --check` 및 활성 ID 정합성 assertion 통과; Phase O 전체 완료 표시는 VDE-019 후속; commit `840a35e` push 완료 |
 | VDE-013 | GPUI | [x] | [x] | [x] | [x] | [x] | [x] | `virtual_disk_panel_registers_navigation_and_renders_read_only_shell`; release `CLAUDE_LOCAL` 캡처 `vde013-panel-920-final-201106.png`, `vde013-panel-1280-final-201106.png`; 후속 실제 VirtualBox 7.2.14 VDI 캡처 `vde019-vbox-standard-loaded-023912.png`에서 VDI 경로·MBR/NTFS 파티션·게스트 루트 연결을 확인하고 새로고침 경계를 GPUI 테스트로 검증; 세션 종료 후 프로세스·세션 루트 0; commit `83c579b` |
