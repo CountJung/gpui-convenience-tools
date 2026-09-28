@@ -6,11 +6,13 @@
 use super::state::{SyncJobStatus, SyncRunning, SyncSharedState};
 use crate::config::SyncJob;
 use crate::platform::SysServiceInfo;
+use crate::sync::browse::BrowseEntry;
 use crate::sync::SyncFailure;
 use crate::sync_history::SyncHistoryEntry;
 use gpui::{Entity, ScrollHandle};
 use gpui_component::{input::InputState, VirtualListScrollHandle};
 use std::collections::{HashMap, HashSet};
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 /// Windows 서비스 패널이 소유하는 상태.
@@ -65,6 +67,12 @@ pub struct SyncState {
     pub(crate) source_input: Option<Entity<InputState>>,
     pub(crate) target_input: Option<Entity<InputState>>,
     pub(crate) exclude_input: Option<Entity<InputState>>,
+    pub(crate) browse_source: String,
+    pub(crate) browse_relative: PathBuf,
+    pub(crate) browse_entries: Vec<BrowseEntry>,
+    pub(crate) browse_page: usize,
+    pub(crate) browse_error: Option<String>,
+    pub(crate) browse_scroll: ScrollHandle,
     pub(crate) page_scroll: ScrollHandle,
     pub(crate) shared: Arc<Mutex<SyncSharedState>>,
     #[cfg(test)]

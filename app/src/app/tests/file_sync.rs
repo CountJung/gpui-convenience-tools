@@ -1,7 +1,6 @@
 //! 파일 동기화 패널 조작·진행 표시줄·로그 요약 회귀 테스트.
 
 use super::*;
-use crate::sync_history::SyncHistoryEntry;
 
 #[gpui::test]
 fn file_sync_unified_page_uses_full_width_and_scrolls_to_last_record(cx: &mut TestAppContext) {
@@ -70,35 +69,6 @@ fn file_sync_unified_page_uses_full_width_and_scrolls_to_last_record(cx: &mut Te
         "wheel input should move the unified page scroll offset"
     );
     assert_inside_viewport(cx, "file-sync-page", "sync-failure-row-11");
-}
-
-#[gpui::test]
-fn file_sync_renders_recent_history_with_result_counts_and_duration(
-    cx: &mut TestAppContext,
-) {
-    initialize_components(cx);
-    let (_view, cx) = cx.add_window_view(|_, _| {
-        let mut root = test_app_root(ActivePanel::FileSync);
-        root.sync.history = vec![SyncHistoryEntry {
-            job_id: "history-job".to_string(),
-            label: "백업 작업".to_string(),
-            started_at_unix: 100,
-            finished_at_unix: 125,
-            copied: 3,
-            skipped: 2,
-            deleted: 1,
-            failed: 1,
-            cancelled: false,
-            summary: "복사 3건, 건너뜀 2건, 삭제 1건, 실패 1건".to_string(),
-        }];
-        root
-    });
-
-    cx.simulate_resize(size(px(DEFAULT_WINDOW_WIDTH), px(DEFAULT_WINDOW_HEIGHT)));
-    refresh(cx);
-
-    assert!(cx.debug_bounds("file-sync-history-card").is_some());
-    assert!(cx.debug_bounds("sync-history-row-0").is_some());
 }
 
 #[gpui::test]
@@ -392,10 +362,7 @@ fn file_sync_stop_button_requests_cancellation_and_clears_pending_queue(cx: &mut
                 failed: 0,
                 stopping: false,
             });
-            root.sync.shared
-                .lock()
-                .expect("sync shared state")
-                .run_now = vec![queued_id.clone()];
+            root.sync.shared.lock().expect("sync shared state").run_now = vec![queued_id.clone()];
             queued_id
         })
     });
@@ -406,7 +373,8 @@ fn file_sync_stop_button_requests_cancellation_and_clears_pending_queue(cx: &mut
     cx.update(|_, app| {
         let root = view.read(app);
         assert!(
-            root.sync.running
+            root.sync
+                .running
                 .as_ref()
                 .expect("still running until the engine reports back")
                 .stopping,
@@ -547,7 +515,8 @@ fn background_sync_event_wakes_render_without_additional_user_input(cx: &mut Tes
     cx.update(|_, app| {
         let status = view
             .read(app)
-            .sync.status
+            .sync
+            .status
             .get(&id)
             .cloned()
             .expect("timer notification should trigger render and consume the event");
@@ -576,7 +545,10 @@ fn file_sync_run_button_saves_current_inputs_and_queues_selected_job(cx: &mut Te
                 root.sync.name_input.clone().expect("name input"),
                 root.sync.source_input.clone().expect("source input"),
                 root.sync.target_input.clone().expect("target input"),
-                root.sync.exclude_input.clone().expect("exclude patterns input"),
+                root.sync
+                    .exclude_input
+                    .clone()
+                    .expect("exclude patterns input"),
             )
         };
         name.update(app, |state, cx| state.set_value("즉시 백업", window, cx));
@@ -601,7 +573,8 @@ fn file_sync_run_button_saves_current_inputs_and_queues_selected_job(cx: &mut Te
         assert_eq!(job.target, r"E:\validation\target");
         assert_eq!(job.exclude_patterns, vec!["*.tmp", "cache/**"]);
         assert_eq!(
-            root.sync.status
+            root.sync
+                .status
                 .get(&job.id)
                 .expect("queued status")
                 .summary,
@@ -695,7 +668,8 @@ fn sidebar_switch_turns_automatic_sync_off_and_on(cx: &mut TestAppContext) {
         let root = view.read(app);
         assert!(root.sync.enabled, "기본값은 켜짐이다");
         assert!(
-            root.sync.shared
+            root.sync
+                .shared
                 .lock()
                 .expect("sync shared state")
                 .auto_enabled
@@ -709,7 +683,8 @@ fn sidebar_switch_turns_automatic_sync_off_and_on(cx: &mut TestAppContext) {
         assert!(!root.sync.enabled, "스위치를 누르면 꺼져야 한다");
         assert!(
             !root
-                .sync.shared
+                .sync
+                .shared
                 .lock()
                 .expect("sync shared state")
                 .auto_enabled,
@@ -722,7 +697,8 @@ fn sidebar_switch_turns_automatic_sync_off_and_on(cx: &mut TestAppContext) {
         let root = view.read(app);
         assert!(root.sync.enabled);
         assert!(
-            root.sync.shared
+            root.sync
+                .shared
                 .lock()
                 .expect("sync shared state")
                 .auto_enabled
@@ -752,7 +728,8 @@ fn changing_the_folders_drops_the_resume_cursor(cx: &mut TestAppContext) {
     let id = cx.update(|_, app| {
         let root = view.read(app);
         let id = root.sync.jobs[0].id.clone();
-        root.sync.shared
+        root.sync
+            .shared
             .lock()
             .expect("sync shared state")
             .cursors
@@ -772,7 +749,8 @@ fn changing_the_folders_drops_the_resume_cursor(cx: &mut TestAppContext) {
     cx.update(|_, app| {
         assert!(
             view.read(app)
-                .sync.shared
+                .sync
+                .shared
                 .lock()
                 .expect("sync shared state")
                 .cursors
@@ -795,7 +773,8 @@ fn changing_the_folders_drops_the_resume_cursor(cx: &mut TestAppContext) {
         let root = view.read(app);
         assert!(
             !root
-                .sync.shared
+                .sync
+                .shared
                 .lock()
                 .expect("sync shared state")
                 .cursors

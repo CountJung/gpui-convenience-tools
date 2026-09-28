@@ -129,17 +129,16 @@ pub enum WatchMode {
 ///
 /// 기본값은 `Skip`이다. 링크를 따라가면 원본 루트 밖으로 탈출하거나 순환 링크를
 /// 만날 수 있고, 링크를 다시 만들려면 Windows 권한 정책이 개입하므로 옵션을
-/// 추가하는 단계와 실제 동작을 분리한다. `Follow`·`Recreate`의 실행 경계는
-/// D-014~D-016에서 각각 확정한다.
+/// 선택 모드마다 원본 내부 추적·순환 차단·대상 충돌 보호 경계를 적용한다.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SymlinkMode {
     /// 링크를 따라가지 않고 안전하게 건너뛴다.
     #[default]
     Skip,
-    /// 링크가 가리키는 대상을 일반 파일·폴더처럼 처리한다(후속 구현).
+    /// 원본 내부 링크가 가리키는 대상을 일반 파일·폴더처럼 처리한다.
     Follow,
-    /// 링크 자체를 대상에 재생성한다(후속 구현).
+    /// 원본 내부 링크를 대상 내부의 상대 링크로 재생성한다.
     Recreate,
 }
 

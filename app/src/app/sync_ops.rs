@@ -6,6 +6,7 @@
 
 use gpui::{Context, PathPromptOptions, Window};
 use gpui_component::notification::NotificationType;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::Ordering;
 
 use super::state::PlatformEvent;
@@ -94,7 +95,7 @@ impl AppRoot {
         }
 
         let enabled = self.sync.enabled;
-            if let Err(err) = update_config(move |cfg| cfg.sync_enabled = enabled) {
+        if let Err(err) = update_config(move |cfg| cfg.sync_enabled = enabled) {
             log::error!("동기화 스위치 저장 실패: {err}");
         }
     }
@@ -181,6 +182,132 @@ impl AppRoot {
                 state.set_value(job.exclude_patterns.join("\n"), window, cx)
             });
         }
+        self.sync.browse_relative = PathBuf::new();
+        self.sync.browse_page = 0;
+        self.sync.browse_scroll = gpui::ScrollHandle::default();
+        self.refresh_sync_browse(cx);
+    }
+
+    /// 입력 중인 원본 경로를 기준으로 직계 항목을 읽는다. 숨김·시스템 항목도 포함한다.
+    pub(crate) fn refresh_sync_browse(&mut self, cx: &mut Context<Self>) {
+        let source = self
+            .sync
+            .source_input
+            .as_ref()
+            .map(|input| input.read(cx).value().to_string())
+            .unwrap_or_default();
+        if self.sync.browse_source != source {
+            self.sync.browse_relative = PathBuf::new();
+            self.sync.browse_page = 0;
+            self.sync.browse_scroll = gpui::ScrollHandle::default();
+        }
+        self.sync.browse_source = source.clone();
+        match crate::sync::browse::list(Path::new(source.trim()), &self.sync.browse_relative) {
+            Ok(entries) => {
+                self.sync.browse_entries = entries;
+                self.sync.browse_error = None;
+            }
+            Err(err) => {
+                self.sync.browse_entries.clear();
+                self.sync.browse_error = Some(err);
+            }
+        }
+        cx.notify();
+    }
+
+    pub(crate) fn enter_sync_browse_dir(&mut self, name: &str, cx: &mut Context<Self>) {
+        if self
+            .sync
+            .source_input
+            .as_ref()
+            .is_some_and(|input| input.read(cx).value().as_ref() != self.sync.browse_source)
+        {
+            self.refresh_sync_browse(cx);
+            return;
+        }
+        if !self
+            .sync
+            .browse_entries
+            .iter()
+            .any(|entry| entry.name == name && entry.is_directory && !entry.is_link)
+        {
+            return;
+        }
+        if let Some(next) = crate::sync::browse::child_relative(&self.sync.browse_relative, name) {
+            self.sync.browse_relative = next;
+            self.sync.browse_page = 0;
+            self.sync.browse_scroll = gpui::ScrollHandle::default();
+            self.refresh_sync_browse(cx);
+        }
+    }
+
+    pub(crate) fn parent_sync_browse_dir(&mut self, cx: &mut Context<Self>) {
+        if self.sync.browse_relative.pop() {
+            self.sync.browse_page = 0;
+            self.sync.browse_scroll = gpui::ScrollHandle::default();
+            self.refresh_sync_browse(cx);
+        }
+    }
+
+    pub(crate) fn change_sync_browse_page(&mut self, direction: isize, cx: &mut Context<Self>) {
+        const PAGE_SIZE: usize = 100;
+        let max_page = self.sync.browse_entries.len().saturating_sub(1) / PAGE_SIZE;
+        self.sync.browse_page = self
+            .sync
+            .browse_page
+            .saturating_add_signed(direction)
+            .min(max_page);
+        self.sync.browse_scroll = gpui::ScrollHandle::default();
+        cx.notify();
+    }
+
+    pub(crate) fn toggle_sync_exclusion(
+        &mut self,
+        relative_path: &str,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if self
+            .sync
+            .source_input
+            .as_ref()
+            .is_some_and(|input| input.read(cx).value().as_ref() != self.sync.browse_source)
+        {
+            self.refresh_sync_browse(cx);
+            self.notify_toast(
+                "원본 경로가 바뀌어 목록을 새로 읽었습니다. 항목을 다시 선택하세요.",
+                NotificationType::Warning,
+                window,
+                cx,
+            );
+            return;
+        }
+        if !self
+            .sync
+            .browse_entries
+            .iter()
+            .any(|entry| entry.relative_path == relative_path)
+        {
+            return;
+        }
+        let Some(input) = self.sync.exclude_input.as_ref() else {
+            return;
+        };
+        let mut patterns = parse_exclude_patterns(input.read(cx).value().as_ref());
+        if let Some(index) = patterns.iter().position(|pattern| pattern == relative_path) {
+            patterns.remove(index);
+        } else {
+            patterns.push(relative_path.to_string());
+        }
+        input.update(cx, |state, cx| {
+            state.set_value(patterns.join("\n"), window, cx)
+        });
+        if let Some(index) = self.sync.selected_job {
+            if self.capture_sync_inputs(index, cx) {
+                self.persist_sync_jobs();
+            }
+        }
+        cx.notify();
     }
 
     /// 선택한 작업을 수정하고 저장한다.
@@ -206,30 +333,33 @@ impl AppRoot {
     /// 호출자가 공유 상태 갱신 또는 실행 큐 등록과 함께 저장 시점을 결정한다.
     fn capture_sync_inputs(&mut self, index: usize, cx: &mut Context<Self>) -> bool {
         let name = self
-            .sync.name_input
+            .sync
+            .name_input
             .as_ref()
             .map(|i| i.read(cx).value().to_string())
             .unwrap_or_default();
         let source = self
-            .sync.source_input
+            .sync
+            .source_input
             .as_ref()
             .map(|i| i.read(cx).value().to_string())
             .unwrap_or_default();
         let target = self
-            .sync.target_input
+            .sync
+            .target_input
             .as_ref()
             .map(|i| i.read(cx).value().to_string())
             .unwrap_or_default();
         let exclude_patterns = self
-            .sync.exclude_input
+            .sync
+            .exclude_input
             .as_ref()
             .map(|i| parse_exclude_patterns(i.read(cx).value().as_ref()))
             .unwrap_or_default();
 
         let changed_id = match self.sync.jobs.get_mut(index) {
             Some(job) => {
-                let paths_changed =
-                    job.source != source.trim() || job.target != target.trim();
+                let paths_changed = job.source != source.trim() || job.target != target.trim();
                 job.name = name.trim().to_string();
                 job.source = source.trim().to_string();
                 job.target = target.trim().to_string();
@@ -257,7 +387,12 @@ impl AppRoot {
 
         self.persist_sync_jobs();
         self.push_log("INFO", "동기화 설정을 저장했습니다.".to_string());
-        self.notify_toast("동기화 설정을 저장했습니다", NotificationType::Success, window, cx);
+        self.notify_toast(
+            "동기화 설정을 저장했습니다",
+            NotificationType::Success,
+            window,
+            cx,
+        );
         cx.notify();
     }
 

@@ -67,13 +67,17 @@ fn pre_scan_counts_the_same_processable_entries_as_sync_progress() {
     let mut reporter = |progress: SyncProgress<'_>| {
         reports.push((progress.total, progress.current_path.to_string()));
     };
-    let mut control = SyncControl::new().total(Some(total)).on_progress(&mut reporter);
+    let mut control = SyncControl::new()
+        .total(Some(total))
+        .on_progress(&mut reporter);
     let outcome = run_sync_job_with_control(&sync_job, &mut control);
 
     assert_eq!(outcome.copied, 2);
     assert_eq!(outcome.skipped, 1);
     assert_eq!(reports.len(), 3);
-    assert!(reports.iter().all(|(reported_total, _)| *reported_total == Some(3)));
+    assert!(reports
+        .iter()
+        .all(|(reported_total, _)| *reported_total == Some(3)));
 
     let _ = fs::remove_dir_all(&root);
 }
@@ -202,37 +206,13 @@ fn skips_symbolic_links_without_reporting_a_sync_failure() {
 
     assert_eq!(outcome.copied, 1, "failures: {:?}", outcome.failures);
     assert_eq!(outcome.skipped, 1);
-    assert!(outcome.failures.is_empty(), "failures: {:?}", outcome.failures);
+    assert!(
+        outcome.failures.is_empty(),
+        "failures: {:?}",
+        outcome.failures
+    );
     assert!(dst.join("target.txt").exists());
     assert!(!dst.join("link.txt").exists());
-
-    let _ = fs::remove_dir_all(&root);
-}
-
-#[cfg(windows)]
-#[test]
-fn rejects_unimplemented_symbolic_link_modes_instead_of_silently_skipping() {
-    use std::os::windows::fs::symlink_file;
-
-    let root = temp_dir("symbolic-link-mode-boundary");
-    let src = root.join("src");
-    let dst = root.join("dst");
-    fs::create_dir_all(&src).unwrap();
-    let target = src.join("target.txt");
-    let link = src.join("link.txt");
-    fs::write(&target, b"target").unwrap();
-    symlink_file(&target, &link).expect("the Windows test environment must allow file symlinks");
-
-    for mode in [SymlinkMode::Follow, SymlinkMode::Recreate] {
-        let mut configured = job(&src, &dst);
-        configured.symlink_mode = mode;
-        let outcome = run_sync_job(&configured);
-
-        assert_eq!(outcome.copied, 1, "the ordinary target file remains supported");
-        assert_eq!(outcome.failures.len(), 1, "the unimplemented link mode is explicit");
-        assert!(outcome.failures[0].reason.contains("아직 구현되지 않았습니다"));
-        let _ = fs::remove_file(dst.join("target.txt"));
-    }
 
     let _ = fs::remove_dir_all(&root);
 }
@@ -258,7 +238,11 @@ fn overwrites_an_existing_readonly_target_file() {
     let outcome = run_sync_job(&job(&src, &dst));
 
     assert_eq!(outcome.copied, 1, "failures: {:?}", outcome.failures);
-    assert!(outcome.failures.is_empty(), "failures: {:?}", outcome.failures);
+    assert!(
+        outcome.failures.is_empty(),
+        "failures: {:?}",
+        outcome.failures
+    );
     assert_eq!(fs::read(&target_file).unwrap(), b"new configuration");
 
     let _ = fs::remove_dir_all(&root);
@@ -491,7 +475,10 @@ fn progress_reports_each_file_with_running_counters() {
         "nested files should also be reported: {paths:?}"
     );
     // 보고는 처리 '직전'이므로 첫 보고의 복사 수는 아직 0이다.
-    assert_eq!(seen[0].1, 0, "progress is reported before the copy: {seen:?}");
+    assert_eq!(
+        seen[0].1, 0,
+        "progress is reported before the copy: {seen:?}"
+    );
 
     let _ = fs::remove_dir_all(&root);
 }
@@ -638,10 +625,16 @@ fn resuming_skips_everything_before_the_cursor() {
         "커서 이후(c·d)만 복사해야 한다: {:?}",
         outcome.failures
     );
-    assert!(outcome.resumed, "이어서 실행했다는 사실이 결과에 남아야 한다");
+    assert!(
+        outcome.resumed,
+        "이어서 실행했다는 사실이 결과에 남아야 한다"
+    );
     assert!(!dst.join("a.txt").exists(), "커서 앞 구간은 손대지 않는다");
     assert!(!dst.join("b.txt").exists());
-    assert!(dst.join("c.txt").exists(), "커서가 가리킨 항목부터 처리한다");
+    assert!(
+        dst.join("c.txt").exists(),
+        "커서가 가리킨 항목부터 처리한다"
+    );
     assert!(dst.join("d.txt").exists());
 
     let _ = fs::remove_dir_all(&root);

@@ -1269,16 +1269,22 @@ passed·4 ignored, Clippy exit 0, `git diff --check`를 통과했으며 구현 �
 `applies_log_count_and_age_retention_before_appending`, `cargo check --locked`, 전체 144
 passed·4 ignored, Clippy exit 0, `git diff --check`를 통과했으며 구현 커밋은 `ed71af4`이다.
 
-#### D-015 — 링크 처리 모드 스키마 경계 진행 중
+#### D-014~D-016 — 링크·정션 처리 정책과 실행 완료 ✅
 
 - `SyncJob.symlink_mode`와 `SymlinkMode::{Skip, Follow, Recreate}`를 추가했다. 필드가 없는
   구버전 작업은 안전한 `Skip`으로 복원하고, `snake_case`로 저장·복원한다.
-- 기본 `Skip`은 기존 동작을 유지한다. 아직 구현하지 않은 `Follow`·`Recreate`를 설정 파일에서
-  직접 요청하면 조용히 건너뛰지 않고 항목별 명시적 실패로 남긴다. 원본 루트 탈출·순환 링크·
-  Windows 권한 경계를 먼저 확정한 뒤 D-014·D-016에서 실제 동작을 추가한다.
-- 전용 설정/경계 테스트, `cargo check --locked`, 전체 `cargo test --all-targets --all-features --locked`
-  (154 passed·4 ignored), `Verify-Workspace.ps1`의 IDE 검증, 표준 Clippy(exit 0, 기존 baseline
-  경고 7건)를 통과했다. 전체 포맷 검사는 기존 baseline 불일치로 별도 보류한다.
+- `Skip`은 링크·정션을 건너뜀으로 계상한다. `Follow`는 원본 루트 안의 파일·폴더만
+  따라가고 조상 경로 순환을 차단한다. `Recreate`는 원본 내부 대상을 대상 내부 상대 경로로
+  매핑해 링크를 만든다. Windows 정션도 디렉터리 심볼릭 링크로 안전하게 변환한다.
+- 대상 루트의 상위까지 링크·정션을 확인해 쓰기 탈출을 막는다. 대상에 다른 링크나 일반
+  항목이 있으면 보존하고 경로별 실패로 남긴다. 링크 생성 권한 오류 1314는 관리자 권한 또는
+  개발자 모드를 안내한다. 관리자 권한으로 링크·정션 테스트 바이너리를 실행해 exit 0을
+  확인했으며, 권한 부족 1314의 실제 발생은 재현되지 않아 메시지 단위 테스트로 검증했다.
+- 숨김·시스템 파일·폴더를 항상 보이는 원본 직계 탐색과 제외 선택 버튼을 추가했다.
+  원본 경로 입력이 바뀌면 기존 목록 클릭을 거부하고 새로 읽는다. 제외 패턴은 직접 편집도
+  가능하며, 숨김 항목 포함 스위치를 끄면 동기화만 건너뛴다.
+- 링크·정션·대상 충돌·GPUI 제외 선택·폭 회귀 테스트를 포함한 전체 186 passed·5 ignored,
+  Clippy `-D warnings`를 확인했다. 실제 화면과 작업별 최종 게이트는 `VERIFICATION.md`에 기록한다.
 
 #### D-020 — 최근 동기화 이력 카드 부분 구현
 
@@ -1287,9 +1293,10 @@ passed·4 ignored, Clippy exit 0, `git diff --check`를 통과했으며 구현 �
   표시하는 카드가 설정·실패 목록 뒤에 배치된다. 설정 저장 버튼이 최소 화면에서 밀리지 않도록
   기존 설정 카드의 위치를 보존했다.
 - `file_sync_renders_recent_history_with_result_counts_and_duration`와 섹션 폭 회귀 테스트,
-  `Verify-Workspace.ps1` 필수 18개 테스트를 추가·통과했다. 검증 전용 `-SeedHistory`와
-  `-InitialPanel FileSync`로 실제 이력 행을 시드한 릴리스 패널 캡처까지 완료했지만, 독립
-  Visual Reviewer 확인은 남아 있어 TODO를 유지한다.
+  `Verify-Workspace.ps1` 필수 테스트를 추가·통과했다. 상태·건수·소요 시간 문구를
+  별도 `history.rs`에서 검증하고 994×702·1280×900의 3행 카드 경계를 다시 고정했다.
+  검증 전용 `-SeedHistory`와 `-InitialPanel FileSync`의 릴리스 패널 캡처도 완료했지만,
+  독립 Visual Reviewer 재확인은 사용량 제한으로 끝내지 못해 TODO를 유지한다.
 
 전체 145 passed·4 ignored, Clippy exit 0(기존 경고 7건), `git diff --check`와 격리 release
 기본·시드 패널 캡처를 통과했으며 구현 커밋은 `031148e`, 검증 하네스 커밋은 `ff9dc72`이다.

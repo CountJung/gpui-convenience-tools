@@ -9,7 +9,7 @@
 
 use std::{
     cmp::Ordering as CmpOrdering,
-    collections::{BTreeSet, HashMap},
+    collections::BTreeSet,
     ffi::OsString,
     fs,
     path::{Path, PathBuf},
@@ -18,6 +18,11 @@ use std::{
 };
 
 use crate::config::{SymlinkMode, SyncJob};
+
+pub mod browse;
+mod links;
+mod patterns;
+use patterns::matches_exclude_pattern;
 
 /// 파일 하나를 처리하기 직전에 보고되는 진행 상황.
 ///
@@ -83,8 +88,7 @@ impl<'a> SyncControl<'a> {
     }
 
     fn is_cancelled(&self) -> bool {
-        self.cancel
-            .is_some_and(|flag| flag.load(Ordering::Relaxed))
+        self.cancel.is_some_and(|flag| flag.load(Ordering::Relaxed))
     }
 
     fn report(&mut self, current_path: &str, outcome: &SyncOutcome) {
@@ -160,98 +164,6 @@ fn split_relative(path: &str) -> Vec<OsString> {
         .filter(|part| !part.is_empty() && *part != ".")
         .map(OsString::from)
         .collect()
-}
-
-/// 상대 경로 하나가 제외 glob 패턴과 일치하는지 확인한다.
-///
-/// `*`는 한 경로 조각 안의 0개 이상의 문자, `?`는 한 문자와 일치한다.
-/// 경로 조각 하나를 넘어가야 할 때는 `**`를 독립 조각으로 사용한다.
-/// 따라서 `**/*.tmp`는 루트와 모든 하위 폴더의 `.tmp` 파일을 모두 가리킨다.
-/// 패턴과 경로의 `/`·`\\`는 같은 구분자로 취급하며, 비교는 대소문자를 구분한다.
-pub(crate) fn matches_exclude_pattern(pattern: &str, relative_path: &str) -> bool {
-    let pattern = pattern.trim();
-    if pattern.is_empty() {
-        return false;
-    }
-
-    let pattern_segments: Vec<_> = pattern
-        .split(['/', '\\'])
-        .filter(|segment| !segment.is_empty() && *segment != ".")
-        .collect();
-    let path_segments: Vec<_> = relative_path
-        .split(['/', '\\'])
-        .filter(|segment| !segment.is_empty() && *segment != ".")
-        .collect();
-
-    let mut memo = HashMap::new();
-    match_glob_segments(&pattern_segments, &path_segments, 0, 0, &mut memo)
-}
-
-fn match_glob_segments(
-    pattern: &[&str],
-    path: &[&str],
-    pattern_index: usize,
-    path_index: usize,
-    memo: &mut HashMap<(usize, usize), bool>,
-) -> bool {
-    if let Some(result) = memo.get(&(pattern_index, path_index)) {
-        return *result;
-    }
-
-    let result = if pattern_index == pattern.len() {
-        path_index == path.len()
-    } else if is_globstar(pattern[pattern_index]) {
-        // `**`는 현재 경로 조각을 소비하지 않는 경우와 하나 소비하는 경우를
-        // 모두 시도해 `foo/**/bar`의 0개 하위 폴더도 올바르게 처리한다.
-        match_glob_segments(pattern, path, pattern_index + 1, path_index, memo)
-            || (path_index < path.len()
-                && match_glob_segments(pattern, path, pattern_index, path_index + 1, memo))
-    } else {
-        path_index < path.len()
-            && match_glob_segment(pattern[pattern_index], path[path_index])
-            && match_glob_segments(pattern, path, pattern_index + 1, path_index + 1, memo)
-    };
-
-    memo.insert((pattern_index, path_index), result);
-    result
-}
-
-fn is_globstar(segment: &str) -> bool {
-    segment.len() >= 2 && segment.chars().all(|character| character == '*')
-}
-
-/// 경로 구분자를 제외한 한 조각을 `*`·`?`로 비교한다.
-fn match_glob_segment(pattern: &str, text: &str) -> bool {
-    let pattern: Vec<_> = pattern.chars().collect();
-    let text: Vec<_> = text.chars().collect();
-    let mut pattern_index = 0;
-    let mut text_index = 0;
-    let mut last_star = None;
-    let mut star_text_index = 0;
-
-    while text_index < text.len() {
-        if pattern_index < pattern.len()
-            && (pattern[pattern_index] == '?' || pattern[pattern_index] == text[text_index])
-        {
-            pattern_index += 1;
-            text_index += 1;
-        } else if pattern_index < pattern.len() && pattern[pattern_index] == '*' {
-            last_star = Some(pattern_index);
-            star_text_index = text_index;
-            pattern_index += 1;
-        } else if let Some(star_index) = last_star {
-            pattern_index = star_index + 1;
-            star_text_index += 1;
-            text_index = star_text_index;
-        } else {
-            return false;
-        }
-    }
-
-    while pattern_index < pattern.len() && pattern[pattern_index] == '*' {
-        pattern_index += 1;
-    }
-    pattern_index == pattern.len()
 }
 
 /// 한 파일에 대한 동기화 실패 기록.
@@ -349,11 +261,16 @@ pub fn run_sync_job_with_control(job: &SyncJob, control: &mut SyncControl<'_>) -
     }
 
     // 대상이 원본 안에 있으면 무한 복사가 발생하므로 차단한다.
-    if is_inside(&target, &source) {
+    if links::destination_is_inside_source(&target, &source) {
         outcome.fail(
             job.target.clone(),
             "대상 폴더가 원본 폴더 내부에 있어 동기화할 수 없습니다.",
         );
+        return outcome;
+    }
+
+    if let Err(err) = links::reject_destination_reparse(&target, &target) {
+        outcome.fail(job.target.clone(), err);
         return outcome;
     }
 
@@ -364,7 +281,20 @@ pub fn run_sync_job_with_control(job: &SyncJob, control: &mut SyncControl<'_>) -
 
     // 이어서 시작하는 순회는 원본 일부만 훑으므로, 그 사실을 미리 붙잡아 둔다.
     let resumed = control.is_resuming();
-    sync_dir(&source, &target, &source, 0, job, control, &mut outcome);
+    let source_root = match fs::canonicalize(&source) {
+        Ok(path) => path,
+        Err(err) => {
+            outcome.fail(job.source.clone(), describe_io_error(&err));
+            return outcome;
+        }
+    };
+    let mut paths = WalkPaths {
+        root: &source,
+        target_root: &target,
+        source_root: &source_root,
+        ancestors: vec![source_root.clone()],
+    };
+    sync_dir(&source, &target, &mut paths, 0, job, control, &mut outcome);
     outcome.resumed = resumed;
     outcome
 }
@@ -380,10 +310,23 @@ pub fn count_sync_entries(job: &SyncJob) -> Option<usize> {
         return None;
     }
 
-    count_sync_dir(source, source, job)
+    let source_root = fs::canonicalize(source).ok()?;
+    count_sync_dir(
+        source,
+        source,
+        &source_root,
+        &mut vec![source_root.clone()],
+        job,
+    )
 }
 
-fn count_sync_dir(source: &Path, root: &Path, job: &SyncJob) -> Option<usize> {
+fn count_sync_dir(
+    source: &Path,
+    root: &Path,
+    source_root: &Path,
+    ancestors: &mut Vec<PathBuf>,
+    job: &SyncJob,
+) -> Option<usize> {
     let mut entries: Vec<_> = fs::read_dir(source).ok()?.collect::<Result<_, _>>().ok()?;
     entries.sort_by_key(|entry: &fs::DirEntry| entry.file_name());
 
@@ -406,10 +349,24 @@ fn count_sync_dir(source: &Path, root: &Path, job: &SyncJob) -> Option<usize> {
             continue;
         }
 
-        if meta.file_type().is_symlink() {
+        if links::is_link(&meta) {
+            if job.symlink_mode == SymlinkMode::Follow {
+                if let Ok(resolved) = links::resolve_inside(&src_path, source_root) {
+                    if resolved.is_dir() && !ancestors.contains(&resolved) {
+                        ancestors.push(resolved);
+                        let nested = count_sync_dir(&src_path, root, source_root, ancestors, job)?;
+                        ancestors.pop();
+                        count += nested;
+                        continue;
+                    }
+                }
+            }
             count += 1;
         } else if meta.is_dir() {
-            count += count_sync_dir(&src_path, root, job)?;
+            let resolved = fs::canonicalize(&src_path).ok()?;
+            ancestors.push(resolved);
+            count += count_sync_dir(&src_path, root, source_root, ancestors, job)?;
+            ancestors.pop();
         } else {
             count += 1;
         }
@@ -422,15 +379,25 @@ fn count_sync_dir(source: &Path, root: &Path, job: &SyncJob) -> Option<usize> {
 ///
 /// `root`는 실패 메시지에 표시할 상대 경로 계산 기준, `depth`는 이어서 시작 지점을 찾을 때
 /// 견줄 경로 컴포넌트의 자리다.
+struct WalkPaths<'a> {
+    root: &'a Path,
+    target_root: &'a Path,
+    source_root: &'a Path,
+    ancestors: Vec<PathBuf>,
+}
+
 fn sync_dir(
     source: &Path,
     target: &Path,
-    root: &Path,
+    paths: &mut WalkPaths<'_>,
     depth: usize,
     job: &SyncJob,
     control: &mut SyncControl<'_>,
     outcome: &mut SyncOutcome,
 ) {
+    let root = paths.root;
+    let target_root = paths.target_root;
+    let source_root = paths.source_root;
     let read_dir = match fs::read_dir(source) {
         Ok(entries) => entries,
         Err(err) => {
@@ -449,6 +416,7 @@ fn sync_dir(
 
     // mirror_deletes 처리를 위해 원본에 존재하는 이름을 모아둔다.
     let mut seen_names = BTreeSet::<OsString>::new();
+    let failures_before_scan = outcome.failures.len() + outcome.truncated_failures;
 
     for entry in entries {
         // 중지 요청은 파일 단위로 확인한다. 이미 복사한 파일은 되돌리지 않고 그대로 둔다.
@@ -507,7 +475,8 @@ fn sync_dir(
             continue;
         }
 
-        if meta.file_type().is_symlink() {
+        if links::is_link(&meta) {
+            let mut report_link = true;
             match job.symlink_mode {
                 SymlinkMode::Skip => {
                     // 링크를 그대로 복제하려면 권한과 대상 종류 판별이 필요하다.
@@ -515,29 +484,96 @@ fn sync_dir(
                     // 아니라 건너뜀 수로 반영한다.
                     outcome.skipped += 1;
                 }
-                SymlinkMode::Follow | SymlinkMode::Recreate => {
-                    // 스키마를 먼저 도입하더라도 미구현 정책을 조용히 Skip으로
-                    // 강등하면 사용자가 설정한 동작과 실제 결과가 달라진다.
-                    // 후속 구현 전에는 명시적인 실패로 남겨 안전한 오작동을 막는다.
-                    outcome.fail(
+                SymlinkMode::Follow => match links::resolve_inside(&src_path, source_root) {
+                    Ok(resolved) if resolved.is_dir() => {
+                        if paths.ancestors.contains(&resolved) {
+                            outcome
+                                .fail(&relative_path, "순환 링크가 발견되어 따라갈 수 없습니다.");
+                        } else if let Err(err) =
+                            links::reject_destination_reparse(&dst_path, target_root)
+                        {
+                            outcome.fail(&relative_path, err);
+                        } else if let Err(err) = fs::create_dir_all(&dst_path) {
+                            outcome.fail(&relative_path, describe_io_error(&err));
+                        } else {
+                            paths.ancestors.push(resolved);
+                            // 디렉터리 링크 자체는 처리 단위가 아니다. 내부 파일만
+                            // 사전 총량에 들어가므로 진행 보고도 내부 순회에 맡긴다.
+                            report_link = false;
+                            sync_dir(
+                                &src_path,
+                                &dst_path,
+                                paths,
+                                resume_depth,
+                                job,
+                                control,
+                                outcome,
+                            );
+                            paths.ancestors.pop();
+                        }
+                    }
+                    Ok(resolved) if resolved.is_file() => {
+                        if let Err(err) = links::reject_destination_reparse(&dst_path, target_root)
+                        {
+                            outcome.fail(&relative_path, err);
+                        } else {
+                            match fs::metadata(&src_path) {
+                                Ok(link_meta) => match needs_copy(&dst_path, &link_meta) {
+                                    Ok(false) => outcome.skipped += 1,
+                                    Ok(true) => match copy_file(&src_path, &dst_path) {
+                                        Ok(()) => outcome.copied += 1,
+                                        Err(err) => outcome.fail(&relative_path, err),
+                                    },
+                                    Err(err) => {
+                                        outcome.fail(&relative_path, describe_io_error(&err))
+                                    }
+                                },
+                                Err(err) => outcome.fail(&relative_path, describe_io_error(&err)),
+                            }
+                        }
+                    }
+                    Ok(_) => outcome.fail(
                         &relative_path,
-                        format!(
-                            "링크 처리 모드 '{}'는 아직 구현되지 않았습니다.",
-                            symlink_mode_label(job.symlink_mode)
-                        ),
-                    );
+                        "일반 파일·폴더가 아닌 링크 대상은 지원하지 않습니다.",
+                    ),
+                    Err(err) => outcome.fail(&relative_path, err),
+                },
+                SymlinkMode::Recreate => {
+                    match links::recreate(&src_path, &dst_path, source_root, target_root) {
+                        Ok(false) => outcome.skipped += 1,
+                        Ok(true) => outcome.copied += 1,
+                        Err(err) => outcome.fail(&relative_path, err),
+                    }
                 }
             }
-            control.report(&relative_path, outcome);
+            if report_link {
+                control.report(&relative_path, outcome);
+            }
             continue;
         }
 
         if meta.is_dir() {
+            if let Err(err) = links::reject_destination_reparse(&dst_path, target_root) {
+                outcome.fail(&relative_path, err);
+                continue;
+            }
             if let Err(err) = fs::create_dir_all(&dst_path) {
                 outcome.fail(relative_label(&dst_path, root), describe_io_error(&err));
                 continue;
             }
-            sync_dir(&src_path, &dst_path, root, resume_depth, job, control, outcome);
+            paths
+                .ancestors
+                .push(fs::canonicalize(&src_path).unwrap_or(src_path.clone()));
+            sync_dir(
+                &src_path,
+                &dst_path,
+                paths,
+                resume_depth,
+                job,
+                control,
+                outcome,
+            );
+            paths.ancestors.pop();
             if outcome.cancelled {
                 return;
             }
@@ -547,6 +583,10 @@ fn sync_dir(
         // 건너뛰는 파일도 보고해야 대용량 폴더에서 화면이 멈춘 것처럼 보이지 않는다.
         control.report(&relative_label(&src_path, root), outcome);
 
+        if let Err(err) = links::reject_destination_reparse(&dst_path, target_root) {
+            outcome.fail(&relative_path, err);
+            continue;
+        }
         match needs_copy(&dst_path, &meta) {
             Ok(false) => {
                 outcome.skipped += 1;
@@ -569,7 +609,10 @@ fn sync_dir(
     // 이어서 시작한 순회는 이 디렉터리의 이름을 모두 모았으므로(건너뛴 항목도 넣는다)
     // 여기서는 안전하다. 다만 통째로 건너뛴 하위 디렉터리 안쪽은 이번에 확인하지 못했고,
     // 그건 삭제가 다음 실행으로 미뤄질 뿐 잘못 지우는 문제가 아니다.
-    if job.mirror_deletes && !outcome.cancelled {
+    if job.mirror_deletes
+        && !outcome.cancelled
+        && outcome.failures.len() + outcome.truncated_failures == failures_before_scan
+    {
         mirror_deletes(target, root, &seen_names, outcome);
     }
 }
@@ -589,13 +632,31 @@ fn mirror_deletes(
         }
     };
 
-    for entry in entries.flatten() {
+    for entry in entries {
+        let entry = match entry {
+            Ok(entry) => entry,
+            Err(err) => {
+                outcome.fail(relative_label(target, root), describe_io_error(&err));
+                continue;
+            }
+        };
         if seen_names.contains(&entry.file_name()) {
             continue;
         }
 
         let path = entry.path();
-        let result = if path.is_dir() {
+        let metadata = match fs::symlink_metadata(&path) {
+            Ok(metadata) => metadata,
+            Err(err) => {
+                outcome.fail(path.display().to_string(), describe_io_error(&err));
+                continue;
+            }
+        };
+        let result = if links::is_link(&metadata) && metadata.is_dir() {
+            fs::remove_dir(&path)
+        } else if links::is_link(&metadata) {
+            fs::remove_file(&path)
+        } else if metadata.is_dir() {
             fs::remove_dir_all(&path)
         } else {
             clear_readonly(&path);
@@ -643,14 +704,6 @@ fn copy_file(src: &Path, dst: &Path) -> Result<(), String> {
     }
 }
 
-fn symlink_mode_label(mode: SymlinkMode) -> &'static str {
-    match mode {
-        SymlinkMode::Skip => "건너뛰기",
-        SymlinkMode::Follow => "대상 따라가기",
-        SymlinkMode::Recreate => "링크 재생성",
-    }
-}
-
 /// 대상 파일의 읽기 전용 속성을 해제한다(실패는 무시하고 복사에서 사유가 드러나게 한다).
 fn clear_readonly(path: &Path) {
     let Ok(meta) = fs::metadata(path) else {
@@ -678,13 +731,6 @@ fn has_hidden_or_system_attribute(path: &Path, _meta: &fs::Metadata) -> bool {
     path.file_name()
         .and_then(|n| n.to_str())
         .is_some_and(|n| n.starts_with('.'))
-}
-
-/// `candidate`가 `base` 내부(또는 동일 경로)인지 검사한다.
-fn is_inside(candidate: &Path, base: &Path) -> bool {
-    let candidate = fs::canonicalize(candidate).unwrap_or_else(|_| candidate.to_path_buf());
-    let base = fs::canonicalize(base).unwrap_or_else(|_| base.to_path_buf());
-    candidate.starts_with(&base)
 }
 
 /// 루트 기준 상대 경로 문자열. 상대화에 실패하면 전체 경로를 쓴다.
@@ -729,5 +775,7 @@ fn describe_io_error(err: &std::io::Error) -> String {
     format!("{err}")
 }
 
+#[cfg(test)]
+mod link_tests;
 #[cfg(test)]
 mod tests;

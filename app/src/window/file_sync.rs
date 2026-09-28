@@ -13,17 +13,20 @@ use gpui::{
 use gpui_component::{h_flex, input::Input, progress::Progress, theme::ActiveTheme, v_flex};
 
 use crate::app::{AppRoot, IntervalTarget};
-use crate::config::WatchMode;
+use crate::config::{SymlinkMode, WatchMode};
 use crate::util::format_interval;
 use crate::window::scroll_pane;
 use crate::window::ui::{self, ButtonStyle};
+
+mod browse;
+mod history;
 
 pub fn render(this: &mut AppRoot, window: &mut Window, cx: &mut Context<AppRoot>) -> AnyElement {
     this.ensure_sync_inputs(window, cx);
 
     let page_scroll = this.sync.page_scroll.clone();
     let jobs = render_job_list(this, cx);
-    let history = render_history(this, cx);
+    let history = history::render(this, cx);
     let settings = render_job_settings(this, window, cx);
     let failures = render_failures(this, cx);
     let status_bar = render_status_bar(this, cx);
@@ -58,77 +61,6 @@ pub fn render(this: &mut AppRoot, window: &mut Window, cx: &mut Context<AppRoot>
 // ─────────────────────────────────────────────
 // 최근 실행 이력
 // ─────────────────────────────────────────────
-
-fn render_history(this: &AppRoot, cx: &mut Context<AppRoot>) -> AnyElement {
-    let theme = cx.theme();
-    let fg = theme.foreground;
-    let muted_fg = theme.muted_foreground;
-    let border = theme.border;
-    let card = theme.secondary;
-    let mut rows = v_flex().gap_1();
-
-    if this.sync.history.is_empty() {
-        rows = rows.child(
-            div()
-                .text_color(muted_fg)
-                .child("아직 실행된 동기화 이력이 없습니다."),
-        );
-    } else {
-        for (index, entry) in this.sync.history.iter().take(20).enumerate() {
-            let (label, tone) = if entry.cancelled {
-                ("중지", ui::Tone::Info)
-            } else if entry.failed > 0 {
-                ("실패 포함", ui::Tone::Warning)
-            } else {
-                ("성공", ui::Tone::Success)
-            };
-            let counters = format!(
-                "복사 {} · 건너뜀 {} · 삭제 {} · 실패 {}",
-                entry.copied, entry.skipped, entry.deleted, entry.failed
-            );
-            let duration = format_interval(entry.duration_secs().min(u32::MAX as u64) as u32);
-            rows = rows.child(
-                h_flex()
-                    .debug_selector(move || format!("sync-history-row-{index}"))
-                    .w_full()
-                    .gap_2()
-                    .items_center()
-                    .px_2()
-                    .py_1()
-                    .rounded_md()
-                    .bg(theme.list)
-                    .child(ui::badge(label, tone, ui::Size::Sm, cx))
-                    .child(
-                        v_flex()
-                            .flex_1()
-                            .min_w_0()
-                            .child(div().text_color(fg).child(entry.label.clone()))
-                            .child(div().text_color(muted_fg).child(counters)),
-                    )
-                    .child(
-                        div()
-                            .text_color(muted_fg)
-                            .child(format!("소요 {duration}")),
-                    ),
-            );
-        }
-    }
-
-    div()
-        .debug_selector(|| "file-sync-history-card".to_string())
-        .rounded_lg()
-        .bg(card)
-        .border_1()
-        .border_color(border)
-        .p_3()
-        .child(
-            v_flex()
-                .gap_2()
-                .child(div().text_color(fg).child("최근 실행 이력"))
-                .child(rows),
-        )
-        .into_any_element()
-}
 
 // ─────────────────────────────────────────────
 // 하단 진행 상태 표시줄
@@ -182,11 +114,11 @@ fn render_status_bar(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElemen
                 .text_color(fg)
                 .child(running.display_path()),
         )
-        .child(
-            div()
-                .text_color(muted_fg)
-                .child(format!("{} — {}", running.label, running.counters())),
-        );
+        .child(div().text_color(muted_fg).child(format!(
+            "{} — {}",
+            running.label,
+            running.counters()
+        )));
 
     if let Some(percent) = running.progress_percent() {
         details = details.child(
@@ -218,7 +150,8 @@ fn render_job_list(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElement 
     let primary_btn = ButtonStyle::primary(cx);
     let is_running = this.sync.running.is_some();
     let stopping = this
-        .sync.running
+        .sync
+        .running
         .as_ref()
         .is_some_and(|running| running.stopping);
     let stop_btn = if is_running {
@@ -307,7 +240,6 @@ fn render_job_list(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElement 
     }
 
     v_flex()
-        .w_full()
         .gap_3()
         .child(
             h_flex()
@@ -337,19 +269,17 @@ fn render_job_list(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElement 
                         ))
                         // 중지는 실행 중일 때만 위험 색으로 강조한다. 유휴 상태에서도
                         // 버튼을 숨기지 않아 실행 직후 위치가 밀리지 않게 한다.
-                        .child(
-                            div()
-                                .debug_selector(|| "sync-stop".to_string())
-                                .child(ui::action_button(
-                                    "sync-stop",
-                                    if stopping { "중지 중…" } else { "중지" },
-                                    ui::Size::Md,
-                                    stop_btn,
-                                    cx.listener(|this, _ev, window, cx| {
-                                        this.request_sync_stop(window, cx);
-                                    }),
-                                )),
-                        ),
+                        .child(div().debug_selector(|| "sync-stop".to_string()).child(
+                            ui::action_button(
+                                "sync-stop",
+                                if stopping { "중지 중…" } else { "중지" },
+                                ui::Size::Md,
+                                stop_btn,
+                                cx.listener(|this, _ev, window, cx| {
+                                    this.request_sync_stop(window, cx);
+                                }),
+                            ),
+                        )),
                 ),
         )
         // ── 작업 목록 카드 ──
@@ -519,23 +449,6 @@ fn render_job_settings(
                                 }),
                             ),
                         ))
-                        // ── 제외 패턴 ──
-                        .child(div().text_color(fg).child("제외 패턴"))
-                        .child(div().text_color(muted_fg).child(
-                            "한 줄에 하나씩 입력합니다. 예: **/*.tmp 또는 cache/**",
-                        ))
-                        .child(
-                            div()
-                                .debug_selector(|| "sync-exclude-patterns-input".to_string())
-                                .w_full()
-                                .min_w_0()
-                                .children(exclude_input.as_ref().map(|input| {
-                                    Input::new(input).h(px(96.0))
-                                })),
-                        )
-                        .child(div().text_color(muted_fg).child(
-                            "파일·폴더의 상대 경로 기준이며, 빈 줄은 저장할 때 무시합니다.",
-                        ))
                         // ── 감시 방식 ──
                         .child(div().text_color(fg).child("감시 방식"))
                         .child(ui::option_row(
@@ -574,8 +487,8 @@ fn render_job_settings(
                         ))
                         .child(ui::option_row(
                             "sync-opt-hidden",
-                            "숨김·시스템 파일 포함",
-                            "끄면 숨김 속성 파일을 건너뜁니다. 기본값은 전체 포함입니다.",
+                            "숨김·시스템 파일 및 폴더 포함",
+                            "탐색 목록에는 항상 표시합니다. 이 옵션을 끄면 동기화에서 건너뜁니다.",
                             job.include_hidden,
                             cx.listener(|this, checked: &bool, window, cx| {
                                 let checked = *checked;
@@ -585,6 +498,37 @@ fn render_job_settings(
                             }),
                             cx,
                         ))
+                        .child(div().text_color(fg).child("링크·정션 처리"))
+                        .child(div().text_color(muted_fg).child(
+                            "기본은 건너뛰기입니다. 따라가기는 원본 내부만 허용하고 순환을 차단합니다. 재생성은 Windows 관리자 권한 또는 개발자 모드가 필요할 수 있습니다.",
+                        ))
+                        .child(
+                            h_flex().w_full().min_w_0().gap_2()
+                                .child(
+                                    div().debug_selector(|| "sync-link-skip".to_string()).child(
+                                        ui::choice_chip("sync-link-skip", "건너뛰기", job.symlink_mode == SymlinkMode::Skip, cx)
+                                            .on_click(cx.listener(|this, _ev, window, cx| {
+                                                this.update_selected_sync_job(window, cx, |job| job.symlink_mode = SymlinkMode::Skip);
+                                            })),
+                                    ),
+                                )
+                                .child(
+                                    div().debug_selector(|| "sync-link-follow".to_string()).child(
+                                        ui::choice_chip("sync-link-follow", "대상 따라가기", job.symlink_mode == SymlinkMode::Follow, cx)
+                                            .on_click(cx.listener(|this, _ev, window, cx| {
+                                                this.update_selected_sync_job(window, cx, |job| job.symlink_mode = SymlinkMode::Follow);
+                                            })),
+                                    ),
+                                )
+                                .child(
+                                    div().debug_selector(|| "sync-link-recreate".to_string()).child(
+                                        ui::choice_chip("sync-link-recreate", "링크 재생성", job.symlink_mode == SymlinkMode::Recreate, cx)
+                                            .on_click(cx.listener(|this, _ev, window, cx| {
+                                                this.update_selected_sync_job(window, cx, |job| job.symlink_mode = SymlinkMode::Recreate);
+                                            })),
+                                    ),
+                                ),
+                        )
                         .child(ui::option_row(
                             "sync-opt-mirror",
                             "원본에서 삭제된 항목 반영",
@@ -597,7 +541,25 @@ fn render_job_settings(
                                 });
                             }),
                             cx,
-                        )),
+                        ))
+                        // ── 제외 패턴 ──
+                        .child(div().text_color(fg).child("제외 패턴"))
+                        .child(div().text_color(muted_fg).child(
+                            "한 줄에 하나씩 입력합니다. 예: **/*.tmp 또는 cache/**",
+                        ))
+                        .child(
+                            div()
+                                .debug_selector(|| "sync-exclude-patterns-input".to_string())
+                                .w_full()
+                                .min_w_0()
+                                .children(exclude_input.as_ref().map(|input| {
+                                    Input::new(input).h(px(96.0))
+                                })),
+                        )
+                        .child(div().text_color(muted_fg).child(
+                            "파일·폴더의 상대 경로 기준이며, 빈 줄은 저장할 때 무시합니다.",
+                        ))
+                        .child(browse::render(this, cx)),
                 ),
         )
         .into_any_element()
@@ -734,4 +696,3 @@ fn render_failures(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElement 
 // ─────────────────────────────────────────────
 // 공통 조각
 // ─────────────────────────────────────────────
-

@@ -13,7 +13,11 @@ impl AppRoot {
     // 입력 위젯 준비
     // ─────────────────────────────────────────────
 
-    pub(crate) fn ensure_theme_filter_input(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    pub(crate) fn ensure_theme_filter_input(
+        &mut self,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         if self.theme_filter_input.is_some() {
             return;
         }
@@ -83,7 +87,8 @@ impl AppRoot {
         }
 
         let job = self
-            .sync.selected_job
+            .sync
+            .selected_job
             .and_then(|ix| self.sync.jobs.get(ix))
             .cloned()
             .unwrap_or_default();
@@ -132,5 +137,6 @@ impl AppRoot {
         self.sync.target_input = Some(target);
         self.sync.exclude_input = Some(exclude);
         self.subscriptions.push(name_sub);
+        self.refresh_sync_browse(cx);
     }
 }

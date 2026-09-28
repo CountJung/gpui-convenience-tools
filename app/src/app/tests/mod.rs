@@ -3,13 +3,15 @@
 //! 시나리오별 테스트는 하위 모듈이 소유한다.
 
 mod file_sync;
+mod file_sync_browse;
+mod file_sync_history;
 mod interval;
 mod layout;
 mod theme;
 mod virtual_disk;
 
-use super::*;
 use super::state::SyncRunning;
+use super::*;
 use crate::config::{SyncJob, BUNDLED_THEMES};
 use crate::platform::NativeWindowHandle;
 use crate::sync::{SyncFailure, SyncOutcome};
@@ -19,7 +21,11 @@ use gpui::{
 };
 use gpui_component::theme::{ActiveTheme, Theme, ThemeMode, ThemeSet};
 use std::sync::atomic::Ordering as AtomicOrdering;
-use std::{cell::Cell, collections::{HashMap, HashSet}, rc::Rc};
+use std::{
+    cell::Cell,
+    collections::{HashMap, HashSet},
+    rc::Rc,
+};
 
 const DEFAULT_WINDOW_WIDTH: f32 = 1000.0;
 const DEFAULT_WINDOW_HEIGHT: f32 = 700.0;
@@ -99,6 +105,12 @@ fn test_app_root(active_panel: ActivePanel) -> AppRoot {
             source_input: None,
             target_input: None,
             exclude_input: None,
+            browse_source: String::new(),
+            browse_relative: Default::default(),
+            browse_entries: Vec::new(),
+            browse_page: 0,
+            browse_error: None,
+            browse_scroll: ScrollHandle::default(),
             page_scroll: ScrollHandle::default(),
             shared: Arc::new(Mutex::new(SyncSharedState::default())),
             external_side_effects_enabled: false,
