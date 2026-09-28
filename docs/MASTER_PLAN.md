@@ -1286,7 +1286,7 @@ passed·4 ignored, Clippy exit 0, `git diff --check`를 통과했으며 구현 �
 - 링크·정션·대상 충돌·GPUI 제외 선택·폭 회귀 테스트를 포함한 전체 186 passed·5 ignored,
   Clippy `-D warnings`를 확인했다. 실제 화면과 작업별 최종 게이트는 `VERIFICATION.md`에 기록한다.
 
-#### D-020 — 최근 동기화 이력 카드 부분 구현
+#### D-020 — 최근 동기화 이력 카드 완료 ✅
 
 - 앱 시작 시 `sync-history.json`의 최신 20건을 읽고, 동기화 완료 이벤트 후 목록을 새로 고친다.
   파일 동기화 패널에는 성공·실패 포함·중지 상태, 복사/건너뜀/삭제/실패 건수와 소요 시간을
@@ -1295,8 +1295,14 @@ passed·4 ignored, Clippy exit 0, `git diff --check`를 통과했으며 구현 �
 - `file_sync_renders_recent_history_with_result_counts_and_duration`와 섹션 폭 회귀 테스트,
   `Verify-Workspace.ps1` 필수 테스트를 추가·통과했다. 상태·건수·소요 시간 문구를
   별도 `history.rs`에서 검증하고 994×702·1280×900의 3행 카드 경계를 다시 고정했다.
-  검증 전용 `-SeedHistory`와 `-InitialPanel FileSync`의 릴리스 패널 캡처도 완료했지만,
-  독립 Visual Reviewer 재확인은 사용량 제한으로 끝내지 못해 TODO를 유지한다.
+  검증 전용 `-SeedHistory`와 `-InitialPanel FileSync`의 릴리스 패널 캡처도 완료했다.
+- 후속 독립 Visual Reviewer가 격리 release 앱의 920×480 첫 화면에서 스크롤바를 끝까지
+  드래그해 마지막 이력 행의 상태·건수·소요 시간과 카드 경계를 확인하고, 994×480·1280×480
+  폭에서도 잘림이 없음을 자체 캡처로 확인했다. 첫 wheel 입력은 실제 화면을 이동시키지 못해
+  성공으로 주장하지 않고, 드래그 경로로 마지막 행 접근을 검증했다. 리뷰에서 지적한 GPUI
+  커버리지 공백을 920×480 overflow·wheel offset·마지막 이력 행 뷰포트 진입 단언으로 보강한 뒤
+  검토자가 해당 테스트를 다시 실행해 `PASS`로 판정했다. 제품 코드 변경은 없으며 전체
+  186 passed·5 ignored, 필수 GPUI 34개, Clippy `-D warnings`를 재확인했다.
 
 전체 145 passed·4 ignored, Clippy exit 0(기존 경고 7건), `git diff --check`와 격리 release
 기본·시드 패널 캡처를 통과했으며 구현 커밋은 `031148e`, 검증 하네스 커밋은 `ff9dc72`이다.

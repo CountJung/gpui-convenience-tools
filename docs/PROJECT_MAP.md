@@ -31,7 +31,7 @@
 안전 경계: 원본 VDI는 read-only로만 열고, 실행 중 VM의 VDI 직접 읽기는 구현하지 않는다.
 실행 중 VM 지원은 후속 `GuestFileSource` 구현으로만 추가한다(VDE-021).
 
-**최종 측정**: 2026-09-28 · `app/src` 총 65개 파일 · 24,411줄
+**최종 측정**: 2026-09-28 · `app/src` 총 65개 파일 · 24,424줄
 
 ## 크기 기준 — 줄 수는 증상이다
 
@@ -127,7 +127,7 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `watch.rs` | 303 | `notify` 재귀 watcher 소유·작업별 변경 이벤트 전달·2초 quiet debounce·감시 실패 중복 억제·작업 변경 시 정리 |
 | `validation.rs` | 112 | 릴리스 화면 검증 전용 초기 패널·VDI·파티션·게스트 경로·자동 중지·읽기 지연 시드·설정 화면; 사용자 설정에는 저장하지 않는 격리 입력 |
 
-### GPUI 회귀 테스트 (`app/src/app/tests/`) — 2,571줄 / 8파일
+### GPUI 회귀 테스트 (`app/src/app/tests/`) — 2,584줄 / 8파일
 
 테스트는 시나리오별 8개 파일로 나뉘며, 픽스처는 `mod.rs`가 단독 소유하고 하위 모듈은
 `use super::*`로 가져다 쓴다.
@@ -136,7 +136,7 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | --- | ---: | --- |
 | `file_sync.rs` | 786 | 동기화 조작·진행·중지·섹션 너비·전역 스위치·감시 방식 UI 경계 |
 | `file_sync_browse.rs` | 150 | 숨김·시스템 원본 항목 선택·링크 모드·원본 변경 시 stale 클릭 차단 |
-| `file_sync_history.rs` | 46 | 이력 3행의 상태·건수·소요 시간 카드 경계 |
+| `file_sync_history.rs` | 59 | 이력 3행의 상태·건수·소요 시간 카드 경계, 최소 높이 마지막 행 스크롤 진입 |
 | `layout.rs` | 434 | 사이드바·스플리터·카드 경계·divider drag·스크롤·사용자 설정 저장 카드 |
 | `interval.rs` | 226 | 주기 드롭다운·프리셋 추가/삭제·패널 간 공유 |
 | `mod.rs` | 203 | 공용 픽스처 (`test_app_root`·`TestPlatform`·`refresh`·`click_debug_element` 등) |
@@ -400,6 +400,7 @@ G-001 판단: `muted`는 비활성 의미이므로 테두리와 hover를 추가�
 | 2026-09-22 | `app/src/app/virtual_disk_ops.rs`·`app/src/window/virtual_disk.rs`·`app/src/app/tests/virtual_disk.rs`·`scripts/Verify-Workspace.ps1` | VDE-024 지연 로딩 폴더 트리와 컴팩트 탐색 영역 | 단일 파일 목록만 있어 깊은 폴더를 열 때 반복 클릭이 필요하고, 큰 행·카드가 페이지 스크롤을 빠르게 늘림 | `GuestDirectoryTreeNode` 기반 폴더 트리, 좌우 `balanced_split`, 내부 트리·목록 스크롤, 행·열·카드 크기 축소와 GPUI 중첩 경로·카드 경계 테스트를 추가; 전체 169 passed·4 ignored·Clippy `-D warnings`; release 920×700·1000×700·1280×900 캡처를 남겼고 실제 트리 Click은 좌표 변환으로 확정하지 않아 GPUI 이벤트 테스트 근거로 분리; commit `4af7cc6` push 완료; 현재 구조 56개 파일·22,488줄·최대 920줄 |
 | 2026-09-22 | `app/src/config_layout.rs`·`app/src/window/mod.rs`·`app/src/window/virtual_disk.rs`·`app/src/app/ops.rs`·`app/src/app/tests/virtual_disk.rs`·`.github/skills/gpui-visual-check/SKILL.md` | VDE-025 컬럼 폭 우선 배치와 레이아웃 영속화 | 스플리터가 폴더 트리를 과도하게 넓히고 파일명·속성·크기 열의 고정 폭이 읽기 영역을 압박하며, 사용자 조정값이 재시작 후 사라질 수 있음 | 트리 150~240px 제한·초기 폭 180px, 파일명 남은 폭 우선, 보조 열 최소 폭·조절 버튼·기본값 복원, `settings.json` 저장/복원·구버전 기본값, 리스트/그리드 컬럼 폭 규칙을 공통 지침과 시각 검증 스킬에 추가; 전체 172 passed·4 ignored·Clippy `-D warnings`, release 920×700·1000×700·1280×900 캡처; commit `195a43e` push 완료; 현재 구조 57개 파일·23,022줄·최대 946줄 |
 | 2026-09-28 | `app/src/sync/{mod,patterns,links,browse,link_tests}.rs`·`app/src/window/file_sync/{browse,history}.rs`·`app/src/app/tests/file_sync_{browse,history}.rs` | D-014~016 링크 정책·제외 선택, D-020 이력 증거 보강 | 링크 모드가 스키마만 있고 실제 실행되지 않으며 숨김 항목 제외 선택과 이력 문구 검증이 부족함 | 원본 내부 Follow·상대 링크 Recreate·정션 변환·대상 충돌 비덮어쓰기·권한 오류 설명, 숨김/시스템 탐색과 제외 버튼, 이력 3행 문구/폭 테스트로 분리; 전체 186 passed·5 ignored·Clippy `-D warnings`, 65파일·24,411줄·최대 945줄 | D-020 독립 Visual Reviewer 재확인과 현재 릴리스 화면 캡처는 검증 기록 참조 |
+| 2026-09-28 | `app/src/app/tests/file_sync_history.rs`·`docs/{TODO,MASTER_PLAN,VERIFICATION,PROJECT_MAP}.md` | D-020 독립 시각 검증 완료 | 최소 높이에서 마지막 이력 행의 뷰포트 진입 GPUI 단언이 없어 독립 검토 `FAIL` | 920×480 overflow·wheel offset·마지막 행 bounds 단언을 추가하고 전체 186 passed·5 ignored·Clippy `-D warnings` 확인; 독립 검토자가 격리 release 920×480·994×480·1280×480에서 스크롤바 드래그와 이력 행·건수·소요 시간·경계를 자체 캡처하고 새 단언 재실행 후 `PASS` 판정 | 현재 65파일·24,424줄·최대 945줄; 실제 wheel 입력 무반응은 성공으로 주장하지 않음 |
 | 2026-07-29 | 편의 기능 스플리터 3곳 | 공용 레이아웃 승격 | 패널별 고정 초기 폭 | `window::balanced_split` | 설정 pane 과도 축소 방지, 양쪽 가용폭 사용 |
 | 2026-07-29 | `app.rs` | 책임 단위 분할 + 재배치 | 1,798 | `app/` 7파일 (최대 564) | 대시보드·로그 렌더는 소유가 잘못돼 있어 `window/`로 이동 |
 | 2026-07-29 | `platform/windows.rs` | 책임 단위 분할 + 승격 | 1,361 | `platform/windows/` 6파일 (최대 344) | `wide_null`을 `windows/mod.rs`로 **공용 승격** |
