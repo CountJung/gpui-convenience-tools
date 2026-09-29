@@ -199,8 +199,8 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `.claude/agents/docs-sync.md` | 11 | Claude용 Documentation Sync 얇은 어댑터 |
 | `.codex/agents/code-reviewer.toml` | 9 | Codex용 Code Reviewer 얇은 어댑터 |
 | `.codex/agents/docs-sync.toml` | 9 | Codex용 Documentation Sync 얇은 어댑터 |
-| `scripts/Verify-Workspace.ps1` | 167 | VS Code용 Rust/GPUI 자동 검증과 ChatGPT 데스크톱 handoff manifest·해시 고정 빌드 생성 |
-| `scripts/Invoke-ClaudeVisualCheck.ps1` | 748 | `CLAUDE_LOCAL` 시각 검증 하네스 — 격리 실행(`-SeedConfig`·`-SeedHistory`·`-InitialPanel`로 상태 재현), 다중 파티션 VDI 선택(`-VdiPartitionNumber`), 원본 복사 없는 대용량 VDI 연결(`-ExternalVdiPath`), 자동 중지(`-CancelAfterMs`)·읽기 지연(`-ReadDelayMs`), 창 캡처(`PrintWindow`)·입력(`SendInput`, `Click`, `Drag`, `Ctrl+A`)·실패 시 버튼/키 해제·정리 |
+| `scripts/Verify-Workspace.ps1` | 213 | VS Code용 Rust/GPUI 자동 검증, 시각 하네스 구문 검사와 ChatGPT 데스크톱 handoff manifest·해시 고정 빌드 생성 |
+| `scripts/Invoke-ClaudeVisualCheck.ps1` | 882 | `CLAUDE_LOCAL` 시각 검증 하네스 — 격리 실행·상태 시드·VDI 검증, 창 단위 `PrintWindow` 캡처, `SendInput` 클릭·휠·드래그·키 입력, 입력 전 커서/포커스 저장·작업 후 조건부 복원·실패 시 버튼/키 해제·세션 정리 |
 | `scripts/Verify-AdWindowState.ps1` | 282 | 지정 PID와 앱 조상·자손의 최상위·선택적 자식 창 상태와 클래스 후보를 읽기 전용 점검(AD-002·AD-005 진단) |
 | `scripts/Start-DesktopVisualValidation.ps1` | 126 | manifest 해시 검증 후 단일 임시 데이터 루트 격리 프로세스·세션 파일 생성과 실패 롤백 |
 | `scripts/Stop-DesktopVisualValidation.ps1` | 75 | 기록된 검증 PID·시작 시각과 작업 전용 임시 루트만 검증 후 정리 |
@@ -209,7 +209,7 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `.github/workflows/release.yml` | 140 | `v*` 태그 → Windows·macOS 병렬 빌드 후 단일 Release 생성 |
 | `.github/workflows/macos-build.yml` | 47 | push/PR마다 macOS check·test·패키징 — 비Windows cfg 경로의 **유일한** 검증 지점 |
 
-> `Invoke-ClaudeVisualCheck.ps1`은 748줄이지만 분할하지 않는다. 하나의 Win32 시퀀스
+> `Invoke-ClaudeVisualCheck.ps1`은 882줄이지만 분할하지 않는다. 하나의 Win32 시퀀스
 > (P/Invoke 선언 → 세션 → 캡처 → 입력 → 정리)를 공유하고, 쪼개면 각 파일이 같은 `Add-Type`
 > 블록과 세션 스키마를 중복 소유하게 되어 응집도가 깨진다.
 > 정본의 「구조 리팩터링 기준 > 예외」 조항을 적용한다.
@@ -401,6 +401,7 @@ G-001 판단: `muted`는 비활성 의미이므로 테두리와 hover를 추가�
 | 2026-09-22 | `app/src/config_layout.rs`·`app/src/window/mod.rs`·`app/src/window/virtual_disk.rs`·`app/src/app/ops.rs`·`app/src/app/tests/virtual_disk.rs`·`.github/skills/gpui-visual-check/SKILL.md` | VDE-025 컬럼 폭 우선 배치와 레이아웃 영속화 | 스플리터가 폴더 트리를 과도하게 넓히고 파일명·속성·크기 열의 고정 폭이 읽기 영역을 압박하며, 사용자 조정값이 재시작 후 사라질 수 있음 | 트리 150~240px 제한·초기 폭 180px, 파일명 남은 폭 우선, 보조 열 최소 폭·조절 버튼·기본값 복원, `settings.json` 저장/복원·구버전 기본값, 리스트/그리드 컬럼 폭 규칙을 공통 지침과 시각 검증 스킬에 추가; 전체 172 passed·4 ignored·Clippy `-D warnings`, release 920×700·1000×700·1280×900 캡처; commit `195a43e` push 완료; 현재 구조 57개 파일·23,022줄·최대 946줄 |
 | 2026-09-28 | `app/src/sync/{mod,patterns,links,browse,link_tests}.rs`·`app/src/window/file_sync/{browse,history}.rs`·`app/src/app/tests/file_sync_{browse,history}.rs` | D-014~016 링크 정책·제외 선택, D-020 이력 증거 보강 | 링크 모드가 스키마만 있고 실제 실행되지 않으며 숨김 항목 제외 선택과 이력 문구 검증이 부족함 | 원본 내부 Follow·상대 링크 Recreate·정션 변환·대상 충돌 비덮어쓰기·권한 오류 설명, 숨김/시스템 탐색과 제외 버튼, 이력 3행 문구/폭 테스트로 분리; 전체 186 passed·5 ignored·Clippy `-D warnings`, 65파일·24,411줄·최대 945줄 | D-020 독립 Visual Reviewer 재확인과 현재 릴리스 화면 캡처는 검증 기록 참조 |
 | 2026-09-28 | `app/src/app/tests/file_sync_history.rs`·`docs/{TODO,MASTER_PLAN,VERIFICATION,PROJECT_MAP}.md` | D-020 독립 시각 검증 완료 | 최소 높이에서 마지막 이력 행의 뷰포트 진입 GPUI 단언이 없어 독립 검토 `FAIL` | 920×480 overflow·wheel offset·마지막 행 bounds 단언을 추가하고 전체 186 passed·5 ignored·Clippy `-D warnings` 확인; 독립 검토자가 격리 release 920×480·994×480·1280×480에서 스크롤바 드래그와 이력 행·건수·소요 시간·경계를 자체 캡처하고 새 단언 재실행 후 `PASS` 판정 | 현재 65파일·24,424줄·최대 945줄; 실제 wheel 입력 무반응은 성공으로 주장하지 않음 |
+| 2026-09-29 | `scripts/Invoke-ClaudeVisualCheck.ps1`·`docs/DEVELOPMENT_GUIDE.md`·`.github/skills/gpui-visual-check/SKILL.md` | E2E 입력 후 사용자 작업 위치 복원 | 입력 직후 커서만 무조건 원위치로 옮기고 검증 앱 포커스는 남아 사용자 작업을 방해할 수 있음 | 입력 전 상태 저장·`finally` 복원, 현재 포커스·커서가 바뀌었으면 최신 사용자 조작을 덮어쓰지 않음, 격리 release 비파괴 클릭의 커서/포커스 복원 확인 | 캡처는 포커스 전환 없음; 실제 wheel 중 커서 변경은 복원을 건너뛰어 보고하고 전역 입력의 짧은 점유 자체는 남음 |
 | 2026-07-29 | 편의 기능 스플리터 3곳 | 공용 레이아웃 승격 | 패널별 고정 초기 폭 | `window::balanced_split` | 설정 pane 과도 축소 방지, 양쪽 가용폭 사용 |
 | 2026-07-29 | `app.rs` | 책임 단위 분할 + 재배치 | 1,798 | `app/` 7파일 (최대 564) | 대시보드·로그 렌더는 소유가 잘못돼 있어 `window/`로 이동 |
 | 2026-07-29 | `platform/windows.rs` | 책임 단위 분할 + 승격 | 1,361 | `platform/windows/` 6파일 (최대 344) | `wide_null`을 `windows/mod.rs`로 **공용 승격** |

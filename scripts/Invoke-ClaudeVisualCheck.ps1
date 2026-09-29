@@ -247,6 +247,84 @@ function Assert-ForegroundTarget([IntPtr]$hwnd) {
     }
 }
 
+function Assert-TargetStillForeground([IntPtr]$hwnd) {
+    if ([ClaudeVisualInterop]::GetForegroundWindow() -ne $hwnd) {
+        throw "입력 중 포그라운드가 바뀌어 다른 창으로의 입력을 중단했다."
+    }
+}
+
+function Get-DesktopInputState {
+    $cursor = New-Object ClaudeVisualInterop+POINT
+    if (-not [ClaudeVisualInterop]::GetCursorPos([ref]$cursor)) {
+        throw "입력 전 커서 위치를 읽지 못했다."
+    }
+    return [PSCustomObject]@{
+        foreground = [ClaudeVisualInterop]::GetForegroundWindow()
+        cursorX = $cursor.X
+        cursorY = $cursor.Y
+    }
+}
+
+function Assert-CursorStillControlled($point) {
+    $current = New-Object ClaudeVisualInterop+POINT
+    if (-not [ClaudeVisualInterop]::GetCursorPos([ref]$current)) {
+        throw "입력 중 커서 위치를 읽지 못했다."
+    }
+    if ([Math]::Abs($current.X - $point.X) -gt 3 -or
+        [Math]::Abs($current.Y - $point.Y) -gt 3) {
+        throw "입력 중 커서가 다른 위치로 이동해 추가 입력을 중단했다."
+    }
+}
+
+# 대상 창이 아직 포그라운드일 때만 이전 창으로 되돌린다. 검증 도중 사용자가 다른 창을
+# 선택했다면 그 선택이 더 최신 의사이므로 포커스를 다시 빼앗지 않는다.
+function Restore-ForegroundIfStillTarget([IntPtr]$target, [IntPtr]$previous) {
+    if ($previous -eq $target) { return "unchanged" }
+    if ([ClaudeVisualInterop]::GetForegroundWindow() -ne $target) { return "skipped-focus-changed" }
+    if ($previous -eq [IntPtr]::Zero -or -not [ClaudeVisualInterop]::IsWindow($previous)) {
+        return "skipped-missing-window"
+    }
+
+    $currentThread = [ClaudeVisualInterop]::GetCurrentThreadId()
+    $targetThread = [ClaudeVisualInterop]::GetWindowThreadProcessId($target, [IntPtr]::Zero)
+    $attached = $false
+    if ($targetThread -ne 0 -and $targetThread -ne $currentThread) {
+        $attached = [ClaudeVisualInterop]::AttachThreadInput($currentThread, $targetThread, $true)
+    }
+    try {
+        [void][ClaudeVisualInterop]::SetForegroundWindow($previous)
+    }
+    finally {
+        if ($attached) {
+            [void][ClaudeVisualInterop]::AttachThreadInput($currentThread, $targetThread, $false)
+        }
+    }
+    if ([ClaudeVisualInterop]::GetForegroundWindow() -eq $previous) { return "restored" }
+    return "failed"
+}
+
+function Restore-DesktopInputState($state, [IntPtr]$target, $controlledPoint) {
+    $cursorStatus = "unchanged"
+    if ($null -ne $controlledPoint) {
+        $current = New-Object ClaudeVisualInterop+POINT
+        if (-not [ClaudeVisualInterop]::GetCursorPos([ref]$current)) {
+            $cursorStatus = "failed-read"
+        }
+        elseif ([Math]::Abs($current.X - $controlledPoint.X) -gt 3 -or
+                [Math]::Abs($current.Y - $controlledPoint.Y) -gt 3) {
+            $cursorStatus = "skipped-cursor-changed"
+        }
+        elseif ([ClaudeVisualInterop]::SetCursorPos($state.cursorX, $state.cursorY)) {
+            $cursorStatus = "restored"
+        }
+        else {
+            $cursorStatus = "failed-set"
+        }
+    }
+    $focusStatus = Restore-ForegroundIfStillTarget $target ([IntPtr]$state.foreground)
+    return [ordered]@{ cursor = $cursorStatus; focus = $focusStatus }
+}
+
 function Send-MouseInput([uint32]$flags, [uint32]$data) {
     $input = New-Object ClaudeVisualInterop+INPUT
     $input.type = 0
@@ -295,18 +373,22 @@ function Send-KeyInput([ushort]$virtualKey, [bool]$keyUp) {
     }
 }
 
-function Send-KeyChord([string]$chord) {
+function Send-KeyChord([string]$chord, [IntPtr]$target) {
     switch ($chord) {
         "Ctrl+A" {
             $controlDown = $false
             try {
+                Assert-TargetStillForeground $target
                 Send-KeyInput $VK_CONTROL $false
                 $controlDown = $true
                 Start-Sleep -Milliseconds 80
+                Assert-TargetStillForeground $target
                 Send-KeyInput $VK_A $false
                 Start-Sleep -Milliseconds 80
+                Assert-TargetStillForeground $target
                 Send-KeyInput $VK_A $true
                 Start-Sleep -Milliseconds 80
+                Assert-TargetStillForeground $target
                 Send-KeyInput $VK_CONTROL $true
                 $controlDown = $false
             }
@@ -478,6 +560,7 @@ switch ($Action) {
                     $env:GPUI_CONVENIENCE_TOOLS_VBOXMANAGE = $defaultVboxManage
                 }
             }
+            $launchForeground = [ClaudeVisualInterop]::GetForegroundWindow()
             $process = Start-Process -FilePath $BinaryPath -PassThru
         }
         finally {
@@ -545,6 +628,7 @@ switch ($Action) {
         [void][ClaudeVisualInterop]::MoveWindow($hwnd, 120, 120, $Width, $Height, $true)
         Start-Sleep -Milliseconds $SettleMs
         $rect = Get-WindowRect $hwnd
+        $launchFocusRestore = Restore-ForegroundIfStillTarget $hwnd $launchForeground
 
         New-Item -ItemType Directory -Force -Path $validationRoot | Out-Null
         $session = [ordered]@{
@@ -560,6 +644,8 @@ switch ($Action) {
             sessionRoot = $sessionRoot
             appData = $appData
             captureRoot = $captureRoot
+            priorForegroundHandle = [int64]$launchForeground
+            launchFocusRestore = $launchFocusRestore
             startedAtUtc = [DateTime]::UtcNow.ToString("o")
         }
         $session | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $sessionPath -Encoding UTF8
@@ -575,59 +661,74 @@ switch ($Action) {
     "Wheel" {
         $session = Read-Session
         $hwnd = [IntPtr][int64]$session.windowHandle
-        Assert-ForegroundTarget $hwnd
-
-        $origin = New-Object ClaudeVisualInterop+POINT
-        [void][ClaudeVisualInterop]::GetCursorPos([ref]$origin)
-        $point = Resolve-ClientPoint $hwnd $X $Y
-        [void][ClaudeVisualInterop]::SetCursorPos($point.X, $point.Y)
-        Start-Sleep -Milliseconds 250
-
-        $notches = [Math]::Abs($Delta)
-        $step = if ($Delta -lt 0) { [uint32](4294967296 - 120) } else { [uint32]120 }
+        $inputState = Get-DesktopInputState
+        $controlledPoint = $null
         try {
+            Assert-ForegroundTarget $hwnd
+            $point = Resolve-ClientPoint $hwnd $X $Y
+            if (-not [ClaudeVisualInterop]::SetCursorPos($point.X, $point.Y)) {
+                throw "휠 입력 위치로 커서를 옮기지 못했다."
+            }
+            $controlledPoint = $point
+            Start-Sleep -Milliseconds 250
+
+            $notches = [Math]::Abs($Delta)
+            $step = if ($Delta -lt 0) { [uint32](4294967296 - 120) } else { [uint32]120 }
             for ($i = 0; $i -lt $notches; $i++) {
+                Assert-TargetStillForeground $hwnd
+                Assert-CursorStillControlled $point
                 Send-MouseInput $MOUSEEVENTF_WHEEL $step
                 Start-Sleep -Milliseconds 120
             }
+            Start-Sleep -Milliseconds $SettleMs
         }
         finally {
-            [void][ClaudeVisualInterop]::SetCursorPos($origin.X, $origin.Y)
+            $restore = Restore-DesktopInputState $inputState $hwnd $controlledPoint
         }
-        Start-Sleep -Milliseconds $SettleMs
         [ordered]@{
             action = "Wheel"; at = ("{0},{1}" -f $point.X, $point.Y)
             notches = $notches; direction = $(if ($Delta -lt 0) { "down" } else { "up" })
+            restore = $restore
         } | ConvertTo-Json -Depth 3
     }
 
     "Click" {
         $session = Read-Session
         $hwnd = [IntPtr][int64]$session.windowHandle
-        Assert-ForegroundTarget $hwnd
-
-        $origin = New-Object ClaudeVisualInterop+POINT
-        [void][ClaudeVisualInterop]::GetCursorPos([ref]$origin)
-        $point = Resolve-ClientPoint $hwnd $X $Y
-        [void][ClaudeVisualInterop]::SetCursorPos($point.X, $point.Y)
-        Start-Sleep -Milliseconds 250
+        $inputState = Get-DesktopInputState
+        $controlledPoint = $null
         $buttonDown = $false
         try {
+            Assert-ForegroundTarget $hwnd
+            $point = Resolve-ClientPoint $hwnd $X $Y
+            if (-not [ClaudeVisualInterop]::SetCursorPos($point.X, $point.Y)) {
+                throw "클릭 위치로 커서를 옮기지 못했다."
+            }
+            $controlledPoint = $point
+            Start-Sleep -Milliseconds 250
+            Assert-TargetStillForeground $hwnd
+            Assert-CursorStillControlled $point
             Send-MouseInput $MOUSEEVENTF_LEFTDOWN 0
             $buttonDown = $true
             Start-Sleep -Milliseconds 60
             Send-MouseInput $MOUSEEVENTF_LEFTUP 0
             $buttonDown = $false
+            Start-Sleep -Milliseconds $SettleMs
         }
         finally {
-            if ($buttonDown) {
-                # 클릭 중 예외가 나도 전역 마우스 버튼을 누른 채 남기지 않는다.
-                Send-MouseInput $MOUSEEVENTF_LEFTUP 0
+            try {
+                if ($buttonDown) {
+                    # 클릭 중 예외가 나도 전역 마우스 버튼을 누른 채 남기지 않는다.
+                    Send-MouseInput $MOUSEEVENTF_LEFTUP 0
+                }
             }
-            [void][ClaudeVisualInterop]::SetCursorPos($origin.X, $origin.Y)
+            finally {
+                $restore = Restore-DesktopInputState $inputState $hwnd $controlledPoint
+            }
         }
-        Start-Sleep -Milliseconds $SettleMs
-        [ordered]@{ action = "Click"; at = ("{0},{1}" -f $point.X, $point.Y) } | ConvertTo-Json -Depth 3
+        [ordered]@{
+            action = "Click"; at = ("{0},{1}" -f $point.X, $point.Y); restore = $restore
+        } | ConvertTo-Json -Depth 3
     }
 
     "Drag" {
@@ -636,53 +737,76 @@ switch ($Action) {
         }
         $session = Read-Session
         $hwnd = [IntPtr][int64]$session.windowHandle
-        Assert-ForegroundTarget $hwnd
-
-        $origin = New-Object ClaudeVisualInterop+POINT
-        [void][ClaudeVisualInterop]::GetCursorPos([ref]$origin)
-        $start = Resolve-ClientPoint $hwnd $X $Y
-        $end = Resolve-ClientPoint $hwnd $ToX $ToY
-        [void][ClaudeVisualInterop]::SetCursorPos($start.X, $start.Y)
-        Start-Sleep -Milliseconds 250
+        $inputState = Get-DesktopInputState
+        $controlledPoint = $null
         $buttonDown = $false
         try {
+            Assert-ForegroundTarget $hwnd
+            $start = Resolve-ClientPoint $hwnd $X $Y
+            $end = Resolve-ClientPoint $hwnd $ToX $ToY
+            if (-not [ClaudeVisualInterop]::SetCursorPos($start.X, $start.Y)) {
+                throw "드래그 시작 위치로 커서를 옮기지 못했다."
+            }
+            $controlledPoint = $start
+            Start-Sleep -Milliseconds 250
+            Assert-TargetStillForeground $hwnd
+            Assert-CursorStillControlled $start
             Send-MouseInput $MOUSEEVENTF_LEFTDOWN 0
             $buttonDown = $true
-            $last = $start
+            $lastX = $start.X
+            $lastY = $start.Y
             $steps = 12
             for ($i = 1; $i -le $steps; $i++) {
+                Assert-TargetStillForeground $hwnd
+                Assert-CursorStillControlled $controlledPoint
                 $nextX = [int]([Math]::Round($start.X + (($end.X - $start.X) * $i / $steps)))
                 $nextY = [int]([Math]::Round($start.Y + (($end.Y - $start.Y) * $i / $steps)))
-                Send-MouseMove ($nextX - $last.X) ($nextY - $last.Y)
-                $last.X = $nextX
-                $last.Y = $nextY
+                Send-MouseMove ($nextX - $lastX) ($nextY - $lastY)
+                $lastX = $nextX
+                $lastY = $nextY
+                $controlledPoint = New-Object ClaudeVisualInterop+POINT
+                if (-not [ClaudeVisualInterop]::GetCursorPos([ref]$controlledPoint)) {
+                    throw "드래그 중 커서 위치를 읽지 못했다."
+                }
                 Start-Sleep -Milliseconds 45
             }
             Send-MouseInput $MOUSEEVENTF_LEFTUP 0
             $buttonDown = $false
+            Start-Sleep -Milliseconds $SettleMs
         }
         finally {
-            if ($buttonDown) {
-                # 이동 중 예외가 나도 전역 마우스 버튼을 누른 채 남기지 않는다.
-                Send-MouseInput $MOUSEEVENTF_LEFTUP 0
+            try {
+                if ($buttonDown) {
+                    # 이동 중 예외가 나도 전역 마우스 버튼을 누른 채 남기지 않는다.
+                    Send-MouseInput $MOUSEEVENTF_LEFTUP 0
+                }
             }
-            [void][ClaudeVisualInterop]::SetCursorPos($origin.X, $origin.Y)
+            finally {
+                $restore = Restore-DesktopInputState $inputState $hwnd $controlledPoint
+            }
         }
-        Start-Sleep -Milliseconds $SettleMs
         [ordered]@{
             action = "Drag"
             from = ("{0},{1}" -f $start.X, $start.Y)
             to = ("{0},{1}" -f $end.X, $end.Y)
+            restore = $restore
         } | ConvertTo-Json -Depth 3
     }
 
     "Key" {
         $session = Read-Session
         $hwnd = [IntPtr][int64]$session.windowHandle
-        Assert-ForegroundTarget $hwnd
-        Send-KeyChord $KeyChord
-        Start-Sleep -Milliseconds $SettleMs
-        [ordered]@{ action = "Key"; chord = $KeyChord } | ConvertTo-Json -Depth 3
+        $inputState = Get-DesktopInputState
+        try {
+            Assert-ForegroundTarget $hwnd
+            Assert-TargetStillForeground $hwnd
+            Send-KeyChord $KeyChord $hwnd
+            Start-Sleep -Milliseconds $SettleMs
+        }
+        finally {
+            $restore = Restore-DesktopInputState $inputState $hwnd $null
+        }
+        [ordered]@{ action = "Key"; chord = $KeyChord; restore = $restore } | ConvertTo-Json -Depth 3
     }
 
     "Resize" {
@@ -719,6 +843,7 @@ switch ($Action) {
 
         # PID 재사용으로 남의 프로세스를 죽이지 않도록 경로와 시작 시각을 함께 확인한다.
         $process = Get-Process -Id ([int]$session.processId) -ErrorAction SilentlyContinue
+        $stopFocusRestore = "unchanged"
         if ($null -ne $process) {
             $expectedBinary = [System.IO.Path]::GetFullPath([string]$session.binaryPath)
             $actualBinary = [System.IO.Path]::GetFullPath([string]$process.Path)
@@ -728,6 +853,11 @@ switch ($Action) {
             $expectedStart = ConvertTo-UtcInstant $session.processStartTimeUtc
             if ([Math]::Abs(($process.StartTime.ToUniversalTime() - $expectedStart).TotalSeconds) -gt 1.0) {
                 throw "PID 시작 시각이 기록과 다르다. 종료하지 않는다."
+            }
+            if ($session.PSObject.Properties.Name -contains "priorForegroundHandle") {
+                $targetWindow = [IntPtr][int64]$session.windowHandle
+                $previousWindow = [IntPtr][int64]$session.priorForegroundHandle
+                $stopFocusRestore = Restore-ForegroundIfStillTarget $targetWindow $previousWindow
             }
             Stop-Process -Id $process.Id -Force
             $process.WaitForExit()
@@ -742,6 +872,7 @@ switch ($Action) {
             processId = [int]$session.processId
             sessionRoot = $sessionRoot
             sessionRootExists = (Test-Path -LiteralPath $sessionRoot)
+            focusRestore = $stopFocusRestore
             captureRoot = $captureRoot
             cleanedAtUtc = [DateTime]::UtcNow.ToString("o")
         }

@@ -76,6 +76,16 @@ try {
         "-NoProfile", "-File", (Join-Path $repoRoot "scripts\Assert-ProjectStructure.ps1")
     )
 
+    $visualHarnessPath = Join-Path $repoRoot "scripts\Invoke-ClaudeVisualCheck.ps1"
+    $tokens = $null
+    $parseErrors = $null
+    [void][System.Management.Automation.Language.Parser]::ParseFile(
+        $visualHarnessPath, [ref]$tokens, [ref]$parseErrors)
+    if ($parseErrors.Count -gt 0) {
+        throw ("Visual harness syntax errors: " + (($parseErrors | ForEach-Object Message) -join "; "))
+    }
+    Write-Host "VISUAL_HARNESS_SYNTAX_VERIFIED"
+
     Invoke-CheckedCommand -Executable "cargo" -Arguments @(
         "check", "-p", $packageName
     )

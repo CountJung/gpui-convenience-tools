@@ -90,6 +90,11 @@ scripts\Invoke-ClaudeVisualCheck.ps1 -Action Capture -Name before
 scripts\Invoke-ClaudeVisualCheck.ps1 -Action Stop
 ```
 
+`Capture`만으로 충분하면 전역 입력을 보내지 않는다. 입력이 필요했다면 각 동작의
+`restore.cursor`·`restore.focus`와 `Start`/`Stop`의 포커스 복원 결과를 확인한다.
+`skipped-*`·`failed*`는 복원 완료가 아니며, 사용자가 검증 중 바꾼 포커스·커서를
+하네스가 덮어쓰지 않는 안전 경계다. 화면 점유 가능성은 입력 전에 알린다.
+
 VS Code/Codex의 `IDE` 표면에서는 화면 조작을 시도하지 않고 다음으로 handoff를 준비한다.
 
 ```powershell

@@ -142,6 +142,10 @@ scripts\Invoke-ClaudeVisualCheck.ps1 -Action Stop
 - `Click`/`Wheel`은 실제 화면 좌표를 `at`으로 출력한다. 빗나갔을 때 이 값으로 보정한다.
 - **눌렀다고 가정하지 말고 다시 캡처해 확인한다.** 특히 패널 전환처럼 무거운 동작
   (예: 서비스 목록 조회)은 기본 대기(700ms)보다 오래 걸릴 수 있어 재캡처가 필요하다.
+- 캡처만 필요한 단계는 `Capture`를 우선한다. 입력 동작의 JSON `restore`에서 커서·포커스가
+  `restored`인지 확인하고, `skipped-*`·`failed*`이면 실제 복원되지 않은 이유를 보고한다.
+  사용자가 검증 중 포커스나 커서를 옮긴 경우 하네스는 이를 덮어쓰지 않는다. 입력 전 짧은
+  화면 점유를 알리는 규칙은 복원 기능이 있어도 그대로 적용한다.
 
 ### 상태 재현 (`-SeedConfig`·`-SeedHistory`·`-InitialPanel`)
 
@@ -167,7 +171,7 @@ scripts\Invoke-ClaudeVisualCheck.ps1 -Action Stop
 | --- | --- | --- |
 | `-Action Stop`이 세션 루트(=격리 `appData`)를 통째로 지운다 | 같은 상태로 재시작 불가 | 재시작이 필요하면 **Stop 전에 `config.json`·`sync-history.json`을 밖으로 복사**해 다음 `-SeedConfig`·`-SeedHistory`로 넘긴다 |
 | 검증 앱이 `target\release\*.exe`를 잠근다 | `cargo build --release`가 `os error 5` | 코드를 고쳤으면 **Stop → build → Start** |
-| 키보드 입력·드래그가 없다 | 텍스트 입력·divider 드래그 검증 불가 | **한계로 분리해 적고 그 항목을 근거로 `PASS`를 내지 않는다.** GPUI 자체 테스트로 덮는다 |
+| 텍스트 입력이 없다 | 임의 문자 입력 검증 불가 (`Key Ctrl+A`·`Drag`는 지원) | **한계로 분리해 적고 그 항목을 근거로 `PASS`를 내지 않는다.** GPUI 자체 테스트로 덮는다 |
 | `APPDATA`만 바꾸면 격리되지 않는다 | 사용자의 실제 config·로그를 건드린다 | 하네스가 쓰는 `GPUI_CONVENIENCE_TOOLS_DATA_DIR`를 그대로 쓴다 |
 | `PrintWindow`가 합성 중간 프레임을 잡을 수 있다 | 가상 리스트 행이 겹쳐 보이는 등 실제와 다른 그림 | 잠시 뒤 재캡처해 같은 그림이 나오는지 확인한 뒤 결론 |
 | 캡처는 정지 화면이다 | 애니메이션·순간 상태는 못 잡는다 | 상태 전이는 전/후 두 장으로 나눠 캡처 |

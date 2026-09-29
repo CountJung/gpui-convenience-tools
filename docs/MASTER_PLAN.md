@@ -1307,6 +1307,18 @@ passed·4 ignored, Clippy exit 0, `git diff --check`를 통과했으며 구현 �
 전체 145 passed·4 ignored, Clippy exit 0(기존 경고 7건), `git diff --check`와 격리 release
 기본·시드 패널 캡처를 통과했으며 구현 커밋은 `031148e`, 검증 하네스 커밋은 `ff9dc72`이다.
 
+#### E2E 하네스 — 입력 후 사용자 작업 위치 조건부 복원 ✅
+
+- 격리 앱 시작 또는 `Click`·`Wheel`·`Drag`·`Key` 후 검증 앱이 여전히 포그라운드이면
+  이전 창으로 복원하고, 커서가 하네스가 제어한 위치에 남아 있을 때만 입력 전 위치로
+  복원한다. 종료 시에도 검증 앱이 포그라운드로 남았을 때만 원래 창 복원을 재시도한다.
+  사용자가 중간에 포커스·커서를 바꾸면 덮어쓰지 않으며, 반환 JSON에 복원·건너뜀·실패를
+  구분한다. `Capture`는 여전히 포커스 전환 없이 창 단위로 동작한다.
+- 격리 release 앱의 비파괴 영역 `Click`에서 `restore.cursor=restored`,
+  `restore.focus=restored`를 확인했다. `Wheel`은 포커스가 복원됐지만 커서가 입력 중
+  다른 위치로 바뀌어 `skipped-cursor-changed`로 기록했다. 따라서 사용자 작업을
+  방해하지 않았다고 단정하지 않고, 입력 전 알림과 캡처 우선 원칙을 유지한다.
+
 #### 품질 게이트 — Clippy baseline 정리 완료 ✅
 
 - `service_view.rs`의 모듈 문서 주석, Windows 트레이 FFI의 불필요한 mutable 참조,
