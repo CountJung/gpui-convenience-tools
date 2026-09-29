@@ -101,6 +101,7 @@ pub(crate) struct ScannerState {
     pub(crate) service_enabled: bool,
     pub(crate) targets: Vec<TargetApp>,
     pub(crate) scan_interval_secs: u32,
+    pub(crate) kakao_reclaim_ad_space: bool,
 }
 
 /// 동기화 스레드와 UI가 공유하는 상태.

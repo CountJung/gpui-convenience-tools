@@ -67,6 +67,7 @@ use crate::config::{
     update_config, LogConfig, VirtualDiskConfig, DEFAULT_SIDEBAR_WIDTH,
 };
 use crate::platform::{NativePlatform, Platform};
+use crate::platform::KakaoLayoutSnapshot;
 use crate::window::{
     ad_block, dashboard, file_sync, log_view, service_mgr, service_view, settings, ui, virtual_disk,
 };
@@ -86,8 +87,11 @@ pub struct AppRoot {
     event_rx: UnboundedReceiver<PlatformEvent>,
     pub(crate) log_scroll_handle: VirtualListScrollHandle,
     scanner_state: Arc<Mutex<ScannerState>>,
+    #[cfg_attr(test, allow(dead_code))]
+    kakao_layout_state: Arc<Mutex<Option<KakaoLayoutSnapshot>>>,
     subscriptions: Vec<Subscription>,
     pub(crate) scan_interval_secs: u32,
+    pub(crate) kakao_reclaim_ad_space: bool,
     pub(crate) sidebar_width: f32,
     /// 스캔 주기·감시 주기가 공유하는 주기 선택 상태.
     pub(crate) interval_picker: IntervalPicker,
@@ -113,6 +117,7 @@ impl AppRoot {
         let platform: Arc<dyn Platform> = Arc::new(NativePlatform::new());
         let mut app_state = AppState::default();
         let mut initial_scan_interval_secs: u32 = 10;
+        let mut kakao_reclaim_ad_space = false;
         let mut sync_jobs = Vec::new();
         let mut favorite_services = Vec::new();
         let mut log_config = LogConfig::default();
@@ -126,7 +131,15 @@ impl AppRoot {
             Vec::new()
         });
 
-        if let Ok(Some(cfg)) = load_config() {
+        let loaded_config = load_config();
+        if let Err(error) = &loaded_config {
+            log::error!("설정 파일을 불러오지 못했습니다: {error:#}");
+            app_state.log_entries.push(LogEntry {
+                level: "ERROR".to_string(),
+                message: format!("설정 파일을 불러오지 못했습니다: {error:#}"),
+            });
+        }
+        if let Ok(Some(cfg)) = loaded_config {
             virtual_disk_config = cfg.virtual_disk.clone();
             sync_enabled = cfg.sync_enabled;
             sidebar_width = normalize_sidebar_width(cfg.sidebar_width);
@@ -136,6 +149,7 @@ impl AppRoot {
                     .filter(|key| !key.trim().is_empty()),
             );
             app_state.is_active = cfg.service_enabled;
+            kakao_reclaim_ad_space = cfg.kakao_reclaim_ad_space;
             if !cfg.targets.is_empty() {
                 app_state.targets = cfg.targets;
             }
@@ -171,7 +185,9 @@ impl AppRoot {
             service_enabled: app_state.is_active,
             targets: app_state.targets.clone(),
             scan_interval_secs: initial_scan_interval_secs,
+            kakao_reclaim_ad_space,
         }));
+        let kakao_layout_state = Arc::new(Mutex::new(None));
         // 끊긴 지점은 작업에 저장돼 있다. 실행 중에는 공유 상태가 정본이므로 여기로 옮긴다.
         let cursors = sync_jobs
             .iter()
@@ -211,6 +227,7 @@ impl AppRoot {
             Arc::clone(&platform),
             event_tx.clone(),
             Arc::clone(&scanner_state),
+            Arc::clone(&kakao_layout_state),
         );
         Self::spawn_sync_loop(event_tx.clone(), Arc::clone(&sync_shared));
 
@@ -229,8 +246,10 @@ impl AppRoot {
             event_rx,
             log_scroll_handle: VirtualListScrollHandle::new(),
             scanner_state,
+            kakao_layout_state,
             subscriptions: Vec::new(),
             scan_interval_secs: initial_scan_interval_secs,
+            kakao_reclaim_ad_space,
             sidebar_width,
             interval_picker: IntervalPicker {
                 presets: initial_interval_presets,
@@ -761,6 +780,17 @@ impl Render for AppRoot {
 #[cfg(not(test))]
 impl Drop for AppRoot {
     fn drop(&mut self) {
+        if let Ok(mut scanner) = self.scanner_state.lock() {
+            scanner.service_enabled = false;
+            scanner.kakao_reclaim_ad_space = false;
+        }
+        background::sync_kakao_layout(
+            self.platform.as_ref(),
+            &self.kakao_layout_state,
+            &self.scanner_state,
+            false,
+            [],
+        );
         if let Err(err) = self.save_current_config() {
             log::error!("앱 종료 시 설정 저장 실패: {err:#}");
         }

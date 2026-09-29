@@ -1,7 +1,15 @@
 use anyhow::Result;
 use gpui_component::theme::ThemeMode;
 use serde::{Deserialize, Serialize};
-use std::{fs, path::PathBuf, process::Command};
+use std::{fs, path::PathBuf};
+
+mod persistence;
+pub use persistence::{
+    effective_config_path, load_config, open_config_file, save_theme_mode, save_theme_selection,
+    update_config,
+};
+#[cfg(test)]
+use persistence::{config_path, fallback_config_path, save_config};
 
 use crate::app::TargetApp;
 pub use crate::config_layout::{
@@ -23,10 +31,16 @@ const MAX_SIDEBAR_WIDTH: f32 = 360.0;
 pub struct AppConfig {
     pub service_enabled: bool,
     pub targets: Vec<TargetApp>,
+    /// 카카오톡 기본 채팅창의 빈 광고 자리를 회수하는 실험적 선택 모드.
+    #[serde(default)]
+    pub kakao_reclaim_ad_space: bool,
     #[serde(default)]
     pub light_theme_name: Option<String>,
     #[serde(default)]
     pub dark_theme_name: Option<String>,
+    /// 사용자가 직접 고른 밝음/어두움 모드. None은 구버전의 초기 모드를 유지한다.
+    #[serde(default)]
+    pub theme_mode: Option<ThemeMode>,
     #[serde(default = "default_scan_interval_secs")]
     pub scan_interval_secs: u32,
     #[serde(default)]
@@ -342,8 +356,10 @@ impl Default for AppConfig {
                 enabled: true,
                 ad_window_class: "Chrome_WidgetWin_1".to_string(),
             }],
+            kakao_reclaim_ad_space: false,
             light_theme_name: None,
             dark_theme_name: None,
+            theme_mode: None,
             scan_interval_secs: default_scan_interval_secs(),
             favorite_services: Vec::new(),
             interval_presets: default_interval_presets(),
@@ -448,55 +464,6 @@ pub fn data_dir() -> PathBuf {
         .join("gpui-convenience-tools")
 }
 
-/// 사용자가 직접 확인·수정할 수 있는 공개 설정파일 경로.
-pub fn config_path() -> PathBuf {
-    if has_data_dir_override() {
-        return data_dir().join(LEGACY_CONFIG_FILE_NAME);
-    }
-
-    executable_dir()
-        .map(|dir| dir.join(SETTINGS_FILE_NAME))
-        .unwrap_or_else(|| data_dir().join(SETTINGS_FILE_NAME))
-}
-
-/// 실행파일 옆 공개 설정파일을 사용할 수 없을 때의 사용자 데이터 경로.
-pub fn fallback_config_path() -> PathBuf {
-    data_dir().join(LEGACY_CONFIG_FILE_NAME)
-}
-
-/// 실제로 설정을 읽거나 저장할 경로.
-pub fn effective_config_path() -> PathBuf {
-    let primary = config_path();
-    if has_data_dir_override() || !fallback_config_path().exists() {
-        return primary;
-    }
-
-    let fallback = fallback_config_path();
-    if !primary.exists() {
-        return fallback;
-    }
-
-    let primary_modified = fs::metadata(&primary).and_then(|metadata| metadata.modified());
-    let fallback_modified = fs::metadata(&fallback).and_then(|metadata| metadata.modified());
-    if fallback_modified.ok() > primary_modified.ok() {
-        fallback
-    } else {
-        primary
-    }
-}
-
-fn executable_dir() -> Option<PathBuf> {
-    std::env::current_exe()
-        .ok()
-        .and_then(|path| path.parent().map(PathBuf::from))
-}
-
-fn has_data_dir_override() -> bool {
-    std::env::var_os(DATA_DIR_ENV)
-        .filter(|value| !value.is_empty())
-        .is_some()
-}
-
 pub fn themes_path() -> PathBuf {
     data_dir().join("themes")
 }
@@ -504,30 +471,6 @@ pub fn themes_path() -> PathBuf {
 /// 롤링 로그 파일이 쌓이는 디렉터리.
 pub fn logs_path() -> PathBuf {
     data_dir().join("logs")
-}
-
-/// 현재 공개 설정파일을 기본 편집기로 연다.
-pub fn open_config_file() -> Result<()> {
-    let path = effective_config_path();
-
-    #[cfg(target_os = "windows")]
-    {
-        Command::new("explorer.exe")
-            .arg(format!("/select,{}", path.display()))
-            .spawn()?;
-    }
-
-    #[cfg(target_os = "macos")]
-    {
-        Command::new("open").arg(&path).spawn()?;
-    }
-
-    #[cfg(all(unix, not(target_os = "macos")))]
-    {
-        Command::new("xdg-open").arg(&path).spawn()?;
-    }
-
-    Ok(())
 }
 
 pub fn ensure_bundled_themes() -> Result<PathBuf> {
@@ -542,68 +485,6 @@ pub fn ensure_bundled_themes() -> Result<PathBuf> {
     }
 
     Ok(path)
-}
-
-pub fn save_config(config: &AppConfig) -> Result<()> {
-    let json = serde_json::to_string_pretty(config)?;
-    let primary = config_path();
-    match write_config_file(&primary, &json) {
-        Ok(()) => Ok(()),
-        Err(primary_error) if !has_data_dir_override() => {
-            let fallback = fallback_config_path();
-            log::warn!(
-                "실행파일 옆 설정파일을 저장할 수 없어 AppData fallback을 사용합니다: {} ({primary_error})",
-                primary.display()
-            );
-            write_config_file(&fallback, &json).map_err(|fallback_error| {
-                anyhow::anyhow!(
-                    "설정 저장 실패: 실행파일 옆 {} ({primary_error}); AppData {} ({fallback_error})",
-                    primary.display(),
-                    fallback.display()
-                )
-            })
-        }
-        Err(error) => Err(error),
-    }
-}
-
-pub fn load_config() -> Result<Option<AppConfig>> {
-    let path = effective_config_path();
-    if !path.exists() {
-        return Ok(None);
-    }
-
-    let data = fs::read_to_string(&path)?;
-    let config = serde_json::from_str::<AppConfig>(&data)?;
-    Ok(Some(config))
-}
-
-fn write_config_file(path: &std::path::Path, json: &str) -> Result<()> {
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent)?;
-    }
-
-    fs::write(path, json)?;
-    Ok(())
-}
-
-/// 저장된 설정을 읽어 수정한 뒤 다시 저장한다.
-///
-/// 설정 필드가 늘어날 때마다 저장 지점마다 복사 로직을 추가하는 실수를 막기 위한
-/// 단일 경로다. 새 저장 로직은 반드시 이 함수를 사용한다.
-pub fn update_config(edit: impl FnOnce(&mut AppConfig)) -> Result<AppConfig> {
-    let mut config = load_config()?.unwrap_or_default();
-    edit(&mut config);
-    save_config(&config)?;
-    Ok(config)
-}
-
-pub fn save_theme_selection(mode: ThemeMode, theme_name: &str) -> Result<()> {
-    update_config(|config| match mode {
-        ThemeMode::Light => config.light_theme_name = Some(theme_name.to_string()),
-        ThemeMode::Dark => config.dark_theme_name = Some(theme_name.to_string()),
-    })?;
-    Ok(())
 }
 
 #[cfg(test)]
@@ -659,6 +540,8 @@ mod tests {
 
         let config: AppConfig = serde_json::from_str(legacy).expect("구버전 config 파싱");
         assert_eq!(config.scan_interval_secs, 15);
+        assert!(!config.kakao_reclaim_ad_space);
+        assert_eq!(config.theme_mode, None);
         assert!(config.sync_jobs.is_empty());
         // 스위치가 없던 config는 켜진 상태로 읽혀야 기존 동작이 유지된다.
         assert!(config.sync_enabled);
@@ -675,10 +558,120 @@ mod tests {
     }
 
     #[test]
+    fn kakao_reclaim_is_opt_in_and_round_trips() {
+        let mut config = AppConfig::default();
+        assert!(!config.kakao_reclaim_ad_space);
+        config.kakao_reclaim_ad_space = true;
+        let serialized = serde_json::to_string(&config).expect("설정 직렬화");
+        let restored: AppConfig = serde_json::from_str(&serialized).expect("설정 역직렬화");
+        assert!(restored.kakao_reclaim_ad_space);
+    }
+
+    #[test]
+    fn trailing_legacy_brace_is_read_without_changing_original() {
+        let _data_dir = IsolatedDataDir::new("legacy-extra-brace");
+        let path = fallback_config_path();
+        let mut expected = AppConfig {
+            kakao_reclaim_ad_space: true,
+            scan_interval_secs: 45,
+            ..AppConfig::default()
+        };
+        expected.log.max_files = 17;
+        let malformed = format!("{}}}", serde_json::to_string(&expected).unwrap());
+        fs::write(&path, &malformed).unwrap();
+
+        let restored = load_config().unwrap().unwrap();
+        assert!(restored.kakao_reclaim_ad_space);
+        assert_eq!(restored.scan_interval_secs, 45);
+        assert_eq!(restored.log.max_files, 17);
+        assert_eq!(fs::read_to_string(path).unwrap(), malformed);
+    }
+
+    #[test]
+    fn malformed_settings_other_than_legacy_trailing_brace_are_not_overwritten() {
+        let _data_dir = IsolatedDataDir::new("invalid-settings-preserved");
+        let path = config_path();
+        fs::write(&path, "{ invalid json").unwrap();
+        assert!(update_config(|config| config.kakao_reclaim_ad_space = true).is_err());
+        assert_eq!(fs::read_to_string(path).unwrap(), "{ invalid json");
+    }
+
+    #[test]
+    fn all_user_settings_survive_save_and_reload() {
+        let _data_dir = IsolatedDataDir::new("all-settings-round-trip");
+        let mut settings = AppConfig {
+            service_enabled: false,
+            ..AppConfig::default()
+        };
+        settings.targets[0].enabled = false;
+        settings.kakao_reclaim_ad_space = true;
+        settings.light_theme_name = Some("test-light".into());
+        settings.dark_theme_name = Some("test-dark".into());
+        settings.theme_mode = Some(ThemeMode::Dark);
+        settings.scan_interval_secs = 42;
+        settings.favorite_services = vec!["TestService".into()];
+        settings.interval_presets = vec![10, 42, 90];
+        settings.sync_enabled = false;
+        settings.sync_jobs = vec![SyncJob {
+            source: r"D:\source".into(),
+            target: r"D:\target".into(),
+            ..SyncJob::default()
+        }];
+        settings.sidebar_width = 300.0;
+        settings.virtual_disk_suppressed_issue_keys = vec!["hidden-file".into()];
+        settings.log.max_files = 12;
+        settings.virtual_disk.last_vdi_path = Some(r"D:\VM\disk.vdi".into());
+
+        save_config(&settings).unwrap();
+        let restored = load_config().unwrap().unwrap();
+        assert_eq!(
+            serde_json::to_value(&restored).unwrap(),
+            serde_json::to_value(&settings).unwrap()
+        );
+    }
+
+    #[test]
+    fn theme_mode_and_theme_name_save_without_resetting_other_settings() {
+        let _data_dir = IsolatedDataDir::new("theme-mode-save");
+        let initial = AppConfig {
+            kakao_reclaim_ad_space: true,
+            ..AppConfig::default()
+        };
+        save_config(&initial).unwrap();
+        save_theme_mode(ThemeMode::Dark).unwrap();
+        save_theme_selection(ThemeMode::Dark, "test-dark").unwrap();
+        let restored = load_config().unwrap().unwrap();
+        assert_eq!(restored.theme_mode, Some(ThemeMode::Dark));
+        assert_eq!(restored.dark_theme_name.as_deref(), Some("test-dark"));
+        assert!(restored.kakao_reclaim_ad_space);
+    }
+
+    #[test]
+    fn concurrent_setting_updates_preserve_both_fields() {
+        let _data_dir = IsolatedDataDir::new("concurrent-setting-updates");
+        save_config(&AppConfig::default()).unwrap();
+        let first = std::thread::spawn(|| {
+            for value in 20..40 {
+                update_config(|config| config.scan_interval_secs = value).unwrap();
+            }
+        });
+        let second = std::thread::spawn(|| {
+            for value in 20..40 {
+                update_config(|config| config.log.max_files = value).unwrap();
+            }
+        });
+        first.join().unwrap();
+        second.join().unwrap();
+        let restored = load_config().unwrap().unwrap();
+        assert_eq!(restored.scan_interval_secs, 39);
+        assert_eq!(restored.log.max_files, 39);
+    }
+
+    #[test]
     fn isolated_override_keeps_settings_path_outside_the_executable_directory() {
         let data_dir = IsolatedDataDir::new("isolated-settings-path");
 
-        assert_eq!(config_path(), data_dir.path.join(LEGACY_CONFIG_FILE_NAME));
+        assert_eq!(config_path(), data_dir.path.join(SETTINGS_FILE_NAME));
         assert_eq!(effective_config_path(), config_path());
     }
 

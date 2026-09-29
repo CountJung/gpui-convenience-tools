@@ -26,6 +26,7 @@ impl AppRoot {
         }
 
         let service_enabled = self.app_state.is_active;
+        let kakao_reclaim_ad_space = self.kakao_reclaim_ad_space;
         let targets = self.app_state.targets.clone();
         let scan_interval_secs = self.scan_interval_secs;
         let favorite_services = self.services.favorites.clone();
@@ -54,6 +55,7 @@ impl AppRoot {
         update_config(move |config| {
             carry_over_engine_progress(&config.sync_jobs, &mut sync_jobs);
             config.service_enabled = service_enabled;
+            config.kakao_reclaim_ad_space = kakao_reclaim_ad_space;
             config.targets = targets;
             config.scan_interval_secs = scan_interval_secs;
             config.favorite_services = favorite_services;
@@ -133,21 +135,50 @@ impl AppRoot {
             state.service_enabled = self.app_state.is_active;
             state.targets = self.app_state.targets.clone();
             state.scan_interval_secs = self.scan_interval_secs;
+            state.kakao_reclaim_ad_space = self.kakao_reclaim_ad_space;
         }
     }
 
-    pub(super) fn persist_config(&self) {
+    pub(super) fn persist_config(&mut self) {
         let is_active = self.app_state.is_active;
+        let kakao_reclaim_ad_space = self.kakao_reclaim_ad_space;
         let targets = self.app_state.targets.clone();
         let interval = self.scan_interval_secs;
 
         if let Err(err) = update_config(move |cfg| {
             cfg.service_enabled = is_active;
+            cfg.kakao_reclaim_ad_space = kakao_reclaim_ad_space;
             cfg.targets = targets;
             cfg.scan_interval_secs = interval;
         }) {
             log::error!("설정 저장 실패: {err}");
+            self.push_log("ERROR", format!("설정을 저장하지 못했습니다: {err}"));
         }
+    }
+
+    pub(crate) fn set_kakao_reclaim_ad_space(&mut self, enabled: bool, cx: &mut Context<Self>) {
+        self.kakao_reclaim_ad_space = enabled;
+        self.sync_scanner_state();
+        if !enabled {
+            super::background::sync_kakao_layout(
+                self.platform.as_ref(),
+                &self.kakao_layout_state,
+                &self.scanner_state,
+                false,
+                [],
+            );
+        }
+        #[cfg(test)]
+        if !self.sync.external_side_effects_enabled {
+            cx.notify();
+            return;
+        }
+        self.persist_config();
+        self.push_log(
+            "INFO",
+            format!("카카오톡 광고 자리 회수 모드: {}", if enabled { "켜짐" } else { "꺼짐" }),
+        );
+        cx.notify();
     }
 
     pub fn set_scan_interval(&mut self, secs: u32, cx: &mut Context<Self>) {

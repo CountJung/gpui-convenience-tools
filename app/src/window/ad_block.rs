@@ -308,6 +308,7 @@ fn render_settings(
     let card = theme.secondary;
     let current_interval = this.scan_interval_secs;
     let is_active = this.app_state().is_active;
+    let reclaim_enabled = this.kakao_reclaim_ad_space;
 
     // ── 실행 중인 프로세스 목록 ──
     let targets = this.app_state().targets.clone();
@@ -366,6 +367,7 @@ fn render_settings(
 
         proc_rows = proc_rows.child(
             h_flex()
+                .debug_selector(move || format!("ad-block-process-row-{ix}"))
                 .w_full()
                 .min_w_0()
                 .h(px(34.0))
@@ -418,6 +420,16 @@ fn render_settings(
                             is_active,
                             cx.listener(|this, checked: &bool, window, cx| {
                                 this.set_service_enabled(*checked, window, cx);
+                            }),
+                            cx,
+                        ))
+                        .child(ui::option_row(
+                            "kakao-reclaim-ad-space",
+                            "카카오톡 광고 자리 회수 (실험적)",
+                            "GUI 세션의 기본 채팅창 빈 하단 공간을 목록에 돌려줍니다. 창 구조가 다르면 적용하지 않습니다.",
+                            reclaim_enabled,
+                            cx.listener(|this, checked: &bool, _window, cx| {
+                                this.set_kakao_reclaim_ad_space(*checked, cx);
                             }),
                             cx,
                         ))

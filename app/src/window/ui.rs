@@ -265,9 +265,15 @@ pub fn option_row(
             v_flex()
                 .flex_1()
                 .min_w_0()
-                .child(div().text_color(t.foreground).child(title.into()))
                 .child(
                     div()
+                        .debug_selector(move || format!("{id}-title"))
+                        .text_color(t.foreground)
+                        .child(title.into()),
+                )
+                .child(
+                    div()
+                        .debug_selector(move || format!("{id}-description"))
                         .text_color(t.muted_foreground)
                         .child(description.into()),
                 ),

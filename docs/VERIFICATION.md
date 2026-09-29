@@ -30,6 +30,10 @@ baseline 포맷 차이가 남아 있어 별도 구조 정리 범위로 유지한
 이번 실행에서는 `DOCS_VERIFIED active=23 matrix=23`도 먼저 통과해 활성 TODO와 검증
 매트릭스의 일대일 대응을 확인했다.
 
+AD-006을 포함한 현재 변경 코드의 검증 결과는 전체 199 passed·7 ignored 및 Clippy `-D warnings`
+통과다. 위 `IDE_VERIFIED`와 `DOCS_VERIFIED`는 이전 기준 실행 결과이므로 이 수치의
+재실행 증거로 간주하지 않는다.
+
 ## 작업마다 적용하는 순서
 
 작업 ID 하나를 완료 처리하기 전에 아래 순서를 따른다. 문서 전용 작업은 해당 없는 코드
@@ -127,6 +131,8 @@ SHA-256을 기록한다. 다른 검증자의 독립 검토가 요구되는 UI �
 
 | ID | 프로필 | B | T | E | V | R | C | 증거 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| AD-006 | E2E | [x] | [x] | [x] | [ ] | [x] | [x] | `kakao_layout.rs`의 창 계층·크기 지문 및 6개 HWND 적용/역순 복원; 기본 꺼짐 설정 왕복, GPUI 옵션 제목·설명·스위치 bounds(920/1000/1280px), 920×480 설정 패널 끝 스크롤 테스트. 실제 KakaoTalk before/during 캡처 `target/visual-validation/captures/ad006-before.png`·`target/visual-validation/captures/ad006-reclaimed.png` 확인; 무시 표시된 live 감지·적용/복원 테스트 별도 통과. 최신 전체 199 passed·7 ignored, 릴리즈 빌드 및 Clippy `-D warnings` 통과. 독립 Visual Reviewer의 최신 릴리즈 화면 재검토는 아직 남아 있어 V 미체크. |
+| C-002 | E2E | [x] | [x] | [x] | [ ] | [x] | [x] | 현재 AppData 구형 JSON 끝의 중괄호 초과를 읽기 전용으로 확인. 격리 복구·원본 불변·전체 설정/색상 모드 왕복·손상 설정 보존·동시 변경·새 설정 우선순위 및 GPUI Light/Dark 버튼 입력 테스트 추가. `config/persistence.rs`는 동시 갱신을 직렬화하고 임시 파일 완성 후 교체; 설정 읽기/저장 실패는 앱 로그에 표시. 전체 199 passed·7 ignored, `cargo check --locked`, Clippy `-D warnings`, 문서·구조 검사 통과. 사용자 승인 후 구 릴리즈를 정상 종료하고 release SHA-256 `67D9F1F6F219F2327427D3447A98B8E9EAE7D11B09B66202257480987667F80F` 빌드. `scripts/Test-SettingsPersistence.ps1`가 격리 프로세스 30956·31028을 차례로 시작/정상 종료해 구형 손상 파일 불변, 새 설정 파일 생성, 광고 자리 회수=true·색상 모드=dark·스캔 37초·서비스/동기화 off·즐겨찾기 유지 확인(`SETTINGS_E2E_PASSED`). 1000×700 실제 릴리즈 설정 화면 `target/visual-validation/captures/c002-dark-settings-restart-150840.png`에서 어두운 모드·카드 경계 확인; 검증 세션과 프로세스 정리. 독립 설정 화면 재검토 및 실제 사용자 프로필의 이전 미저장 옵션 재선택은 남아 있어 V 미체크. |
 | VDE-024 | E2E | [x] | [x] | [x] | [x] | [x] | [x] | 지연 로딩 `GuestDirectoryTreeNode`와 좌우 `balanced_split` 탐색 영역을 추가해 폴더 트리 선택으로 중첩 경로를 바로 열고, 목록 행 높이·열 폭·탐색 카드 높이를 컴팩트하게 조정; `virtual_disk_folder_tree_navigates_nested_paths_without_repeated_list_clicks`, `virtual_disk_explorer_keeps_tree_and_file_list_inside_compact_card`와 전체 169 passed·4 ignored, Clippy `-D warnings` 통과; `Verify-Workspace.ps1` 필수 GPUI 테스트 29개 이름 검증; release 캡처 `target/visual-validation/captures/vde024-tree-920x700-121233.png`, `vde024-tree-1000x700-121200.png`, `vde024-tree-1280x900-121234.png`; 실제 트리 Click은 하네스 좌표 변환으로 상태 전환을 확정하지 않아 GPUI 이벤트 테스트로 대체, commit `4af7cc6` push 완료; 독립 Visual Reviewer는 후속 |
 | VDE-025 | E2E | [x] | [x] | [x] | [x] | [x] | [x] | `VirtualDiskLayoutConfig`에 트리·종류·속성·크기 폭과 기본값/최소·최대 보정을 추가하고 `settings.json` round-trip을 검증; 트리 스플리터는 150~240px, 파일명은 남은 폭, 속성·크기 열은 최소 읽기 폭을 사용하며 속성·크기 조절 및 기본값 복원 UI를 추가; `virtual_disk_layout_controls_update_and_reset_readable_column_widths`, `virtual_disk_tree_width_setting_is_clamped_and_persisted`, 기존 트리·카드 bounds 테스트와 전체 172 passed·4 ignored, Clippy `-D warnings`, 필수 GPUI 31개 통과; release 캡처 `target/visual-validation/captures/vde025-final-920x700-scrolled-124559.png`, `vde025-final-1000x700-124600.png`, `vde025-final-capped-tree-1280x900-124829.png`; 실제 스플리터 Drag는 포그라운드 안전 경계로 미수행, commit `195a43e` push 완료; 독립 Visual Reviewer는 후속 |
 | VDE-022 | RUST | [x] | [x] | [x] | [ ] | [x] | [x] | 실제 `D:\VMMachine\win11\TACS\TACS_1.vdi`를 읽기 전용으로 대조해 `VDI normal (base)`, `dynamic default`, GPT 1번 MSR, 2번 `-FVE-FS-` BitLocker를 확인; `classifies_bitlocker_and_microsoft_reserved_partitions_explicitly`, `encrypted_partition_error_explains_the_offline_boundary`, 전체 테스트 163 passed·4 ignored, release 캡처 `target/visual-validation/captures/vde022-final-095347.png`에서 MSR·BitLocker 라벨과 안내를 확인; commit `6b89a09` push 완료; 독립 Visual Reviewer는 후속 |

@@ -198,6 +198,44 @@ fn ad_block_split_fills_default_and_minimum_supported_width(cx: &mut TestAppCont
 }
 
 #[gpui::test]
+fn kakao_reclaim_option_is_visible_and_toggleable(cx: &mut TestAppContext) {
+    initialize_components(cx);
+    let (view, cx) = cx.add_window_view(|_, _| test_app_root(ActivePanel::AdBlock));
+    for width in [MIN_SUPPORTED_WINDOW_WIDTH, DEFAULT_WINDOW_WIDTH, 1280.0] {
+        cx.simulate_resize(size(px(width), px(DEFAULT_WINDOW_HEIGHT)));
+        refresh(cx);
+        let row = cx.debug_bounds("kakao-reclaim-ad-space-row").expect("옵션 행");
+        let title = cx.debug_bounds("kakao-reclaim-ad-space-title").expect("옵션 제목");
+        let description = cx.debug_bounds("kakao-reclaim-ad-space-description").expect("옵션 설명");
+        let switch = cx.debug_bounds("kakao-reclaim-ad-space").expect("옵션 스위치");
+        assert!(title.origin.x >= row.origin.x && title.origin.x + title.size.width <= switch.origin.x);
+        assert!(description.origin.x >= row.origin.x && description.origin.x + description.size.width <= switch.origin.x);
+        assert!(switch.origin.x + switch.size.width <= row.origin.x + row.size.width);
+    }
+    click_option_switch(cx, "kakao-reclaim-ad-space");
+    assert!(view.read_with(cx, |root, _| root.kakao_reclaim_ad_space));
+}
+
+#[gpui::test]
+fn ad_block_settings_scroll_reaches_last_process_at_compact_height(cx: &mut TestAppContext) {
+    initialize_components(cx);
+    let (view, cx) = cx.add_window_view(|_, _| test_app_root(ActivePanel::AdBlock));
+    cx.update(|_, app| {
+        view.update(app, |root, cx| {
+            root.running_processes = (0..12).map(|index| format!("sample-{index}.exe")).collect();
+            cx.notify();
+        });
+    });
+    cx.simulate_resize(size(px(MIN_SUPPORTED_WINDOW_WIDTH), px(COMPACT_WINDOW_HEIGHT)));
+    refresh(cx);
+    wheel_to_end(cx, "ad-block-right", -2400.0);
+    let viewport = cx.debug_bounds("ad-block-right").expect("설정 뷰포트");
+    let last = cx.debug_bounds("ad-block-process-row-11").expect("마지막 프로세스 행");
+    assert!(last.origin.y >= viewport.origin.y);
+    assert!(last.origin.y + last.size.height <= viewport.origin.y + viewport.size.height);
+}
+
+#[gpui::test]
 fn ad_block_cards_contain_long_content_at_supported_widths(cx: &mut TestAppContext) {
     initialize_components(cx);
     let (view, cx) = cx.add_window_view(|_, _| test_app_root(ActivePanel::AdBlock));

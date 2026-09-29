@@ -10,7 +10,7 @@ use gpui_component::{
 };
 
 use crate::app::AppRoot;
-use crate::config::{effective_config_path, open_config_file, save_theme_selection};
+use crate::config::{effective_config_path, open_config_file, save_theme_mode, save_theme_selection};
 use crate::theme::change_theme;
 use crate::window::ui::{self, ButtonStyle, Size};
 
@@ -39,6 +39,10 @@ fn render_theme_option(
             if let Some(theme) = selected {
                 Theme::global_mut(cx).apply_config(&theme);
                 change_theme(theme.mode, Some(window), cx);
+                #[cfg(test)]
+                if !_this.sync.external_side_effects_enabled {
+                    return;
+                }
                 if let Err(err) = save_theme_selection(theme.mode, theme.name.as_ref()) {
                     log::error!("failed to save theme selection: {err}");
                 }
@@ -474,8 +478,16 @@ pub fn render(this: &mut AppRoot, window: &mut Window, cx: &mut Context<AppRoot>
                                             border
                                         })
                                         .id("theme-light")
+                                        .debug_selector(|| "theme-light".to_string())
                                         .on_click(cx.listener(|_this, _event, window, cx| {
                                             change_theme(ThemeMode::Light, Some(window), cx);
+                                            #[cfg(test)]
+                                            if !_this.sync.external_side_effects_enabled {
+                                                return;
+                                            }
+                                            if let Err(err) = save_theme_mode(ThemeMode::Light) {
+                                                log::error!("밝은 색상 모드 저장 실패: {err}");
+                                            }
                                         }))
                                         .child("Light"),
                                 )
@@ -494,8 +506,16 @@ pub fn render(this: &mut AppRoot, window: &mut Window, cx: &mut Context<AppRoot>
                                             border
                                         })
                                         .id("theme-dark")
+                                        .debug_selector(|| "theme-dark".to_string())
                                         .on_click(cx.listener(|_this, _event, window, cx| {
                                             change_theme(ThemeMode::Dark, Some(window), cx);
+                                            #[cfg(test)]
+                                            if !_this.sync.external_side_effects_enabled {
+                                                return;
+                                            }
+                                            if let Err(err) = save_theme_mode(ThemeMode::Dark) {
+                                                log::error!("어두운 색상 모드 저장 실패: {err}");
+                                            }
                                         }))
                                         .child("Dark"),
                                 ),

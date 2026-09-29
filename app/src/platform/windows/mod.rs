@@ -11,6 +11,7 @@
 //! | [`services`] | 설치된 서비스 조회·제어 |
 
 mod scm;
+mod kakao_layout;
 mod services;
 mod task_scheduler;
 mod tray;
@@ -43,7 +44,7 @@ use window_ops::{
     is_process_id_running, is_target_process_running, list_running_window_process_names,
 };
 
-use crate::platform::{AdWindowSnapshot, Platform};
+use crate::platform::{AdWindowSnapshot, KakaoLayoutSnapshot, Platform};
 
 /// Rust 문자열을 null-terminated UTF-16 버퍼로 변환한다. Win32 W계열 API 인자용.
 pub(super) fn wide_null(value: &str) -> Vec<u16> {
@@ -130,6 +131,22 @@ impl Platform for WindowsPlatform {
 
     fn restore_ad_window_state(&self, snapshot: &AdWindowSnapshot) -> Result<()> {
         window_ops::restore_ad_window_state(snapshot)
+    }
+
+    fn capture_kakao_layout(&self, ad_handle: HWND) -> Result<Option<KakaoLayoutSnapshot>> {
+        kakao_layout::capture(ad_handle)
+    }
+
+    fn apply_kakao_layout(&self, snapshot: &KakaoLayoutSnapshot) -> Result<()> {
+        kakao_layout::apply(snapshot)
+    }
+
+    fn is_kakao_layout_applied(&self, snapshot: &KakaoLayoutSnapshot) -> bool {
+        kakao_layout::is_applied(snapshot)
+    }
+
+    fn restore_kakao_layout(&self, snapshot: &KakaoLayoutSnapshot) -> Result<()> {
+        kakao_layout::restore(snapshot)
     }
 
     fn list_sys_services(&self) -> Result<Vec<crate::platform::SysServiceInfo>> {

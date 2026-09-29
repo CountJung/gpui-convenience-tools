@@ -83,3 +83,22 @@ fn rendered_switch_toggles_in_light_dark_and_missing_switch_token_theme(cx: &mut
     apply_bundled_theme(cx, "alduin.json", "Alduin");
     assert_sync_notify_switch_toggles(&view, cx, ThemeMode::Dark, Some("Alduin"));
 }
+
+#[gpui::test]
+fn settings_theme_mode_buttons_apply_both_modes(cx: &mut TestAppContext) {
+    initialize_components(cx);
+    let (_view, cx) = cx.add_window_view(|_, _| test_app_root(ActivePanel::Settings));
+    cx.simulate_resize(size(px(1280.0), px(900.0)));
+    refresh(cx);
+    wheel_to_end(cx, "content-area", -1200.0);
+
+    for (selector, expected) in [
+        ("theme-dark", ThemeMode::Dark),
+        ("theme-light", ThemeMode::Light),
+    ] {
+        assert!(cx.debug_bounds(selector).is_some(), "{selector} button should render");
+        click_debug_element(cx, selector);
+        let actual = cx.update(|_, app| app.theme().mode);
+        assert_eq!(actual, expected, "{selector} should change the visible theme");
+    }
+}

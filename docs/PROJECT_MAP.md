@@ -31,7 +31,7 @@
 안전 경계: 원본 VDI는 read-only로만 열고, 실행 중 VM의 VDI 직접 읽기는 구현하지 않는다.
 실행 중 VM 지원은 후속 `GuestFileSource` 구현으로만 추가한다(VDE-021).
 
-**최종 측정**: 2026-09-28 · `app/src` 총 65개 파일 · 24,424줄
+**최종 측정**: 2026-09-29 · `app/src` 총 67개 파일 · 25,452줄
 
 ## 크기 기준 — 줄 수는 증상이다
 
@@ -45,7 +45,7 @@
 | 800~1,000 | 🟡 경고 | 다음 작업 전에 구조 리팩터링 |
 | 1,000 초과 | 🔴 위반 | **즉시 리팩터링.** 다른 작업보다 우선 |
 
-현재 🔴 위반 **없음**, 🟡 경고 **6개**. 최대 파일은 945줄(`config.rs`)이며, 다음 구조 작업은 `config.rs`·`virtual_disk.rs`·`virtual_disk_ops.rs`·`partition.rs`·`vdi.rs`·`ntfs.rs`의 책임 증가를 먼저 검토한다.
+현재 🔴 위반 **없음**, 🟡 경고 **7개**. 최대 파일은 943줄(`window/virtual_disk.rs`)이며, `app/mod.rs`도 801줄로 경고 범위에 들어왔다. 다음 구조 작업은 이 두 파일의 책임 증가를 먼저 검토한다.
 줄 수와 무관하게 처리하는 중복 헬퍼는 아래 「중복 헬퍼 추적」에서 관리한다.
 
 `scripts/Assert-ProjectStructure.ps1`가 이 측정값을 자동 대조한다. 소스 파일을 추가·삭제·
@@ -71,23 +71,29 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 
 | 파일 | 줄 | 책임 |
 | --- | ---: | --- |
-| `main.rs` | 133 | 진입점 — 로거 설치 → 테마 시드 → 윈도우 오픈, `--service`/`--tray` 플래그 분기 |
+| `main.rs` | 134 | 진입점 — 로거 설치 → 테마 시드 → 윈도우 오픈, `--service`/`--tray` 플래그 분기 |
 | `theme.rs` | 143 | 테마 모드 적용과 스위치 팔레트 최소 대비 보정·번들 테마 감사 테스트 |
-| `config.rs` | 946 | `AppConfig`·`SyncJob`·`WatchMode`·`SymlinkMode`·`LogConfig`·`VirtualDiskConfig`·주기 프리셋·사이드바 폭·VDI 오류 억제 키 정의, 실행파일 옆 `settings.json` 우선 저장·구버전 AppData fallback·검증 데이터 루트 오버라이드 |
+| `config.rs` | 938 | `AppConfig`·`SyncJob`·`WatchMode`·`SymlinkMode`·`LogConfig`·`VirtualDiskConfig`·주기 프리셋·사이드바 폭·VDI 오류 억제 키·카카오톡 회수 옵션·색상 모드 정의와 설정 왕복 테스트 |
 | `config_layout.rs` | 103 | VDI 탐색기 트리·파일명 우선 열 폭 설정, 기본값·최소/최대 보정·구버전 역직렬화 기본값 |
 | `logging.rs` | 560 | 롤링 파일 로거 (`log::Log` 구현, 테스트용 출력 경로 주입) |
 | `sync_history.rs` | 223 | 동기화 완료 이력의 JSON 배열 저장·순서 보장·손상 파일 보존·개수/기간 보존·최신 목록 로드·소요 시간 계산 |
 | `util.rs` | 139 | 도메인 주인이 없는 순수 헬퍼 — `format_interval`·`interval_to_secs`·`TimeUnit` |
 
-### VirtualBox 도메인 (`app/src/virtual_disk/`) — 4,981줄 / 10파일
+### 사용자 설정 저장 (`app/src/config/`) — 275줄 / 1파일
+
+| 파일 | 줄 | 책임 |
+| --- | ---: | --- |
+| `persistence.rs` | 275 | 설정 경로 우선순위·구형 JSON 말미 복구·손상 원본 보존·동시 갱신 직렬화·임시 파일 교체 저장·색상 모드/테마 선택 저장 |
+
+### VirtualBox 도메인 (`app/src/virtual_disk/`) — 5,067줄 / 10파일
 
 | 파일 | 줄 | 책임 |
 | --- | ---: | --- |
 | `mod.rs` | 462 | VDI·파티션·게스트 파일 항목 모델, 정규화된 게스트 경로·시간 메타데이터, `GuestFileSource`, 플랫폼 비의존 오류 계약 |
-| `vdi.rs` | 821 | 표준 VDI 1.1 read-only 헤더·블록 맵·동적/고정 블록 읽기, 잠금·VM 사용·크기/mtime 안정성 가드 |
+| `vdi.rs` | 907 | 표준 VDI 1.1 read-only 헤더·블록 맵·동적/고정 블록 읽기, 잠금·VM 사용·크기/mtime 안정성 가드 |
 | `vdi/fixtures.rs` | 156 | 테스트 전용 합성 VDI·raw fixture 생성/export와 임시 파일 정리 — 운영 리더 본문과 분리 |
-| `partition.rs` | 797 | read-only `PartitionSource` 경계, MBR·EBR·protective MBR·GPT 검색, 양쪽 CRC·LBA 범위 검증, NTFS 3.1 부트 섹터 판정 |
-| `ntfs.rs` | 801 | 파티션 범위 `Read + Seek` 어댑터, NTFS 3.1 디렉터리·기본 데이터 스트림 읽기, 압축·암호화·범위·손상 오류와 속성·시간 보존, 고정/손상 픽스처 테스트 |
+| `partition.rs` | 846 | read-only `PartitionSource` 경계, MBR·EBR·protective MBR·GPT 검색, 양쪽 CRC·LBA 범위 검증, NTFS 3.1 부트 섹터 판정 |
+| `ntfs.rs` | 811 | 파티션 범위 `Read + Seek` 어댑터, NTFS 3.1 디렉터리·기본 데이터 스트림 읽기, 압축·암호화·범위·손상 오류와 속성·시간 보존, 고정/손상 픽스처 테스트 |
 | `path_policy.rs` | 335 | 절대 대상 루트 기준 게스트 경로 매핑, Windows 예약 이름·경로 길이 검증, 게스트·호스트 리파스 포인트/심볼릭 링크 추적 차단 |
 | `copy.rs` | 673 | `GuestFileSource` 선택 파일·폴더의 설정 청크 복사, 대상 부모 생성, 건너뜀·덮어쓰기·새 이름 충돌 정책, 메타데이터 결과 집계, 청크 단위 중지와 부분 파일 제거 |
 | `copy/tests.rs` | 328 | 복사 엔진의 충돌·청크·중지·실패·부분 결과 정리 회귀 테스트 |
@@ -107,27 +113,27 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `browse.rs` | 82 | 숨김·시스템 항목 포함 원본 직계 탐색·링크 내부 진입 차단 |
 | `link_tests.rs` | 250 | Windows 링크·정션 Follow/Recreate·탈출·순환·대상 충돌 안전 회귀 |
 
-### 앱 루트 (`app/src/app/`) — 5,144줄 / 13파일
+### 앱 루트 (`app/src/app/`) — 5,367줄 / 13파일
 
 `app.rs`(1,798줄)를 책임별로 분할한 결과다.
 
 | 파일 | 줄 | 책임 |
 | --- | ---: | --- |
-| `mod.rs` | 771 | `AppRoot` 정의·생성자·동기화 이력 초기 로드·백그라운드 UI wake·사이드바·최상위 레이아웃·종료 저장 |
+| `mod.rs` | 801 | `AppRoot` 정의·생성자·설정 로드 오류 기록·동기화 이력 초기 로드·백그라운드 UI wake·사이드바·최상위 레이아웃·카카오톡 레이아웃 종료 복원·설정 저장 |
 | `sync_ops.rs` | 592 | 동기화 작업 조작·원본 직계 탐색/제외 선택·링크 모드 저장·실행 큐·커서 무효화 |
 | `interval.rs` | 313 | 주기 선택 상태(`IntervalPicker`)와 조작 — 프리셋 추가·삭제·드롭다운 동기화 |
-| `events.rs` | 326 | `PlatformEvent` 채널 소비, 진행 상태·동기화 이력·감시 실패 강등 반영, 로그·토스트 유틸 |
-| `background.rs` | 459 | 스캔 스레드와 동기화 스레드 (다중 광고 창 추적·복원·진행 이벤트 빈도 제한·중지·실행 위치·동기화 이력 영속화·실시간 watcher 연동) |
-| `state.rs` | 262 | 순수 데이터 타입 (`AppState`, `PlatformEvent`, `SyncRunning`, `ActivePanel`, 감시 실패 강등 이벤트, 타깃별 `NAV_*`) |
-| `ops.rs` | 252 | 광고 차단·서비스 관리·로그 설정 조작·사용자 설정 일괄 저장 |
+| `events.rs` | 329 | `PlatformEvent` 채널 소비, 진행 상태·동기화 이력·감시 실패 강등 반영, 로그·토스트 유틸 |
+| `background.rs` | 624 | 스캔 스레드와 동기화 스레드 (다중 광고 창 추적·복원·카카오톡 레이아웃 적용/복원·진행 이벤트 빈도 제한·중지·실행 위치·동기화 이력 영속화·실시간 watcher 연동) |
+| `state.rs` | 282 | 순수 데이터 타입 (`AppState`, `PlatformEvent`, `SyncRunning`, `ActivePanel`, 카카오톡 회수 스캔 옵션, 감시 실패 강등 이벤트, 타깃별 `NAV_*`) |
+| `ops.rs` | 330 | 광고 차단·카카오톡 회수 옵션·서비스 관리·로그 설정 조작·사용자 설정 일괄 저장과 실패 UI 로그 |
 | `inputs.rs` | 142 | 입력 위젯 지연 생성·제외 패턴 편집기·원본 탐색 초기화 |
 | `ui_state.rs` | 87 | 기능별 UI 상태와 동기화 이력·원본 탐색 상태 |
-| `virtual_disk_ops.rs` | 886 | VDI 경로 입력·read-only 열기·파티션 검색/선택·게스트 목록 새로고침·지연 로딩 폴더 트리·폴더 이동·Ctrl 토글/Shift 범위 다중 선택·포커스·stale 목록 제거를 포함한 안전 오류 안내·항목별 반복 알림 억제 저장·마지막 경로 복원 |
+| `virtual_disk_ops.rs` | 888 | VDI 경로 입력·read-only 열기·파티션 검색/선택·게스트 목록 새로고침·지연 로딩 폴더 트리·폴더 이동·Ctrl 토글/Shift 범위 다중 선택·포커스·stale 목록 제거를 포함한 안전 오류 안내·항목별 반복 알림 억제 저장·마지막 경로 복원 |
 | `virtual_disk_copy.rs` | 564 | VDI 대상 폴더 입력·선택, 백그라운드 read-only 복사, 청크 단위 중지 요청, 진행·중지·완료 요약·항목별 오류 로그·미억제 토스트 게이트·탐색기 keymap·검증 자동 복사·검증 자동 중지·검증 전용 읽기 지연 |
 | `watch.rs` | 303 | `notify` 재귀 watcher 소유·작업별 변경 이벤트 전달·2초 quiet debounce·감시 실패 중복 억제·작업 변경 시 정리 |
 | `validation.rs` | 112 | 릴리스 화면 검증 전용 초기 패널·VDI·파티션·게스트 경로·자동 중지·읽기 지연 시드·설정 화면; 사용자 설정에는 저장하지 않는 격리 입력 |
 
-### GPUI 회귀 테스트 (`app/src/app/tests/`) — 2,584줄 / 8파일
+### GPUI 회귀 테스트 (`app/src/app/tests/`) — 2,644줄 / 8파일
 
 테스트는 시나리오별 8개 파일로 나뉘며, 픽스처는 `mod.rs`가 단독 소유하고 하위 모듈은
 `use super::*`로 가져다 쓴다.
@@ -137,13 +143,13 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `file_sync.rs` | 786 | 동기화 조작·진행·중지·섹션 너비·전역 스위치·감시 방식 UI 경계 |
 | `file_sync_browse.rs` | 150 | 숨김·시스템 원본 항목 선택·링크 모드·원본 변경 시 stale 클릭 차단 |
 | `file_sync_history.rs` | 59 | 이력 3행의 상태·건수·소요 시간 카드 경계, 최소 높이 마지막 행 스크롤 진입 |
-| `layout.rs` | 434 | 사이드바·스플리터·카드 경계·divider drag·스크롤·사용자 설정 저장 카드 |
+| `layout.rs` | 472 | 사이드바·스플리터·카드 경계·divider drag·스크롤·사용자 설정 저장 카드·카카오톡 회수 옵션 클릭·컴팩트 높이 설정 목록 끝 도달 |
 | `interval.rs` | 226 | 주기 드롭다운·프리셋 추가/삭제·패널 간 공유 |
-| `mod.rs` | 203 | 공용 픽스처 (`test_app_root`·`TestPlatform`·`refresh`·`click_debug_element` 등) |
-| `theme.rs` | 85 | 테마 전환과 스위치 가시성 |
-| `virtual_disk.rs` | 629 | VirtualBox 탐색 네비게이션·VDI 입력·파티션 카드·현재 경로·지연 로딩 폴더 트리·컴팩트 트리/목록 경계·열 폭 조절·상위 이동·실제 목록·숨김/시스템 전체 선택·복사 진행/실패 요약·오류 억제 버튼 dispatch·키보드 단축키·손상 하위 폴더의 stale 목록 제거·안전/미지원 상태·새로고침 렌더 경계 |
+| `mod.rs` | 206 | 공용 픽스처 (`test_app_root`·`TestPlatform`·`refresh`·`click_debug_element` 등) |
+| `theme.rs` | 104 | 테마 전환·설정 화면 Light/Dark 버튼 조작과 스위치 가시성 |
+| `virtual_disk.rs` | 641 | VirtualBox 탐색 네비게이션·VDI 입력·파티션 카드·현재 경로·지연 로딩 폴더 트리·컴팩트 트리/목록 경계·열 폭 조절·상위 이동·실제 목록·숨김/시스템 전체 선택·복사 진행/실패 요약·오류 억제 버튼 dispatch·키보드 단축키·손상 하위 폴더의 stale 목록 제거·안전/미지원 상태·새로고침 렌더 경계 |
 
-### 패널 (`app/src/window/`) — 4,875줄 / 13파일
+### 패널 (`app/src/window/`) — 4,913줄 / 13파일
 
 | 파일 | 줄 | 책임 |
 | --- | ---: | --- |
@@ -151,29 +157,30 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `file_sync.rs` | 698 | 편의 기능 — 파일 동기화 작업·설정·실패·상태 표시줄 레이아웃 |
 | `file_sync/browse.rs` | 182 | 제외 대상 선택용 직계 폴더·파일 탐색 UI |
 | `file_sync/history.rs` | 127 | 최근 실행 이력 카드·상태/건수/소요 시간 문구 |
-| `settings.rs` | 535 | 전역 설정 — 사용자 설정파일 경로·저장/열기·테마 선택·로그 보관 정책 |
-| `ad_block.rs` | 502 | 편의 기능 — 웹뷰 광고 차단 (상태·타겟 ↔ 스캔 주기·프로세스 추가·카드 경계) |
+| `settings.rs` | 555 | 전역 설정 — 사용자 설정파일 경로·저장/열기·색상 모드/테마 선택 즉시 저장·로그 보관 정책 |
+| `ad_block.rs` | 514 | 편의 기능 — 웹뷰 광고 차단 (상태·타겟 ↔ 스캔 주기·프로세스 추가·카카오톡 광고 자리 회수 옵션·카드 경계) |
 | `service_view.rs` | 317 | 시스템 — 자동 시작(작업 스케줄러) 등록·삭제·즉시 실행 |
-| `ui.rs` | 327 | **공용 UI 프리미티브** — 배지·액션 버튼·토글 스위치·통계 타일·설정 행·선택 칩·로그 레벨 칸·폭 경계 |
+| `ui.rs` | 333 | **공용 UI 프리미티브** — 배지·액션 버튼·토글 스위치·통계 타일·설정 행·선택 칩·로그 레벨 칸·폭 경계 |
 | `dashboard.rs` | 161 | 개요 — 전체 상태 요약과 최근 활동 (플랫폼별 요약 카드 + 동기화 상태 배지) |
 | `interval.rs` | 154 | 주기 선택 렌더 — 드롭다운 + (값·단위·추가) 행 + 등록된 프리셋 목록 |
 | `log_view.rs` | 110 | 시스템 — 화면 로그 가상 리스트와 로그 파일 현황 |
 | `mod.rs` | 149 | 패널 모듈 선언 + 균형/초기 폭 지정 스플리터·`scroll_pane` 레이아웃 헬퍼 |
 | `virtual_disk.rs` | 943 | 편의 기능 — VDI 경로 입력·파티션 선택·지연 로딩 폴더 트리·게스트 현재 경로·행 선택·폴더/상위 이동·컴팩트 좌우 탐색 영역·사용자 조정 폭·단축키 포커스·안전/미지원 상태·대상 폴더·복사 진행·오류 요약 억제/재표시·목록 새로고침·검증 자동 스크롤 |
 
-### 플랫폼 (`app/src/platform/`) — 2,390줄 / 8파일
+### 플랫폼 (`app/src/platform/`) — 2,829줄 / 9파일
 
 `windows.rs`(1,361줄)를 책임별로 분할한 결과다.
 
 | 파일 | 줄 | 책임 |
 | --- | ---: | --- |
-| `mod.rs` | 220 | `Platform` trait 정의 + 광고 창 후보 목록·상태 스냅샷·서비스 타입, `NativePlatform` 타깃별 별칭 |
+| `mod.rs` | 263 | `Platform` trait 정의 + 광고 창 후보 목록·상태 스냅샷·카카오톡 레이아웃 스냅샷/적용/복원 계약·서비스 타입, `NativePlatform` 타깃별 별칭 |
 | `fallback.rs` | 59 | 비Windows `Platform` 구현 — 광고 차단 계열 미지원을 명시적으로 반환 |
 | `windows/scm.rs` | 449 | Windows 서비스(SCM) 등록과 서비스 모드 실행 |
 | `windows/services.rs` | 340 | 설치된 Win32 서비스 조회·시작·중지·삭제, 권한 확인 |
 | `windows/tray.rs` | 274 | 시스템 트레이 아이콘과 메시지 루프 |
 | `windows/window_ops.rs` | 719 | 타겟 프로세스 트리·최상위/명시적 자식 창 열거, 클래스 필터, 광고 팝업 후보 탐색, 창 상태 캡처·0×0 축소·복원 |
-| `windows/mod.rs` | 178 | `WindowsPlatform` + `Platform` 구현, 다중 창 후보·상태 API 연결, 하위 모듈 re-export |
+| `windows/kakao_layout.rs` | 382 | 카카오톡 기본 채팅창의 광고 팝업·슬롯·목록 지문 확인, 6개 HWND 크기 적용·부분 실패 역복원·동일 PID/클래스/부모/소유자/치수 확인 후 복원, live ignored 테스트 |
+| `windows/mod.rs` | 195 | `WindowsPlatform` + `Platform` 구현, 다중 창 후보·상태 API와 카카오톡 레이아웃 API 연결, 하위 모듈 re-export |
 | `windows/task_scheduler.rs` | 148 | 로그온 시 자동 시작(`schtasks`) |
 
 ### 빌드
@@ -237,8 +244,8 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `config.rs` | `carry_over_engine_progress(stored, jobs)` | UI 스냅샷 저장 시 엔진이 기록한 `last_run_unix`·`resume_cursor`를 디스크에서 되살린다 |
 | `sync/mod.rs` | `SyncControl::resume_from(path)` | 끊긴 순회를 그 상대 경로부터 이어서 시작 (앞 구간만 건너뜀) |
 | `theme.rs` | `change_theme` · `normalize_component_palette` | 테마 변경 후 스위치 트랙·썸 최소 대비 보정 |
-| `config.rs` | `update_config(edit)` | 설정 읽기-수정-쓰기 **단일 경로** |
-| `config.rs` | `data_dir` · `config_path` · `themes_path` · `logs_path` | 데이터 루트 하위 경로 계산 (`GPUI_CONVENIENCE_TOOLS_DATA_DIR`로 재지정 가능) |
+| `config/persistence.rs` | `update_config(edit)` | 동시 변경을 직렬화하고 다른 값을 보존하는 설정 읽기-수정-쓰기 **단일 경로** |
+| `config.rs`·`config/persistence.rs` | `data_dir` · `config_path` · `themes_path` · `logs_path` | 데이터 루트 하위 경로 계산 (`GPUI_CONVENIENCE_TOOLS_DATA_DIR`로 재지정 가능) |
 | `config.rs` | `default_interval_presets` · `normalize_interval_presets` | 주기 프리셋 기본값(10·30·60초)과 정규화(중복 제거·오름차순) |
 | `util.rs` | `format_interval(secs)` | 초 → `10초`·`1분`·`1분 30초`·`1시간` 표기. **모든 주기 표시는 이것만 쓴다** |
 | `util.rs` | `interval_to_secs(amount, unit)` · `TimeUnit` | 사용자 입력 (값, 단위) → 초. 범위 밖이면 보여줄 사유를 반환 |

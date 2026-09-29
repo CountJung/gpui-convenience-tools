@@ -28,7 +28,7 @@
 
 | 기능 | 설명 | 플랫폼 |
 | --- | --- | --- |
-| **웹뷰 광고 차단** | 카카오톡 등 WebView2 기반 앱의 확인된 광고 창을 0×0으로 축소하고 입력을 막는다. | Windows |
+| **웹뷰 광고 차단** | 카카오톡 등 WebView2 기반 앱의 확인된 광고 창을 0×0으로 축소하고 입력을 막는다. 카카오톡 기본 채팅창에는 별도 선택형 광고 자리 회수 모드(실험적)가 있다. | Windows |
 | **파일 동기화** | 원본 폴더를 대상 폴더로 주기적으로 복사한다. 숨김·시스템 파일 포함. | 공통 |
 | **Windows 서비스** | 설치된 Win32 서비스를 조회·시작·중지·삭제한다. | Windows |
 | **VirtualBox 디스크 탐색** | 종료된 VM의 VDI를 읽기 전용으로 탐색하고 숨김·시스템 파일을 호스트로 복사한다. | Windows 1차 |
@@ -88,6 +88,12 @@ cargo build -p gpui-convenience-tools --release  # 릴리즈
 전용 진단을 사용한다. 명시적 `Chrome_WidgetWin_1` 필터는 KakaoTalk WebView 광고 자식
 창 확인용이며, 결과의 `Visible=False`는 현재 화면에서 축소 동작을 판정할 수 없다는 뜻이다.
 
+광고 자리 회수는 **웹뷰 광고 차단** 패널의 선택 옵션이며 기본값은 꺼짐이다. 카카오톡
+기본 채팅창의 확인된 창 계층·크기가 맞을 때만 하단 광고 슬롯을 접고 목록 영역을 늘린다.
+옵션이나 차단을 끄거나 앱을 종료하면 저장한 크기로 복원을 시도한다. 현재 검증 범위와
+독립 GPUI 화면 검토의 잔여 조건은 `VERIFICATION.md`의 `AD-006`을 참조한다. 이 옵션은
+대화형 GUI 세션 전용이며 Session 0의 `--service` 모드에는 적용되지 않는다.
+
 ```powershell
 pwsh -NoProfile -File .\scripts\Verify-AdWindowState.ps1 `
   -ProcessId 26440 -IncludeChildWindows -ClassFilter Chrome_WidgetWin_1
@@ -98,7 +104,12 @@ pwsh -NoProfile -File .\scripts\Verify-AdWindowState.ps1 `
 사용자가 확인·수정하는 설정은 기본적으로 실행파일 옆 `settings.json`에 저장한다. 로그·테마·실행
 이력 같은 앱 데이터와 실행파일 옆 저장이 불가능한 경우의 fallback 설정은
 `%APPDATA%\gpui-convenience-tools\` 아래에 둔다. `GPUI_CONVENIENCE_TOOLS_DATA_DIR`가
-설정된 검증 환경에서는 해당 경로를 우선 사용한다.
+설정된 검증 환경에서는 해당 경로의 `settings.json`·`config.json`을 분리해 사용한다.
+
+앱에서 바꾼 설정(밝음/어두움 색상 모드 포함)은 변경 시 저장되고 다음 실행에서 복원된다. `settings.json`이 있으면
+구형 `config.json`보다 항상 우선한다. 구형 파일 끝의 여분 닫는 괄호는 읽기 시에만
+복구하며 원본은 보존한다. 그 밖의 손상은 덮어쓰지 않고 오류를 기록한다. 공통 저장 규칙은
+`DEVELOPMENT_GUIDE.md`의 「사용자 설정 기본 영속화」를 참조한다.
 
 ```mermaid
 flowchart TD

@@ -76,9 +76,9 @@ fn main() {
                 }
             }
 
-            if has_changes {
-                let mode = Theme::global(cx).mode;
-                theme::change_theme(mode, None, cx);
+            let restored_mode = cfg.theme_mode.unwrap_or_else(|| Theme::global(cx).mode);
+            if has_changes || cfg.theme_mode.is_some() {
+                theme::change_theme(restored_mode, None, cx);
             }
         };
 

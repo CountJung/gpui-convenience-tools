@@ -79,9 +79,12 @@ fn test_app_root(active_panel: ActivePanel) -> AppRoot {
             service_enabled: app_state.is_active,
             targets: app_state.targets,
             scan_interval_secs: 10,
+            kakao_reclaim_ad_space: false,
         })),
+        kakao_layout_state: Arc::new(Mutex::new(None)),
         subscriptions: Vec::new(),
         scan_interval_secs: 10,
+        kakao_reclaim_ad_space: false,
         sidebar_width: crate::config::DEFAULT_SIDEBAR_WIDTH,
         interval_picker: IntervalPicker {
             presets: crate::config::default_interval_presets(),

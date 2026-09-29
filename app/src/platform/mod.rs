@@ -30,6 +30,27 @@ pub(crate) enum AdWindowShowState {
     Maximized,
 }
 
+/// 카카오톡 기본 채팅창에서 회수한 하단 광고 자리의 창 크기 스냅샷.
+#[derive(Clone, Debug)]
+pub(crate) struct KakaoLayoutSnapshot {
+    pub(crate) main_window: NativeWindowHandle,
+    pub(crate) main_process_id: u32,
+    pub(crate) windows: Vec<KakaoWindowSize>,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct KakaoWindowSize {
+    pub(crate) handle: NativeWindowHandle,
+    pub(crate) process_id: u32,
+    pub(crate) class_name: String,
+    pub(crate) parent: NativeWindowHandle,
+    pub(crate) owner: NativeWindowHandle,
+    pub(crate) original_width: i32,
+    pub(crate) original_height: i32,
+    pub(crate) target_width: i32,
+    pub(crate) target_height: i32,
+}
+
 // ─────────────────────────────────────────────
 // B-1: 시스템 서비스 정보 구조체
 // ─────────────────────────────────────────────
@@ -150,6 +171,25 @@ pub trait Platform: Send + Sync {
     /// 이전에 캡처한 광고 창 상태를 복원한다.
     fn restore_ad_window_state(&self, _snapshot: &AdWindowSnapshot) -> Result<()> {
         Err(anyhow::anyhow!("광고 창 상태 복원은 지원되지 않습니다."))
+    }
+
+    fn capture_kakao_layout(
+        &self,
+        _ad_handle: NativeWindowHandle,
+    ) -> Result<Option<KakaoLayoutSnapshot>> {
+        Ok(None)
+    }
+
+    fn apply_kakao_layout(&self, _snapshot: &KakaoLayoutSnapshot) -> Result<()> {
+        Err(anyhow::anyhow!("카카오톡 광고 자리 회수는 지원되지 않습니다."))
+    }
+
+    fn is_kakao_layout_applied(&self, _snapshot: &KakaoLayoutSnapshot) -> bool {
+        false
+    }
+
+    fn restore_kakao_layout(&self, _snapshot: &KakaoLayoutSnapshot) -> Result<()> {
+        Err(anyhow::anyhow!("카카오톡 광고 자리 복원은 지원되지 않습니다."))
     }
 
     // ─── B-1: 시스템 서비스 관리 ───

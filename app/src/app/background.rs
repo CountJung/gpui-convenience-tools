@@ -15,9 +15,9 @@ use std::{
 use tokio::sync::mpsc::UnboundedSender;
 
 use super::state::{PlatformEvent, ScannerState, SyncSharedState};
-use super::AppRoot;
 use super::watch::WatchManager;
-use crate::platform::{AdWindowSnapshot, NativeWindowHandle, Platform};
+use super::AppRoot;
+use crate::platform::{AdWindowSnapshot, KakaoLayoutSnapshot, NativeWindowHandle, Platform};
 use crate::sync::{count_sync_entries, run_sync_job_with_control, SyncControl, SyncProgress};
 
 /// 진행 상황 이벤트 최소 간격.
@@ -107,7 +107,87 @@ fn discard_dead_ad_window_snapshots(
 
     for handle in dead_handles {
         collapsed_windows.remove(&handle);
-        log::info!("광고 창이 닫혀 기존 상태 스냅샷을 폐기했습니다 (HWND {:?})", handle);
+        log::info!(
+            "광고 창이 닫혀 기존 상태 스냅샷을 폐기했습니다 (HWND {:?})",
+            handle
+        );
+    }
+}
+
+/// 카카오톡 전용 레이아웃은 스캔 스레드와 앱 종료 복원이 같은 스냅샷을 공유한다.
+pub(super) fn sync_kakao_layout(
+    platform: &dyn Platform,
+    state: &Mutex<Option<KakaoLayoutSnapshot>>,
+    scanner_state: &Mutex<ScannerState>,
+    requested_enabled: bool,
+    candidates: impl IntoIterator<Item = NativeWindowHandle>,
+) {
+    let Ok(mut current) = state.lock() else {
+        log::warn!("카카오톡 광고 자리 스냅샷 잠금 실패");
+        return;
+    };
+    // UI에서 토글/종료를 누른 직후 스캔의 오래된 지역 스냅샷으로 재적용하지 않는다.
+    let enabled = requested_enabled
+        && scanner_state.lock().is_ok_and(|scanner| {
+            scanner.service_enabled
+                && scanner.kakao_reclaim_ad_space
+                && scanner.targets.iter().any(|target| {
+                    target.enabled
+                        && target.process_name.eq_ignore_ascii_case("KakaoTalk.exe")
+                        && target.ad_window_class.eq_ignore_ascii_case("Chrome_WidgetWin_1")
+                })
+        });
+    if !enabled {
+        if let Some(layout) = current.as_ref() {
+            if !platform.is_process_id_running(layout.main_process_id)
+                || !platform.is_ad_window_alive(layout.main_window)
+            {
+                *current = None;
+            } else if let Err(err) = platform.restore_kakao_layout(layout) {
+                log::warn!("카카오톡 광고 자리 복원 실패: {err}");
+            } else {
+                *current = None;
+            }
+        }
+        return;
+    }
+    if current
+        .as_ref()
+        .is_some_and(|layout| !platform.is_kakao_layout_applied(layout))
+    {
+        if let Some(layout) = current.as_ref() {
+            if !platform.is_process_id_running(layout.main_process_id)
+                || !platform.is_ad_window_alive(layout.main_window)
+            {
+                *current = None;
+            } else if let Err(err) = platform.restore_kakao_layout(layout) {
+                log::warn!("변경된 카카오톡 광고 자리 부분 복원 실패: {err}");
+                return;
+            } else {
+                *current = None;
+            }
+        }
+    }
+    if current.is_some() {
+        return;
+    }
+    for hwnd in candidates {
+        match platform.capture_kakao_layout(hwnd) {
+            Ok(Some(layout)) => match platform.apply_kakao_layout(&layout) {
+                Ok(()) => {
+                    log::info!("카카오톡 광고 자리 회수 적용 (메인 HWND {:?})", layout.main_window);
+                    *current = Some(layout);
+                    break;
+                }
+                Err(err) => {
+                    log::warn!("카카오톡 광고 자리 회수 실패 (복원 추적 유지): {err}");
+                    *current = Some(layout);
+                    break;
+                }
+            },
+            Ok(None) => {}
+            Err(err) => log::warn!("카카오톡 레이아웃 식별 실패: {err}"),
+        }
     }
 }
 
@@ -120,6 +200,7 @@ impl AppRoot {
         platform: Arc<dyn Platform>,
         event_tx: UnboundedSender<PlatformEvent>,
         scanner_state: Arc<Mutex<ScannerState>>,
+        kakao_layout_state: Arc<Mutex<Option<KakaoLayoutSnapshot>>>,
     ) {
         std::thread::spawn(move || {
             let runtime = tokio::runtime::Builder::new_current_thread()
@@ -140,9 +221,9 @@ impl AppRoot {
                         let snapshot = scanner_state
                             .lock()
                             .ok()
-                            .map(|s| (s.service_enabled, s.targets.clone(), s.scan_interval_secs));
+                            .map(|s| (s.service_enabled, s.targets.clone(), s.scan_interval_secs, s.kakao_reclaim_ad_space));
 
-                        let Some((service_enabled, targets, interval_secs)) = snapshot else {
+                        let Some((service_enabled, targets, interval_secs, reclaim_enabled)) = snapshot else {
                             tokio::time::sleep(Duration::from_secs(1)).await;
                             continue;
                         };
@@ -150,6 +231,7 @@ impl AppRoot {
                         let sleep_duration = Duration::from_secs(interval_secs.max(1) as u64);
 
                         if !service_enabled {
+                            sync_kakao_layout(platform.as_ref(), &kakao_layout_state, &scanner_state, false, []);
                             restore_collapsed_ad_windows(
                                 platform.as_ref(),
                                 &mut collapsed_windows,
@@ -165,6 +247,11 @@ impl AppRoot {
 
                         let mut any_running = false;
                         let mut candidate_windows = HashSet::new();
+                        let mut kakao_candidates = Vec::new();
+                        let kakao_target_enabled = targets.iter().any(|target| {
+                            target.enabled && target.process_name.eq_ignore_ascii_case("KakaoTalk.exe")
+                                && target.ad_window_class.eq_ignore_ascii_case("Chrome_WidgetWin_1")
+                        });
 
                         for target in targets.iter().filter(|t| t.enabled) {
                             if !platform.is_target_running(&target.process_name) {
@@ -176,7 +263,13 @@ impl AppRoot {
                             match platform
                                 .find_ad_windows(&target.process_name, &target.ad_window_class)
                             {
-                                Ok(windows) => candidate_windows.extend(windows),
+                                Ok(windows) => {
+                                    if target.process_name.eq_ignore_ascii_case("KakaoTalk.exe")
+                                        && target.ad_window_class.eq_ignore_ascii_case("Chrome_WidgetWin_1") {
+                                        kakao_candidates.extend(windows.iter().copied());
+                                    }
+                                    candidate_windows.extend(windows);
+                                }
                                 Err(err) => {
                                     log::warn!("광고 창 후보 열거 실패: {err}");
                                 }
@@ -241,6 +334,14 @@ impl AppRoot {
                                 }
                             }
                         }
+
+                        sync_kakao_layout(
+                            platform.as_ref(),
+                            &kakao_layout_state,
+                            &scanner_state,
+                            reclaim_enabled && kakao_target_enabled,
+                            kakao_candidates,
+                        );
 
                         restore_collapsed_ad_windows(
                             platform.as_ref(),
@@ -377,9 +478,7 @@ impl AppRoot {
                                 );
                             }
 
-                            if last_sent
-                                .is_some_and(|at| at.elapsed() < PROGRESS_EVENT_INTERVAL)
-                            {
+                            if last_sent.is_some_and(|at| at.elapsed() < PROGRESS_EVENT_INTERVAL) {
                                 return;
                             }
                             last_sent = Some(Instant::now());
@@ -459,5 +558,67 @@ impl AppRoot {
                 }
             }
         });
+    }
+}
+
+#[cfg(test)]
+mod kakao_tests {
+    use super::*;
+    use anyhow::{anyhow, Result};
+    use std::sync::atomic::{AtomicUsize, Ordering as AtomicOrdering};
+
+    struct RestorePlatform {
+        restores: AtomicUsize,
+        fail: bool,
+    }
+
+    impl Platform for RestorePlatform {
+        fn is_target_running(&self, _: &str) -> bool { true }
+        fn list_running_processes(&self) -> Result<Vec<String>> { Ok(Vec::new()) }
+        fn find_ad_window(&self, _: &str, _: &str) -> Result<Option<NativeWindowHandle>> { Ok(None) }
+        fn hide_ad(&self, _: NativeWindowHandle) -> Result<()> { Ok(()) }
+        fn show_ad(&self, _: NativeWindowHandle) -> Result<()> { Ok(()) }
+        fn is_process_id_running(&self, _: u32) -> bool { true }
+        fn is_ad_window_alive(&self, _: NativeWindowHandle) -> bool { true }
+        fn restore_kakao_layout(&self, _: &KakaoLayoutSnapshot) -> Result<()> {
+            self.restores.fetch_add(1, AtomicOrdering::SeqCst);
+            if self.fail { Err(anyhow!("fixture restore failure")) } else { Ok(()) }
+        }
+    }
+
+    fn snapshot() -> KakaoLayoutSnapshot {
+        KakaoLayoutSnapshot { main_window: 7, main_process_id: 42, windows: Vec::new() }
+    }
+
+    fn scanner_state() -> Mutex<ScannerState> {
+        Mutex::new(ScannerState {
+            service_enabled: true,
+            targets: vec![super::super::TargetApp {
+                process_name: "KakaoTalk.exe".to_string(),
+                display_name: "KakaoTalk".to_string(),
+                enabled: true,
+                ad_window_class: "Chrome_WidgetWin_1".to_string(),
+            }],
+            scan_interval_secs: 10,
+            kakao_reclaim_ad_space: false,
+        })
+    }
+
+    #[test]
+    fn disabled_live_switch_overrides_stale_scan_and_restores_immediately() {
+        let platform = RestorePlatform { restores: AtomicUsize::new(0), fail: false };
+        let layout = Mutex::new(Some(snapshot()));
+        sync_kakao_layout(&platform, &layout, &scanner_state(), true, []);
+        assert_eq!(platform.restores.load(AtomicOrdering::SeqCst), 1);
+        assert!(layout.lock().unwrap().is_none());
+    }
+
+    #[test]
+    fn failed_restore_keeps_snapshot_for_retry() {
+        let platform = RestorePlatform { restores: AtomicUsize::new(0), fail: true };
+        let layout = Mutex::new(Some(snapshot()));
+        sync_kakao_layout(&platform, &layout, &scanner_state(), false, []);
+        assert_eq!(platform.restores.load(AtomicOrdering::SeqCst), 1);
+        assert!(layout.lock().unwrap().is_some());
     }
 }
