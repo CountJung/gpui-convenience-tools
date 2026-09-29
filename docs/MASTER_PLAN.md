@@ -774,7 +774,7 @@ NTFS 오인 방지도 고정했다. 캡처는 `vde017-unsupported-partition-rele
 `cargo check --locked`, 일반 Clippy exit 0, 변경 파일 rustfmt와 `git diff --check`로 수행했다.
 GPUI 파일 행·키보드·복사 UI의 실제 이미지 E2E는 VDE-019의 범위로 남긴다.
 
-### Phase O-18 — VDE-021 실행 중 VM 백엔드 설계 경계 확정
+### Phase O-18 — VDE-021 실행 중 VM 백엔드 검토안 기록 (미채택)
 
 실행 중 VM 지원을 오프라인 VDI 경로와 분리하는 설계 정본을 `docs/VIRTUAL_DISK_BACKENDS.md`에
 추가했다. `VBoxManage guestcontrol`은 VM UUID/이름 기반의 별도 어댑터에서만 사용하며,
@@ -785,8 +785,9 @@ GPUI 파일 행·키보드·복사 UI의 실제 이미지 E2E는 VDE-019의 범�
 Oracle 공식 7.1/7.2 문서와 현재 소스의 `GuestFileSource` 계약을 대조해 설계를 작성했으며,
 검토 머신의 PATH에는 `VBoxManage.exe`가 없었지만 `C:\Program Files\Oracle\VirtualBox\VBoxManage.exe`
 설치본을 환경 변수로 주입해 오프라인 VDI의 실행 중 VM 가드를 확인했다. Guest Additions·테스트
-VM·credential 주입이 없어 실제 Guest Control 동작은 검증하지 않았으며, 이 설계를 구현 완료로
-승격하지 않는다.
+VM·credential 주입이 없어 실제 Guest Control 동작은 검증하지 않았다. 2026-09-29 사용자
+결정으로 실행 중 VM 파일 접근 자체를 범위에서 제외했다. 당시 검토안은
+`VIRTUAL_DISK_BACKENDS.md`에 미채택 이력으로만 남긴다.
 
 ### Phase O-19 — VDE-019 격리 합성 VDI 릴리스 검증 보강 진행 중
 
@@ -1119,12 +1120,12 @@ flowchart TD
 - 숨김·시스템·읽기 전용 파일을 목록에서 누락하지 않고, 복사 실패는 항목별 사유와 함께
   토스트/로그에 남긴다
 - 경로 탈출, 예약 이름, 심볼릭 링크·리파스 포인트 추적을 차단하고 대상 폴더에만 쓴다
-- Windows 게스트 NTFS를 1차 대상으로 하며, ext4와 실행 중 VM의 `VBoxManage guestcontrol`
-  백엔드는 오프라인 경로가 안정화된 후 별도 단계로 검토한다
+- Windows 게스트 NTFS를 1차 대상으로 하며, ext4는 별도 후속 범위다. 실행 중 VM 파일
+  접근은 Guest Control을 포함해 지원하지 않는다
 
-세부 오프라인 작업은 `TODO.md`의 Phase O-2~O-5에서 추적한다. `VDE-021`의 실행 중 VM
-Guest Control은 O-6 선택 후속이며 오프라인 완료의 선행 조건이 아니다. `VDE-001`·`VDE-002`의
-결정은 위의 Phase O-1 완료 기록을 정본으로 한다.
+세부 오프라인 작업은 `TODO.md`의 O-2~O-5에서 추적한다. TODO의 실행 중 VM 후속
+구획(O-6)은 사용자 결정으로 종료했다. 이는 위의 과거 완료 이력 `Phase O-6`(NTFS 탐색)과
+다르다. `VDE-001`·`VDE-002`의 결정은 위의 Phase O-1 완료 기록을 정본으로 한다.
 
 ### Phase D — 파일 동기화 고도화 🗓
 

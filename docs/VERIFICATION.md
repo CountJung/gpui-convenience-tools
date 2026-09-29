@@ -124,6 +124,44 @@ SHA-256을 기록한다. 다른 검증자의 독립 검토가 요구되는 UI �
 게이트가 모두 끝난 뒤다. 완료 결과는 `MASTER_PLAN.md`에 한 번 기록하고, 테스트 이름·명령·
 캡처 경로·커밋을 중복해서 여러 문서에 복사하지 않고 이 문서의 증거 칸에서 참조한다.
 
+## 2026-09-29 Phase O 격리 E2E 보강
+
+Windows Codex의 `CLAUDE_LOCAL` 하네스를 사용했다. 사용자 앱 PID 44832는 그대로 두고,
+실행 중임을 읽기 전용 상태 조회로 확인한 `TACS` VM의 VDI는 열지 않았다. 이미 있는
+VirtualBox 생성 5 MiB 합성 NTFS VDI를 `-SeedVdi`로 작업별 임시 루트에 복사했다.
+릴리즈 바이너리 SHA-256은 `67D9F1F6F219F2327427D3447A98B8E9EAE7D11B09B66202257480987667F80F`다.
+`cargo test -p gpui-convenience-tools --locked virtual_disk` 결과는 81 passed·3 ignored였다.
+
+- `VDE-024`·`VDE-019`: 1200×900 초기 캡처 `phase-o-offline-initial-20260929-160012.png`에서
+  루트 트리·파일 목록과 숨김/시스템 폴더를 확인했다. `-InitialGuestPath '$Extend'` 캡처
+  `phase-o-subfolder-20260929-160715.png`에서는 현재 경로가 `$Extend`로 바뀌고 그 자식
+  `$ObjId`가 표시됐다. 이는 시작 상태를 주입한 E2E이며 실제 트리 클릭 증거는 아니다.
+- `VDE-012`·`VDE-015`·`VDE-019`: `-AutoCopyVdi` 격리 릴리즈 캡처
+  `phase-o-offline-autocopy-20260929-160303.png`에 `완료 · 파일 17개 · 915.3 KB · 실패 1`과
+  손상 `many_subdirs` 사유가 표시됐다. 격리 대상 실제 파일은 17개·937,234바이트였고
+  13개가 숨김 또는 시스템 속성이었다. 실제 오류 억제 버튼 클릭·자연 속도 대용량 중지
+  조작은 수행하지 않았다.
+- `VDE-017`: 합성 미지원 파티션 VDI 캡처
+  `phase-o-unsupported-20260929-160842.png`에서 NTFS 3.1만 지원한다는 오류·파티션
+  경고를 확인했다. 실행 중 VM 판정은 자동 테스트
+  `detects_a_running_vm_disk_from_machine_readable_info`로만 확인했고 실제 VM의 VDI를
+  열어 보는 E2E는 사용자 결정에 따라 적용하지 않는다.
+
+각 `Start`의 `launchFocusRestore`는 `skipped-focus-changed`였으므로 전역 Click/Key/Drag는
+보내지 않았다. 따라서 `VDE-012`·`VDE-014`·`VDE-016`·`VDE-023`·`VDE-025`의 실제 입력
+게이트는 그대로 남는다. 네 구현 검증 세션은 각각 `Stop` 후 임시 루트 제거를 확인했다.
+
+독립 Visual Reviewer도 같은 SHA-256 릴리즈를 다른 격리 세션으로 시작해 GPUI 관련
+테스트 70 passed·3 ignored를 재실행했다. 자체 첫 캡처
+`independent-vde019-root-first-1200x900-161356.png`에서 NTFS 3.1·숨김/시스템 항목과
+트리/목록 경계, `independent-vde019-extend-1200x900-161439.png`에서 `$Extend` 자식
+`$ObjId`, `independent-vde019-autocopy-1200x900-161718.png`에서 복사 17개·실패 1건을
+독립적으로 재확인했다. 대상 실제 파일은 17개·937,234바이트였고 구현 검증과 불일치는 없었다.
+그러나 세션의 `launchFocusRestore: failed`와 사용자 작업 상태 불확실성 때문에 전역 입력을
+보내지 않았으므로 종합 판정은 `BLOCKED(input)`이다. 실제 클릭·키보드·버튼 동작의 독립
+검증을 `PASS`로 승격하지 않는다. 검토자의 세 세션은 모두 `Stop`으로 정리했고 사용자 앱
+PID 44832는 유지됐다.
+
 ## 작업별 체크 매트릭스
 
 `TODO.md`의 모든 활성 ID는 이 표에 정확히 한 번 있어야 한다. `—`는 작업 성격상 해당
@@ -142,7 +180,6 @@ SHA-256을 기록한다. 다른 검증자의 독립 검토가 요구되는 UI �
 | VDE-016 | GPUI | [x] | [x] | [x] | [x] | [x] | [ ] | `cargo check -p gpui-convenience-tools --locked`; 최신 전체 `cargo test --all-targets --all-features --locked` 160 passed·4 ignored; `virtual_disk_panel_dispatches_explorer_shortcuts_when_directory_is_focused`와 선택 집합·단일 폴더 진입 단위 테스트; 릴리즈 `CLAUDE_LOCAL` 920×700·1000×700·1280×700 캡처 `target/visual-validation/captures/vde016-fixed-920-205304.png`, `vde016-fixed-1000-205250.png`, `vde016-fixed-1280-205319.png`; 실제 표준 VDI `-SelectAllVdi` 시드 캡처 `target/visual-validation/captures/vde019-vbox-select-all-seed-025058.png`에서 16개 선택 확인; `Key Ctrl+A`는 기본 포커스 전환·UI Automation `SetFocus`·`SetWindowPos` 시도 후에도 foreground 안전 차단으로 입력을 보내지 않아 외부 키보드 E2E와 독립 Visual Reviewer는 잔여 |
 | VDE-017 | GPUI | [x] | [x] | [x] | [x] | [x] | [ ] | `cargo check -p gpui-convenience-tools --locked`; 최신 전체 `cargo test --all-targets --all-features --locked` 160 passed·4 ignored; 실행 중 VM 오류·미지원 파일시스템 메시지 단위 테스트, `reads_unsupported_partition_fixture_without_claiming_ntfs`, `exports_unsupported_partition_vdi_fixture_when_requested`, `virtual_disk_panel_explains_unsupported_partition_state` GPUI 렌더 테스트; 미지원 MBR 파티션 VDI를 최신 release 앱에 주입해 `vde017-unsupported-partition-release-fixed-033450.png`에서 `지원하지 않는 파일시스템` 오류 카드와 `미지원/미확인 파일시스템` 파티션 경고를 확인; 읽기 전용 `VBoxManage list runningvms`가 비어 있고 TACS `VMState=poweroff`여서 실행 중 VM E2E는 미수행; 세션 정리 후 프로세스 0·세션 루트 0; 독립 Visual Reviewer는 후속 |
 | VDE-019 | E2E | [x] | [x] | [x] | [ ] | [x] | [x] | `cargo check -p gpui-convenience-tools --locked`; 최신 전체 `cargo test --all-targets --all-features --locked` 160 passed·4 ignored, VDI 집중 60 passed·2 ignored; 표준 VDI 헤더 오프셋 수정 후 VirtualBox 7.2.14 `convertfromraw` 생성 VDI(`Storage format: VDI`, `State: created`)를 `GPUI_CONVENIENCE_TOOLS_VBOXMANAGE` 환경 변수와 함께 격리 릴리스 앱에 주입; 숨김/시스템 항목 17개·937,234바이트 복사와 `many_subdirs` 손상 사유 확인; 최신 release 1200×1000 캡처 `target/visual-validation/captures/continuation-vde019-current-release-040648.png`에서 숨김/시스템 행과 17개·915.3KB·실패 1건 요약을 재확인; 이번 구현 세션에서도 1200×1000 `target/visual-validation/captures/continuation-current-vde019-1200x1000-052717.png`와 920×700 `target/visual-validation/captures/continuation-current-vde019-920x700-052734.png`를 캡처해 안전 경계·NTFS 3.1·숨김/시스템 행·16개 선택과 compact 폭 경계를 확인; 선택 전 `0개 선택` 캡처와 `-SelectAllVdi` 후 `16개 선택` 캡처 `target/visual-validation/captures/vde019-vbox-key-before-024822.png`, `vde019-vbox-select-all-seed-025058.png`; 기본 포커스 전환·UI Automation `SetFocus`·`SetWindowPos` 모두 foreground를 바꾸지 못해 `Key Ctrl+A`는 안전 차단으로 미검증; 세션 종료 후 `PROCESS_COUNT=0`·`SESSION_COUNT=0`·대상 루트 삭제; 이번 캡처는 구현 세션 증거이며 외부 키보드·실제 릴리스 오류 억제 버튼 클릭·독립 Visual Reviewer는 잔여; commits `87937dc`, `bed5914` |
-| VDE-021 | DECISION | — | — | — | — | [x] | [x] | `VIRTUAL_DISK_BACKENDS.md`의 분리 설계는 commit `28dc516`으로 완료. 이 행의 체크는 설계 문서에만 해당한다. Guest Control 채택 결정·어댑터 구현·실행 검증은 미완료이며 오프라인 Phase O의 선행 조건이 아니다. 읽기 전용 `VBoxManage list runningvms`는 비어 있고 TACS `VMState=poweroff`; Guest Additions·격리 VM·credential 주입 근거 없음. |
 | E-001 | E2E | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | — |
 | E-002 | E2E | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | — |
 | E-003 | E2E | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | — |
@@ -186,6 +223,7 @@ G-003의 실제 divider 드래그 경로는 검증 하네스에 `-Action Drag -X
 | ID | 프로필 | B | T | E | V | R | C | 증거 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | AD-006 | E2E | [x] | [x] | [x] | [x] | [x] | [x] | `kakao_layout.rs`의 창 계층·크기 지문 및 6개 HWND 적용/역순 복원, GPUI 경계 테스트와 전체 199 passed·7 ignored, 릴리즈 빌드·Clippy `-D warnings` 통과(기존 기록). 실제 KakaoTalk 전후 캡처 `target/visual-validation/captures/ad006-before.png`·`target/visual-validation/captures/ad006-reclaimed.png`와 사용자 실기기 확인을 근거로 Phase A 종료. 독립 Visual Reviewer 세션은 수행하지 않았고, 이번 사용자 직접 수용을 V 게이트의 명시적 예외로 기록한다. 새 데스크톱 테스트를 수행했다는 뜻이 아니다. |
+| VDE-021 | DECISION | — | — | — | — | [x] | [x] | 2026-09-29 사용자 결정: 실행 중 VM 파일 접근은 VDI 직접 읽기와 `VBoxManage guestcontrol` 모두 구현하지 않는다. O-6을 종료했고, 과거 분리 설계(commit `28dc516`)는 `VIRTUAL_DISK_BACKENDS.md`에 미채택 이력으로 보존한다. 실행 중 VM 파일을 검증용으로 열거나 Guest Control E2E를 수행하지 않았다. |
 | C-001 | E2E | [x] | [x] | [x] | [x] | [x] | [x] | 실행파일 옆 `settings.json` 우선 경로·구버전 AppData `config.json` fallback·`GPUI_CONVENIENCE_TOOLS_DATA_DIR` 격리 경계와 `VirtualDiskConfig` 왕복을 구현; 정상 실행 경로가 실행파일 옆 `settings.json`을 가리키는 회귀 테스트와 설정 테스트 전용 환경 잠금 추가; GPUI `settings_page_keeps_user_config_actions_inside_the_card` 통과; 설정 화면에 현재 경로·`설정 저장`·`파일 위치 열기`를 추가했고 창 닫기/Drop 저장 경계를 연결; 전체 167 passed·4 ignored, Clippy `-D warnings` 통과, `DOCS_VERIFIED active=28 matrix=28`, `STRUCTURE_VERIFIED files=56 lines=22003 max=920 path=app/src/config.rs warnings=4`; release 설정 화면 1000×700 `target/visual-validation/captures/c001-settings-1000x700-111818.png`, 920×700 `c001-settings-920x700-111840.png`, VDI 입력 복원 `c001-vdi-restored-1000x700-112034.png`; commit `1d7b972` push 완료 |
 | AD-001 | RUST | [x] | [x] | — | — | [x] | [x] | `platform::windows::window_ops::tests` 3개 통과; `cargo check --locked` 통과; 최상위 소유/도구 팝업만 후보화, 상태 저장·0×0 동작은 후속 AD-002·AD-003 |
 | AD-002 | RUST | [x] | [x] | — | — | [x] | [x] | `window_ops::tests` 5개 통과; `cargo check --locked`; `Verify-AdWindowState.ps1 -ProcessId 26440`로 KakaoTalk/WebView2 관련 PID·창 상태를 읽기 전용 확인; 실제 사용자 창 조작은 수행하지 않음 |

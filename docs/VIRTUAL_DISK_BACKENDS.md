@@ -1,10 +1,21 @@
-# VirtualBox 백엔드 설계 경계
+# VirtualBox 파일 접근 결정
 
-이 문서는 `VDE-021`의 설계 검토 결과를 기록한다. 이 문서가 있다고 해서 실행 중 VM
-접근을 앱에서 활성화하지 않는다. 필수 경로는 종료된 VM의 오프라인 VDI read-only
-탐색이며, 실행 중 VM은 별도 백엔드와 별도 검증 게이트를 거쳐야 한다.
+## 현재 결정 — 2026-09-29
 
-## 결정 요약
+- 파일 탐색·복사는 **종료된 VM의 오프라인 VDI 읽기 전용 경로만** 지원한다.
+- 실행 중 VM의 VDI를 직접 읽지 않으며, `VBoxManage guestcontrol`로 실행 중 VM의 파일을
+  열거하거나 호스트로 복사하는 기능도 구현하지 않는다.
+- 실행 중 VM 또는 잠금 상태를 발견하면 기존 안전 가드가 접근을 거부하고 사유를 안내한다.
+  가드 검증은 합성 fixture·모의 상태로 수행하며, 실행 중인 실제 VM의 VDI를 검증용으로 열지 않는다.
+- `VDE-021`의 Guest Control 설계는 검토 이력으로만 남긴다. O-6 구현 대기열은 종료한다.
+  향후 범위 변경은 새 사용자 결정과 별도 작업 ID가 있어야 한다.
+
+## 이전 검토안 — 미채택 기록
+
+아래의 Guest Control 어댑터·명령 계약·구현 순서는 2026-09-22 검토안이다. 현재 구현 계획이나
+허용 작업이 아니며, 위 현재 결정이 우선한다.
+
+### 당시 설계 요약
 
 - 오프라인 `VdiReader`·NTFS 경로는 기본값으로 유지한다.
 - 실행 중 VM은 VDI 파일 경로를 열지 않고 VM UUID 또는 이름으로만 접근한다.
@@ -18,7 +29,7 @@
 - `copyto`, `mkdir`, `rm`, `rmdir`, `mv`는 이 앱의 실행 중 VM 읽기 기능에서 호출하지 않는다.
   게스트에서 호스트로 가져오는 `copyfrom`만 허용한다.
 
-## 실제 VDI 진단 결과
+### 실제 VDI 진단 결과
 
 2026-09-22 현재 `D:\VMMachine\win11\TACS\TACS_1.vdi`는 `VBoxManage showmediuminfo`에서
 `VDI normal (base)`, `dynamic default`, `Encryption: disabled`로 확인됐다. 부모 VDI가
@@ -41,7 +52,7 @@ flowchart TD
 BitLocker 복구 키를 앱에 저장하거나 암호화를 우회하지 않으며, 파일을 복사하려면
 복호화된 NTFS VDI 또는 별도 잠금 해제·검증 경로가 필요하다.
 
-## 백엔드 분리
+### 백엔드 분리 검토안
 
 ```mermaid
 flowchart TD
@@ -61,7 +72,7 @@ flowchart TD
 오류 경계는 섞지 않는다. 실행 중 VM 모드에서 VDI 경로 입력을 받거나 `VdiReader`를
 재사용하는 것은 설계 위반이다.
 
-## 공식 명령 계약과 사용 범위
+### 공식 명령 계약 검토안
 
 Oracle VirtualBox 7.1/7.2 문서의 `VBoxManage guestcontrol` 계약을 기준으로 한다.
 버전에 따라 옵션 표기가 달라질 수 있으므로 구현 시 설치된 `VBoxManage --version`과
@@ -81,7 +92,7 @@ Oracle VirtualBox 7.1/7.2 문서의 `VBoxManage guestcontrol` 계약을 기준�
 - [Oracle VirtualBox 7.1 VBoxManage](https://docs.oracle.com/en/virtualization/virtualbox/7.1/user/vboxmanage.html)
 - [Oracle VirtualBox 7.2 User Guide](https://docs.oracle.com/en/virtualization/virtualbox/7.2/user/EN-VBOX-7-2-USER.pdf)
 
-## 안전·오류 경계
+### 안전·오류 경계 검토안
 
 1. 시작 전에 `VBoxManage` 경로가 정규 파일인지, 버전 조회가 성공하는지 확인한다.
 2. VM UUID/이름은 사용자가 선택한 값으로 제한하고, 명령 인자에 쉘 문법을 해석시키지
@@ -97,7 +108,7 @@ Oracle VirtualBox 7.1/7.2 문서의 `VBoxManage guestcontrol` 계약을 기준�
 7. 숨김/시스템 속성·타임스탬프 적용 결과는 기존 `MetadataFailure`와 같은 구조화된
    결과로 수집하고, 적용하지 못한 항목만 토스트·로그 억제 키에 전달한다.
 
-## 구현 순서와 차단 조건
+### 구현 순서와 차단 조건 검토안
 
 ```mermaid
 flowchart LR
@@ -109,8 +120,8 @@ flowchart LR
     prereq["VDE-019 실제 패널·복사 E2E\nVDE-020 문서 완료"] -.-> live
 ```
 
-다음 구현 작업은 이 문서의 설계만으로 자동 착수하지 않는다. 아래 조건이 모두 충족된
-뒤 별도 작업 ID를 발급한다.
+당시에는 아래 조건을 충족한 뒤 별도 작업 ID를 발급하려 했다. 현재는 앞의 미채택 결정으로
+이 구현 순서를 진행하지 않는다.
 
 - VDE-019의 실제 VirtualBox 패널 캡처와 복사 대상 E2E가 완료됨
 - VDE-020의 `PROJECT_MAP.md`·`MASTER_PLAN.md` 정합성 검토가 완료됨
