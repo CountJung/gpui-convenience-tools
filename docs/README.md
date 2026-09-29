@@ -36,7 +36,7 @@
 부가 요소로 대시보드, 자동 시작 등록(작업 스케줄러), 롤링 파일 로그, 21종 테마를 제공한다.
 
 > VirtualBox 디스크 탐색은 `MASTER_PLAN.md`의 Phase O-1 결정 완료 후
-> `TODO.md`의 `VDE-003`~`VDE-021` 단계로 구현 중이며, 현재 오프라인 VDI 1.1
+> `TODO.md`의 Phase O 오프라인 단계로 구현 중이며, 현재 오프라인 VDI 1.1
 > read-only 블록 리더·VDE-005 안전 가드·VDE-006 MBR/GPT 파티션 검색·VDE-007~008 NTFS 읽기 전용 탐색·오류 경계·VDE-009 호스트 경로 안전 매핑·VDE-010 청크 복사·VDE-011 메타데이터 적용·VDE-012 오류 수집 도메인 경계·VDE-013 탐색기 셸과 파티션 연결·VDE-014 목록 행 선택과 폴더 이동·VDE-015 대상 폴더 복사·VDE-016 탐색기 키보드 단축키·VDE-017 안전 상태 안내·VDE-018 고정 NTFS/합성 VDI 통합 검증·VDE-019 GPUI 목록/복사 상태 테스트까지 구현 중이다. 실제 VirtualBox 패널 캡처·복사 대상 E2E·독립 Visual Reviewer 확인은 VDE-019 잔여 범위다. `VBoxManage` 실행 중 VM 경로
 > 대조를 사용하려면 `GPUI_CONVENIENCE_TOOLS_VBOXMANAGE`에 실행 파일 경로를 지정한다.
 > 실행 중인 VM의 VDI를 직접 읽는 기능은 기본 경로로 제공하지 않으며, 오프라인 읽기 전용
@@ -90,8 +90,8 @@ cargo build -p gpui-convenience-tools --release  # 릴리즈
 
 광고 자리 회수는 **웹뷰 광고 차단** 패널의 선택 옵션이며 기본값은 꺼짐이다. 카카오톡
 기본 채팅창의 확인된 창 계층·크기가 맞을 때만 하단 광고 슬롯을 접고 목록 영역을 늘린다.
-옵션이나 차단을 끄거나 앱을 종료하면 저장한 크기로 복원을 시도한다. 현재 검증 범위와
-독립 GPUI 화면 검토의 잔여 조건은 `VERIFICATION.md`의 `AD-006`을 참조한다. 이 옵션은
+옵션이나 차단을 끄거나 앱을 종료하면 저장한 크기로 복원을 시도한다. 사용자 실기기 확인과
+검증 범위는 `VERIFICATION.md`의 `AD-006` 완료 기록을 참조한다. 이 옵션은
 대화형 GUI 세션 전용이며 Session 0의 `--service` 모드에는 적용되지 않는다.
 
 ```powershell
