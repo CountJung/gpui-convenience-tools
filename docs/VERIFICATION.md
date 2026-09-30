@@ -258,6 +258,10 @@ pwsh -NoProfile -File scripts/Test-VdiSafetyE2E.ps1 -Action Stop -SessionPath <s
 `DOCS_VERIFIED active=12 matrix=12`, 구조 assertion과 `git diff --check`를 통과했다.
 새 제품 코드 변경이 없어 사용자 앱 종료·릴리즈 재빌드는 수행하지 않았다.
 
+읽기 전용 Code Reviewer의 안전 코드·문서 정합성 검토를 통과했다. 검증 도구·증거 및
+선택 범위 변경은 커밋 `f91dc66`으로 `origin/main`까지 푸시했고 로컬/원격 해시 일치를
+확인한 뒤 아래 C 게이트를 체크했다. 리뷰어의 새 실제 UI 재현을 주장하지 않는다.
+
 ## 작업별 체크 매트릭스
 
 `TODO.md`의 모든 활성 ID는 이 표에 정확히 한 번 있어야 한다. `—`는 작업 성격상 해당
@@ -311,11 +315,11 @@ G-003의 실제 divider 드래그 경로는 검증 하네스에 `-Action Drag -X
 
 | ID | 프로필 | B | T | E | V | R | C | 증거 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| VDE-017 | E2E | [x] | [x] | [x] | [x] | [x] | [ ] | 2026-09-30 실행 중 VM 모의 응답·조회 실패·잠금 표식 3개 실제 릴리즈 차단 화면과 원본 불변/조회 trace를 확인. 위 O-5 증거 참조. 실제 실행 중 VM 디스크는 열지 않음. 관련 자동 테스트 81 passed·3 ignored. |
-| VDE-025 | E2E | [x] | [x] | — | [x] | [x] | [ ] | 컬럼 폭 보정·설정 round-trip·조절 버튼·bounds 테스트와 기존 릴리즈 캡처 통과. `virtual_disk_tree_width_setting_is_clamped_and_persisted`는 setter 호출이며 저장 비활성 상태라 drag 저장의 증거가 아님. 선택 보강: GPUI drag/mouse-up→설정 저장·재로드와 새 화면 폭 복원 단언.  2026-09-30 사용자 요청으로 추가 검증을 필수 범위에서 제외. 미수행을 PASS로 표시하지 않음. |
-| VDE-014 | GPUI | [x] | [x] | — | [x] | [x] | [ ] | 기존 더블클릭 폴더 진입 GPUI 이벤트·단순/Ctrl 선택과 Shift 선택 헬퍼 테스트 통과. 선택 보강: modifier가 있는 실제 GPUI 행 이벤트의 선택 집합과 상위 버튼 경로·목록 단언. 외부 키보드 반복 검증은 요건에서 제외.  2026-09-30 사용자 요청으로 추가 검증을 필수 범위에서 제외. 미수행을 PASS로 표시하지 않음. |
-| VDE-015 | GPUI | [x] | [x] | — | [x] | [x] | [ ] | 청크 취소·부분 파일 정리 자동 테스트, 실제 합성 VDI 복사와 제어된 취소 증거는 기존 기록 참조. 선택 보강: 대상 입력→시작/중지 버튼의 작업·취소 상태 자동 단언 및 대상 폴더 대화상자 선택/취소 1회. 자연 속도 초대형 파일 검증은 불필요.  2026-09-30 사용자 요청으로 추가 검증을 필수 범위에서 제외. 미수행을 PASS로 표시하지 않음. |
-| VDE-016 | GPUI | [x] | [x] | — | [x] | [x] | [ ] | Ctrl+A 선택은 GPUI 결과 단언으로 검증됨. 기존 종합 단축키 테스트는 빈 화면의 요소 존재만 확인한다. 선택 보강: 로드된 목록의 Enter/Backspace/F5/Ctrl+C 결과 및 입력창 포커스 시 비작동 단언.  2026-09-30 사용자 요청으로 추가 검증을 필수 범위에서 제외. 미수행을 PASS로 표시하지 않음. |
+| VDE-017 | E2E | [x] | [x] | [x] | [x] | [x] | [x] | 2026-09-30 실행 중 VM 모의 응답·조회 실패·잠금 표식 3개 실제 릴리즈 차단 화면과 원본 불변/조회 trace를 확인. 위 O-5 증거 참조. 실제 실행 중 VM 디스크는 열지 않음. 관련 자동 테스트 81 passed·3 ignored. |
+| VDE-025 | E2E | [x] | [x] | — | [x] | [x] | [x] | 컬럼 폭 보정·설정 round-trip·조절 버튼·bounds 테스트와 기존 릴리즈 캡처 통과. `virtual_disk_tree_width_setting_is_clamped_and_persisted`는 setter 호출이며 저장 비활성 상태라 drag 저장의 증거가 아님. 선택 보강: GPUI drag/mouse-up→설정 저장·재로드와 새 화면 폭 복원 단언.  2026-09-30 사용자 요청으로 추가 검증을 필수 범위에서 제외. 미수행을 PASS로 표시하지 않음. |
+| VDE-014 | GPUI | [x] | [x] | — | [x] | [x] | [x] | 기존 더블클릭 폴더 진입 GPUI 이벤트·단순/Ctrl 선택과 Shift 선택 헬퍼 테스트 통과. 선택 보강: modifier가 있는 실제 GPUI 행 이벤트의 선택 집합과 상위 버튼 경로·목록 단언. 외부 키보드 반복 검증은 요건에서 제외.  2026-09-30 사용자 요청으로 추가 검증을 필수 범위에서 제외. 미수행을 PASS로 표시하지 않음. |
+| VDE-015 | GPUI | [x] | [x] | — | [x] | [x] | [x] | 청크 취소·부분 파일 정리 자동 테스트, 실제 합성 VDI 복사와 제어된 취소 증거는 기존 기록 참조. 선택 보강: 대상 입력→시작/중지 버튼의 작업·취소 상태 자동 단언 및 대상 폴더 대화상자 선택/취소 1회. 자연 속도 초대형 파일 검증은 불필요.  2026-09-30 사용자 요청으로 추가 검증을 필수 범위에서 제외. 미수행을 PASS로 표시하지 않음. |
+| VDE-016 | GPUI | [x] | [x] | — | [x] | [x] | [x] | Ctrl+A 선택은 GPUI 결과 단언으로 검증됨. 기존 종합 단축키 테스트는 빈 화면의 요소 존재만 확인한다. 선택 보강: 로드된 목록의 Enter/Backspace/F5/Ctrl+C 결과 및 입력창 포커스 시 비작동 단언.  2026-09-30 사용자 요청으로 추가 검증을 필수 범위에서 제외. 미수행을 PASS로 표시하지 않음. |
 | G-001 | E2E | [x] | [x] | [x] | [x] | [x] | [x] | `ButtonStyle` 기본값 통일 및 개별 덮어쓰기 제거; 검증 전용 `-InitialPanel`로 패널 전환 입력을 격리 실행에 주입; `cargo check -p gpui-convenience-tools --locked`; 관련 GPUI 테스트 `ad_block_cards_contain_long_content_at_supported_widths`, `service_rows_keep_names_readable_at_supported_window_widths`, `file_sync_sections_share_one_width_at_every_window_width`; 전체 테스트 145 passed·4 ignored; Clippy exit 0(기존 경고 7건); 격리 release 파일 동기화 캡처 `target/visual-validation/captures/g001-file-sync-013019.png`와 자동 시작 캡처 `target/visual-validation/captures/g001-auto-start-013004.png`에서 두 화면과 공용 버튼 스타일 확인, processCount=0·sessionCount=0; 2026-09-30 기존 bounds·릴리즈 화면 증거와 읽기 전용 코드 리뷰로 완료 재판정(새 UI 실행 아님); commits `0d7bf25` 및 후속 검증 경로 커밋 push 완료 |
 | VDE-024 | E2E | [x] | [x] | [x] | [x] | [x] | [x] | 지연 로딩 `GuestDirectoryTreeNode`와 좌우 `balanced_split` 탐색 영역을 추가해 폴더 트리 선택으로 중첩 경로를 바로 열고, 목록 행 높이·열 폭·탐색 카드 높이를 컴팩트하게 조정; `virtual_disk_folder_tree_navigates_nested_paths_without_repeated_list_clicks`, `virtual_disk_explorer_keeps_tree_and_file_list_inside_compact_card`와 전체 169 passed·4 ignored, Clippy `-D warnings` 통과; `Verify-Workspace.ps1` 필수 GPUI 테스트 29개 이름 검증; release 캡처 `target/visual-validation/captures/vde024-tree-920x700-121233.png`, `vde024-tree-1000x700-121200.png`, `vde024-tree-1280x900-121234.png`; 실제 트리 Click은 하네스 좌표 변환으로 상태 전환을 확정하지 않아 GPUI 이벤트 테스트로 대체, commit `4af7cc6` push 완료; 2026-09-30 새 기준으로 완료: 실제 GPUI 트리 클릭→직계 경로/목록 단언과 기존 캡처가 충분 |
 | VDE-022 | RUST | [x] | [x] | [x] | [x] | [x] | [x] | 실제 `D:\VMMachine\win11\TACS\TACS_1.vdi`를 읽기 전용으로 대조해 `VDI normal (base)`, `dynamic default`, GPT 1번 MSR, 2번 `-FVE-FS-` BitLocker를 확인; `classifies_bitlocker_and_microsoft_reserved_partitions_explicitly`, `encrypted_partition_error_explains_the_offline_boundary`, 전체 테스트 163 passed·4 ignored, release 캡처 `target/visual-validation/captures/vde022-final-095347.png`에서 MSR·BitLocker 라벨과 안내를 확인; commit `6b89a09` push 완료; 2026-09-30 새 기준으로 완료: 분류·안내 자동 테스트와 기존 릴리즈 화면 확인이 충분 |
