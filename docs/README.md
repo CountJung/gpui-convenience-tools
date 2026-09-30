@@ -35,10 +35,11 @@
 
 부가 요소로 대시보드, 자동 시작 등록(작업 스케줄러), 롤링 파일 로그, 21종 테마를 제공한다.
 
-> VirtualBox 디스크 탐색은 `MASTER_PLAN.md`의 Phase O-1 결정 완료 후
-> `TODO.md`의 Phase O 오프라인 단계로 구현 중이며, 현재 오프라인 VDI 1.1
-> read-only 블록 리더·VDE-005 안전 가드·VDE-006 MBR/GPT 파티션 검색·VDE-007~008 NTFS 읽기 전용 탐색·오류 경계·VDE-009 호스트 경로 안전 매핑·VDE-010 청크 복사·VDE-011 메타데이터 적용·VDE-012 오류 수집 도메인 경계·VDE-013 탐색기 셸과 파티션 연결·VDE-014 목록 행 선택과 폴더 이동·VDE-015 대상 폴더 복사·VDE-016 탐색기 키보드 단축키·VDE-017 안전 상태 안내·VDE-018 고정 NTFS/합성 VDI 통합 검증·VDE-019 GPUI 목록/복사 상태 테스트까지 구현 중이다. 실제 VirtualBox 패널 캡처·복사 대상 E2E·독립 Visual Reviewer 확인은 VDE-019 잔여 범위다. `VBoxManage` 실행 중 VM 경로
-> 대조를 사용하려면 `GPUI_CONVENIENCE_TOOLS_VBOXMANAGE`에 실행 파일 경로를 지정한다.
+> VirtualBox 디스크 탐색은 종료된 VM의 오프라인 VDI 1.1을 읽기 전용으로 탐색하며,
+> 현재 NTFS 3.1·숨김/시스템 항목 표시·호스트 복사를 지원한다. MSR·BitLocker는
+> 탐색 지원 대상이 아니며 사유를 안내한다. 구현 및 남은 검증은 `TODO.md`의 Phase O,
+> 확인한 증거는 `VERIFICATION.md`를 참조한다.
+> `VBoxManage` 실행 중 VM 경로 대조는 `GPUI_CONVENIENCE_TOOLS_VBOXMANAGE`로 지정한다.
 > 실행 중 VM의 파일은 VDI 직접 읽기와 Guest Control 방식 모두 접근하지 않는다.
 > 결정과 과거 검토 이력은 `VIRTUAL_DISK_BACKENDS.md`에 기록한다.
 

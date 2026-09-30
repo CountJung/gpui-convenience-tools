@@ -7,19 +7,18 @@
 
 ## 현재 E2E 경로
 
-이 저장소에는 Playwright·브라우저용 E2E 하네스가 없다. 현재 사용자 흐름 검증은 다음 두
-단계를 조합한다.
+이 저장소에는 브라우저용 E2E 하네스가 없다. 수용 기준에 맞춰 다음 경로를 선택한다.
 
 1. **GPUI 상호작용 수용 테스트** — `#[gpui::test]`에서 실제 대상 뷰를 렌더링하고
    `TestAppContext`/`VisualTestContext`로 리사이즈·클릭·키보드·wheel을 입력한 뒤 앱 상태,
-   선택·포커스, 스크롤 offset, `debug_bounds`를 단언한다. 이것이 코드 수정의 기본 E2E
-   대체 경로다.
+   선택·포커스, 스크롤 offset, `debug_bounds`를 단언한다. 앱 내부 동작은 이 경로로 충분하다.
 2. **데스크톱 black-box 검증** — Windows에서 release 바이너리를 격리 실행하고
    `scripts/Invoke-ClaudeVisualCheck.ps1` 또는 데스크톱 handoff 절차로 실제 창 전환·스크롤·
-   캡처를 확인한다. 캡처만으로 GPUI 자체 테스트를 대신하지 않는다.
+   캡처를 확인한다. 화면 표시와 OS 연동 경계에 필요한 경우만 추가한다.
 
-텍스트 입력처럼 로컬 창 하네스가 지원하지 않는 입력은 GPUI 테스트로 검증하고,
-하네스 미지원 상태를 `N/A` 사유 없이 `PASS`로 기록하지 않는다.
+하네스가 지원하지 않는 내부 입력은 의미 있는 GPUI 테스트로 검증한다. OS 경계의 자동화가
+어려우면 사용자 직접 확인을 기록할 수 있다. 두 담당자의 실제 화면 반복 검증은 기본
+완료 조건이 아니다. 적용 수준의 정본은 `DEVELOPMENT_GUIDE.md`다.
 
 최신 품질 게이트 기준은 `cargo check -p gpui-convenience-tools --locked`, 전체 테스트
 186 passed·5 ignored, 표준 `cargo clippy -p gpui-convenience-tools --all-targets --all-features --locked -- -D warnings` exit 0·경고
@@ -44,8 +43,8 @@ AD-006을 포함한 현재 변경 코드의 검증 결과는 전체 199 passed·
 | 프로필 | 적용 대상 | 필수 검증 |
 | --- | --- | --- |
 | `RUST` | 순수 Rust·플랫폼·설정·파일 I/O | `cargo check --locked` + 관련 테스트 + 전체 테스트(단계 완료 시) |
-| `GPUI` | 레이아웃·테마·포커스·스크롤·사용자 입력 | 관련 `#[gpui::test]` + `cargo test --all-targets --all-features` |
-| `E2E` | 여러 상태/화면을 잇는 사용자 흐름 | `GPUI` 수용 테스트 + 가능하면 격리 데스크톱 검증 |
+| `GPUI` | 레이아웃·테마·포커스·스크롤·사용자 입력 | 관련 이벤트·결과 `#[gpui::test]`; 공용/다중 모듈 변경 때 전체 테스트 |
+| `E2E` | 여러 상태/화면을 잇는 사용자 흐름 | `GPUI` 수용 테스트 + 필요한 OS 경계의 대표 실제 확인 |
 | `DOCS` | 문서·TODO·프로젝트 맵 | `git diff --check` + 링크/ID assertion + 참조 경로 확인 |
 
 ### 2. 자동 검증 실행
@@ -71,7 +70,7 @@ pwsh -NoProfile -File .\scripts\Verify-Workspace.ps1
 
 ### 3. GPUI E2E 수용 테스트 작성·실행
 
-UI를 바꿀 때는 수용 기준마다 테스트 하나를 연결한다.
+UI를 바꿀 때는 필요한 수용 기준과 기존 테스트를 연결하고 빠진 단언만 보강한다.
 
 - 기본 창 크기와 최소 지원 창 크기를 모두 사용한다.
 - 입력 전 상태, 입력(`simulate_click`, `simulate_keystrokes`, `simulate_event`, wheel),
@@ -82,7 +81,7 @@ UI를 바꿀 때는 수용 기준마다 테스트 하나를 연결한다.
 
 ### 4. 실제 데스크톱 E2E/시각 검증
 
-Windows Claude Code에서는 다음처럼 작업 전용 세션을 사용한다. 상세 좌표·시드·정리 규칙은
+Windows 로컬 하네스 경로에서는 다음처럼 작업 전용 세션을 사용한다. 상세 좌표·시드·정리 규칙은
 `.github/skills/gpui-visual-check/SKILL.md`만 참조한다.
 
 ```powershell
@@ -96,8 +95,8 @@ scripts\Invoke-ClaudeVisualCheck.ps1 -Action Stop
 
 `Capture`만으로 충분하면 전역 입력을 보내지 않는다. 입력이 필요했다면 각 동작의
 `restore.cursor`·`restore.focus`와 `Start`/`Stop`의 포커스 복원 결과를 확인한다.
-`skipped-*`·`failed*`는 복원 완료가 아니며, 사용자가 검증 중 바꾼 포커스·커서를
-하네스가 덮어쓰지 않는 안전 경계다. 화면 점유 가능성은 입력 전에 알린다.
+복원 실패는 그대로 기록한다. `skipped-focus-changed`만으로 입력 불가능이나 사용자 작업 중을
+판단하지 않는다. 화면 점유 가능성은 입력 전에 알린다.
 
 VS Code/Codex의 `IDE` 표면에서는 화면 조작을 시도하지 않고 다음으로 handoff를 준비한다.
 
@@ -106,8 +105,8 @@ pwsh -NoProfile -File .\scripts\Verify-Workspace.ps1 -PrepareDesktopHandoff
 ```
 
 `CLAUDE_LOCAL`/`DESKTOP` 검증은 캡처 PNG, 창 크기, 시나리오, 기대·관찰 결과, 바이너리 커밋과
-SHA-256을 기록한다. 다른 검증자의 독립 검토가 요구되는 UI 작업은 구현 세션과 별도 세션에서
-같은 시나리오를 반복한다.
+SHA-256을 기록한다. Visual Reviewer는 필요한 항목만 선택 검토하며 새 실제 재현과 기존
+증거 검토를 구분한다. 자동 테스트가 다루는 내부 조작은 데스크톱에서 반복하지 않아도 된다.
 
 ### 5. 완료 체크와 커밋
 
@@ -115,14 +114,17 @@ SHA-256을 기록한다. 다른 검증자의 독립 검토가 요구되는 UI �
 
 - `[B]` 빌드/정적 검사 통과
 - `[T]` 관련 자동 테스트 및 필요한 경우 전체 테스트 통과
-- `[E]` GPUI 상호작용 또는 데스크톱 E2E 통과
-- `[V]` 실제 화면/시각 검증 통과 또는 명시적 `N/A` 사유
+- `[E]` 결과 상태를 단언하는 GPUI 상호작용 또는 필요한 실제 OS 검증 통과
+- `[V]` 필요한 화면 확인 1회 또는 적용 불필요 사유; 독립 재조작은 기본 요건이 아님
 - `[R]` 오류 리뷰 완료 및 오류 없음/잔여 오류 기록
 - `[C]` 검증 결과를 커밋하고 `origin/main`까지 푸시
 
 `TODO.md`에서 항목을 삭제하는 시점은 `[B]`, `[T]`, `[R]`, `[C]`와 해당 작업의 `[E]`/`[V]`
 게이트가 모두 끝난 뒤다. 완료 결과는 `MASTER_PLAN.md`에 한 번 기록하고, 테스트 이름·명령·
 캡처 경로·커밋을 중복해서 여러 문서에 복사하지 않고 이 문서의 증거 칸에서 참조한다.
+
+사용자 수동 확인은 해당 OS/화면 조건의 `USER_ACCEPTED` 증거로 기록한다. 수행하지 않은
+실제 조작을 통과했다고 쓰지 않으며, 아직 필요한 OS 검증은 `N/A`로 생략하지 않는다.
 
 ## 2026-09-29 Phase O 격리 E2E 보강
 
@@ -162,6 +164,24 @@ VirtualBox 생성 5 MiB 합성 NTFS VDI를 `-SeedVdi`로 작업별 임시 루트
 검증을 `PASS`로 승격하지 않는다. 검토자의 세 세션은 모두 `Stop`으로 정리했고 사용자 앱
 PID 44832는 유지됐다.
 
+## 2026-09-30 필수 검증 기준 재판정
+
+사용자 요청에 따라 공통 완료 기준을 실용적으로 조정했다. 과거의 실제 외부 입력·독립
+재조작 미수행 기록은 그대로 보존하며, 새 검증을 수행했다고 주장하지 않는다.
+축약 전 상세 증거는 커밋 `1f5320f`의 이 문서에 보존한다.
+
+기존 이벤트·상태 테스트와 실제 릴리즈 증거로 `VDE-012`·`VDE-024`·`VDE-022`·`VDE-019`를
+완료 기록으로 옮겼다. Code Reviewer가 실제 단언을 확인했고, `VDE-017`의 실행 중 VM 가드는
+경로 일치뿐 아니라 열기 거부·소스 미연결을 확인해야 하므로 계속 활성으로 유지했다.
+`VDE-014`·`VDE-015`·`VDE-016`·`VDE-025`의 버튼/수정키/저장 연결 단언과 `VDE-023`의 OS
+대화상자 선택·취소는 남는다. 테스트 추가·실제 UI 재실행은 이번 문서 변경의 범위가 아니다.
+별도 구조 항목 `G-001`도 기존 bounds 테스트와 릴리즈 두 화면 증거로 종료했다.
+`C-002`는 기존 사용자 프로필 확인만, `G-003`은 드래그 저장·재로드 단언만 남긴다.
+
+이번 문서 전용 변경은 `Assert-ProjectDocs.ps1`의 `DOCS_VERIFIED active=17 matrix=17`,
+에이전트 TOML 3개 파싱, 정본·절차 참조 경로 확인, `git diff --check`를 통과했다.
+제품 코드·설정·실행 중 앱은 변경하지 않았고 코드 테스트·새 화면 E2E는 실행하지 않았다.
+
 ## 작업별 체크 매트릭스
 
 `TODO.md`의 모든 활성 ID는 이 표에 정확히 한 번 있어야 한다. `—`는 작업 성격상 해당
@@ -169,24 +189,19 @@ PID 44832는 유지됐다.
 
 | ID | 프로필 | B | T | E | V | R | C | 증거 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| C-002 | E2E | [x] | [x] | [x] | [ ] | [x] | [x] | 현재 AppData 구형 JSON 끝의 중괄호 초과를 읽기 전용으로 확인. 격리 복구·원본 불변·전체 설정/색상 모드 왕복·손상 설정 보존·동시 변경·새 설정 우선순위 및 GPUI Light/Dark 버튼 입력 테스트 추가. `config/persistence.rs`는 동시 갱신을 직렬화하고 임시 파일 완성 후 교체; 설정 읽기/저장 실패는 앱 로그에 표시. 전체 199 passed·7 ignored, `cargo check --locked`, Clippy `-D warnings`, 문서·구조 검사 통과. 사용자 승인 후 구 릴리즈를 정상 종료하고 release SHA-256 `67D9F1F6F219F2327427D3447A98B8E9EAE7D11B09B66202257480987667F80F` 빌드. `scripts/Test-SettingsPersistence.ps1`가 격리 프로세스 30956·31028을 차례로 시작/정상 종료해 구형 손상 파일 불변, 새 설정 파일 생성, 광고 자리 회수=true·색상 모드=dark·스캔 37초·서비스/동기화 off·즐겨찾기 유지 확인(`SETTINGS_E2E_PASSED`). 1000×700 실제 릴리즈 설정 화면 `target/visual-validation/captures/c002-dark-settings-restart-150840.png`에서 어두운 모드·카드 경계 확인; 검증 세션과 프로세스 정리. 독립 설정 화면 재검토 및 실제 사용자 프로필의 이전 미저장 옵션 재선택은 남아 있어 V 미체크. |
-| VDE-024 | E2E | [x] | [x] | [x] | [x] | [x] | [x] | 지연 로딩 `GuestDirectoryTreeNode`와 좌우 `balanced_split` 탐색 영역을 추가해 폴더 트리 선택으로 중첩 경로를 바로 열고, 목록 행 높이·열 폭·탐색 카드 높이를 컴팩트하게 조정; `virtual_disk_folder_tree_navigates_nested_paths_without_repeated_list_clicks`, `virtual_disk_explorer_keeps_tree_and_file_list_inside_compact_card`와 전체 169 passed·4 ignored, Clippy `-D warnings` 통과; `Verify-Workspace.ps1` 필수 GPUI 테스트 29개 이름 검증; release 캡처 `target/visual-validation/captures/vde024-tree-920x700-121233.png`, `vde024-tree-1000x700-121200.png`, `vde024-tree-1280x900-121234.png`; 실제 트리 Click은 하네스 좌표 변환으로 상태 전환을 확정하지 않아 GPUI 이벤트 테스트로 대체, commit `4af7cc6` push 완료; 독립 Visual Reviewer는 후속 |
-| VDE-025 | E2E | [x] | [x] | [x] | [x] | [x] | [x] | `VirtualDiskLayoutConfig`에 트리·종류·속성·크기 폭과 기본값/최소·최대 보정을 추가하고 `settings.json` round-trip을 검증; 트리 스플리터는 150~240px, 파일명은 남은 폭, 속성·크기 열은 최소 읽기 폭을 사용하며 속성·크기 조절 및 기본값 복원 UI를 추가; `virtual_disk_layout_controls_update_and_reset_readable_column_widths`, `virtual_disk_tree_width_setting_is_clamped_and_persisted`, 기존 트리·카드 bounds 테스트와 전체 172 passed·4 ignored, Clippy `-D warnings`, 필수 GPUI 31개 통과; release 캡처 `target/visual-validation/captures/vde025-final-920x700-scrolled-124559.png`, `vde025-final-1000x700-124600.png`, `vde025-final-capped-tree-1280x900-124829.png`; 실제 스플리터 Drag는 포그라운드 안전 경계로 미수행, commit `195a43e` push 완료; 독립 Visual Reviewer는 후속 |
-| VDE-022 | RUST | [x] | [x] | [x] | [ ] | [x] | [x] | 실제 `D:\VMMachine\win11\TACS\TACS_1.vdi`를 읽기 전용으로 대조해 `VDI normal (base)`, `dynamic default`, GPT 1번 MSR, 2번 `-FVE-FS-` BitLocker를 확인; `classifies_bitlocker_and_microsoft_reserved_partitions_explicitly`, `encrypted_partition_error_explains_the_offline_boundary`, 전체 테스트 163 passed·4 ignored, release 캡처 `target/visual-validation/captures/vde022-final-095347.png`에서 MSR·BitLocker 라벨과 안내를 확인; commit `6b89a09` push 완료; 독립 Visual Reviewer는 후속 |
-| VDE-023 | GPUI | [x] | [x] | [ ] | [x] | [x] | [x] | `gpui::PathPromptOptions { files: true, directories: false, multiple: false }` 기반 네이티브 파일 선택 버튼과 경로 입력 반영 구현, `virtual_disk_panel_registers_navigation_and_renders_read_only_shell`에서 `virtual-disk-browse` bounds 확인, release 캡처 `target/visual-validation/captures/vde022-final-095347.png`에서 `찾아보기` 배치 확인; 실제 대화상자 열기·선택 입력은 포그라운드 안전 경계로 미수행; commit `6b89a09` push 완료 |
-| VDE-012 | E2E | [x] | [x] | [x] | [ ] | [x] | [x] | `cargo check -p gpui-convenience-tools --locked`; 최신 전체 `cargo test --all-targets --all-features --locked` 160 passed·4 ignored; `virtual_disk::copy::tests::collecting_copy_errors_removes_partial_output_and_keeps_issue`로 원본 단축 읽기 실패 뒤 부분 대상 파일 제거와 원본 `SourceChanged` 사유 보존을 확인하고, 오류 행 selector·억제 키 저장/재로드·미억제 토스트 게이트와 `virtual_disk_panel_renders_copy_progress_and_issue_summary`의 GPUI `simulate_click` 억제/재표시 dispatch를 검증; 실제 VBox 생성 VDI 릴리스 복사에서 `many_subdirs` 손상 사유·17개 파일 부분 결과를 확인; 독립 Visual Reviewer와 실제 릴리스 버튼 조작은 잔여 |
-| VDE-014 | GPUI | [x] | [x] | [ ] | [x] | [x] | [x] | `cargo check -p gpui-convenience-tools --locked`; `cargo test --all-targets --all-features` (161 passed, 4 ignored); `virtual_disk_directory_row_double_click_enters_directory_and_refreshes_entries`가 실제 렌더 행에 `MouseDown/MouseUp click_count=2`를 전달해 폴더 진입·새로고침·오류 목록 제거를 확인하고, `shift_range_selection_uses_anchor_in_both_directions`로 순방향·역방향 Shift 범위 선택과 기준점 소실 경계를 확인했으며 GPUI 셸 테스트에 상위 이동 액션 경계를 포함; `virtual_disk_clears_stale_entries_when_directory_refresh_fails`로 손상 하위 폴더 진입 시 이전 목록 제거 확인; 최종 release 1200×1000 캡처 `target/visual-validation/captures/vde014-initial-guest-path-many-subdirs-final-042633.png`에서 현재 경로·손상 사유·빈 목록 확인; 최신 release 캡처 `target/visual-validation/captures/vde014-shift-range-release-final-045106.png`에서 16개 선택·숨김/시스템 행·카드 경계를 확인; 실제 폴더 진입 Click과 Shift 마우스 입력은 포그라운드 안전 검사에서 차단되어 E2E 성공으로 기록하지 않음; 세션 종료 후 프로세스 0·세션 루트 0 |
-| VDE-015 | GPUI | [x] | [x] | [x] | [x] | [x] | [x] | `cargo check -p gpui-convenience-tools --locked`; 최신 전체 `cargo test --all-targets --all-features --locked` 161 passed·4 ignored; `virtual_disk_copy` 백그라운드 이벤트·대상 입력·진행/중지/완료 카드 GPUI 경계 테스트, `virtual_disk::copy::tests::cancellation_stops_between_chunks_and_removes_partial_file`의 청크 경계 중지·부분 대상 파일 제거, `virtual_disk::copy::tests::collecting_copy_errors_removes_partial_output_and_keeps_issue`의 원본 단축 읽기 실패 정리를 확인; 릴리즈 `CLAUDE_LOCAL` 1000×700·920×700·1280×700 캡처 `target/visual-validation/captures/vde015-copy-card-1000-113840-203852.png`, `vde015-copy-card-920-113852-203905.png`, `vde015-copy-card-1280-113852-203905.png`; 최신 표준 VDI 자동 복사 캡처 `target/visual-validation/captures/vde015-continuation-autocopy-1850-035033.png`에서 파일 17개·915.3KB·실패 1개 요약 확인, 격리 대상 `-Force` 재검사 17개·937,234바이트와 손상 `many_subdirs` 사유 확인; 종료된 TACS VDI의 `$Extend/$RmMetadata/$TxfLog`를 `-ReadDelayMs 1000 -CancelAfterMs 2200`으로 실행해 실제 2MiB 파일 복사 중 0바이트 부분 파일 생성·취소 후 제거와 `중지됨 · 파일 2개 · 64.0 KB`를 확인하고 캡처 `target/visual-validation/captures/vde015-txf-log-slow-chunk-before-cancel-062617.png`, `target/visual-validation/captures/vde015-txf-log-slow-chunk-after-cancel-062619.png`를 남김; 원본 길이 85,269,151,744바이트·VM poweroff·세션 종료 후 process/session 0; 256MB NTFS VHD fixture 생성은 `diskpart` 50초 무응답으로 중지되어 VHD·드라이브·잔류 프로세스가 없음을 확인했으며 자연 속도 대용량 VDI 중지·독립 Visual Reviewer는 후속 |
-| VDE-016 | GPUI | [x] | [x] | [x] | [x] | [x] | [ ] | `cargo check -p gpui-convenience-tools --locked`; 최신 전체 `cargo test --all-targets --all-features --locked` 160 passed·4 ignored; `virtual_disk_panel_dispatches_explorer_shortcuts_when_directory_is_focused`와 선택 집합·단일 폴더 진입 단위 테스트; 릴리즈 `CLAUDE_LOCAL` 920×700·1000×700·1280×700 캡처 `target/visual-validation/captures/vde016-fixed-920-205304.png`, `vde016-fixed-1000-205250.png`, `vde016-fixed-1280-205319.png`; 실제 표준 VDI `-SelectAllVdi` 시드 캡처 `target/visual-validation/captures/vde019-vbox-select-all-seed-025058.png`에서 16개 선택 확인; `Key Ctrl+A`는 기본 포커스 전환·UI Automation `SetFocus`·`SetWindowPos` 시도 후에도 foreground 안전 차단으로 입력을 보내지 않아 외부 키보드 E2E와 독립 Visual Reviewer는 잔여 |
-| VDE-017 | GPUI | [x] | [x] | [x] | [x] | [x] | [ ] | `cargo check -p gpui-convenience-tools --locked`; 최신 전체 `cargo test --all-targets --all-features --locked` 160 passed·4 ignored; 실행 중 VM 오류·미지원 파일시스템 메시지 단위 테스트, `reads_unsupported_partition_fixture_without_claiming_ntfs`, `exports_unsupported_partition_vdi_fixture_when_requested`, `virtual_disk_panel_explains_unsupported_partition_state` GPUI 렌더 테스트; 미지원 MBR 파티션 VDI를 최신 release 앱에 주입해 `vde017-unsupported-partition-release-fixed-033450.png`에서 `지원하지 않는 파일시스템` 오류 카드와 `미지원/미확인 파일시스템` 파티션 경고를 확인; 읽기 전용 `VBoxManage list runningvms`가 비어 있고 TACS `VMState=poweroff`여서 실행 중 VM E2E는 미수행; 세션 정리 후 프로세스 0·세션 루트 0; 독립 Visual Reviewer는 후속 |
-| VDE-019 | E2E | [x] | [x] | [x] | [ ] | [x] | [x] | `cargo check -p gpui-convenience-tools --locked`; 최신 전체 `cargo test --all-targets --all-features --locked` 160 passed·4 ignored, VDI 집중 60 passed·2 ignored; 표준 VDI 헤더 오프셋 수정 후 VirtualBox 7.2.14 `convertfromraw` 생성 VDI(`Storage format: VDI`, `State: created`)를 `GPUI_CONVENIENCE_TOOLS_VBOXMANAGE` 환경 변수와 함께 격리 릴리스 앱에 주입; 숨김/시스템 항목 17개·937,234바이트 복사와 `many_subdirs` 손상 사유 확인; 최신 release 1200×1000 캡처 `target/visual-validation/captures/continuation-vde019-current-release-040648.png`에서 숨김/시스템 행과 17개·915.3KB·실패 1건 요약을 재확인; 이번 구현 세션에서도 1200×1000 `target/visual-validation/captures/continuation-current-vde019-1200x1000-052717.png`와 920×700 `target/visual-validation/captures/continuation-current-vde019-920x700-052734.png`를 캡처해 안전 경계·NTFS 3.1·숨김/시스템 행·16개 선택과 compact 폭 경계를 확인; 선택 전 `0개 선택` 캡처와 `-SelectAllVdi` 후 `16개 선택` 캡처 `target/visual-validation/captures/vde019-vbox-key-before-024822.png`, `vde019-vbox-select-all-seed-025058.png`; 기본 포커스 전환·UI Automation `SetFocus`·`SetWindowPos` 모두 foreground를 바꾸지 못해 `Key Ctrl+A`는 안전 차단으로 미검증; 세션 종료 후 `PROCESS_COUNT=0`·`SESSION_COUNT=0`·대상 루트 삭제; 이번 캡처는 구현 세션 증거이며 외부 키보드·실제 릴리스 오류 억제 버튼 클릭·독립 Visual Reviewer는 잔여; commits `87937dc`, `bed5914` |
+| C-002 | E2E | [x] | [x] | [ ] | [x] | [x] | [x] | 현재 AppData 구형 JSON 끝의 중괄호 초과를 읽기 전용으로 확인. 격리 복구·원본 불변·전체 설정/색상 모드 왕복·손상 설정 보존·동시 변경·새 설정 우선순위 및 GPUI Light/Dark 버튼 입력 테스트 추가. `config/persistence.rs`는 동시 갱신을 직렬화하고 임시 파일 완성 후 교체; 설정 읽기/저장 실패는 앱 로그에 표시. 전체 199 passed·7 ignored, `cargo check --locked`, Clippy `-D warnings`, 문서·구조 검사 통과. 사용자 승인 후 구 릴리즈를 정상 종료하고 release SHA-256 `67D9F1F6F219F2327427D3447A98B8E9EAE7D11B09B66202257480987667F80F` 빌드. `scripts/Test-SettingsPersistence.ps1`가 격리 프로세스 30956·31028을 차례로 시작/정상 종료해 구형 손상 파일 불변, 새 설정 파일 생성, 광고 자리 회수=true·색상 모드=dark·스캔 37초·서비스/동기화 off·즐겨찾기 유지 확인(`SETTINGS_E2E_PASSED`). 1000×700 실제 릴리즈 설정 화면 `target/visual-validation/captures/c002-dark-settings-restart-150840.png`에서 어두운 모드·카드 경계 확인; 검증 세션과 프로세스 정리. 2026-09-30 표시 검증은 기존 증거로 충족. 남은 일: 기존 사용자 프로필에서 광고 자리 회수를 다시 선택한 뒤 재시작 유지 여부 1회 확인. 격리 검증을 사용자 프로필 확인으로 표시하지 않음. |
+| VDE-025 | E2E | [x] | [x] | [ ] | [x] | [x] | [x] | 컬럼 폭 보정·설정 round-trip·조절 버튼·bounds 테스트와 기존 릴리즈 캡처 통과. `virtual_disk_tree_width_setting_is_clamped_and_persisted`는 setter 호출이며 저장 비활성 상태라 drag 저장의 증거가 아님. 남은 일: GPUI drag/mouse-up→설정 저장·재로드와 새 화면 폭 복원 단언. |
+| VDE-023 | GPUI | [x] | [x] | [ ] | [x] | [x] | [x] | `PathPromptOptions { files: true, directories: false, multiple: false }`와 찾아보기 버튼 배치 구현. 실제 OS 대화상자 선택→경로 반영, 취소→기존 경로 유지 각 1회가 남음. 자동화 미지원 시 USER_ACCEPTED로 기록하며 버튼 존재를 행동 검증으로 쓰지 않음. |
+| VDE-014 | GPUI | [x] | [x] | [ ] | [x] | [x] | [x] | 기존 더블클릭 폴더 진입 GPUI 이벤트·단순/Ctrl 선택과 Shift 선택 헬퍼 테스트 통과. 남은 일: modifier가 있는 실제 GPUI 행 이벤트의 선택 집합과 상위 버튼 경로·목록 단언. 외부 키보드 반복 검증은 요건에서 제외. |
+| VDE-015 | GPUI | [x] | [x] | [ ] | [x] | [x] | [x] | 청크 취소·부분 파일 정리 자동 테스트, 실제 합성 VDI 복사와 제어된 취소 증거는 기존 기록 참조. 남은 일: 대상 입력→시작/중지 버튼의 작업·취소 상태 자동 단언 및 대상 폴더 대화상자 선택/취소 1회. 자연 속도 초대형 파일 검증은 불필요. |
+| VDE-016 | GPUI | [x] | [x] | [ ] | [x] | [x] | [ ] | Ctrl+A 선택은 GPUI 결과 단언으로 검증됨. 기존 종합 단축키 테스트는 빈 화면의 요소 존재만 확인한다. 남은 일: 로드된 목록의 Enter/Backspace/F5/Ctrl+C 결과 및 입력창 포커스 시 비작동 단언. |
+| VDE-017 | GPUI | [x] | [x] | [ ] | [x] | [x] | [ ] | 미지원 파일시스템 안내의 GPUI 테스트·릴리즈 캡처는 2026-09-29 기록 참조. 실행 중 VM 경로 일치 테스트는 실제 열기 거부까지 확인하지 않는다. 남은 일: 모의 실행 VM 상태→VDI 열기 거부·소스 미연결 자동 단언. 실제 사용 중인 VM의 VDI를 여는 E2E는 수행하지 않음. |
 | E-001 | E2E | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | — |
 | E-002 | E2E | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | — |
 | E-003 | E2E | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | — |
 | E-004 | E2E | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | — |
-| G-001 | E2E | [x] | [x] | [x] | [x] | [x] | [x] | `ButtonStyle` 기본값 통일 및 개별 덮어쓰기 제거; 검증 전용 `-InitialPanel`로 패널 전환 입력을 격리 실행에 주입; `cargo check -p gpui-convenience-tools --locked`; 관련 GPUI 테스트 `ad_block_cards_contain_long_content_at_supported_widths`, `service_rows_keep_names_readable_at_supported_window_widths`, `file_sync_sections_share_one_width_at_every_window_width`; 전체 테스트 145 passed·4 ignored; Clippy exit 0(기존 경고 7건); 격리 release 파일 동기화 캡처 `target/visual-validation/captures/g001-file-sync-013019.png`와 자동 시작 캡처 `target/visual-validation/captures/g001-auto-start-013004.png`에서 두 화면과 공용 버튼 스타일 확인, processCount=0·sessionCount=0; 독립 Visual Reviewer는 후속; commits `0d7bf25` 및 후속 검증 경로 커밋 push 완료 |
 | K-001 | RUST | [ ] | [ ] | — | — | [ ] | [ ] | — |
-| G-003 | E2E | [x] | [x] | [x] | [ ] | [x] | [x] | `sidebar_width` 설정 필드와 200~360px 보정·기본 240px 복원; `sidebar_width_is_normalized_to_supported_range`, `update_config_preserves_unedited_fields`, GPUI `sidebar_divider_drag_resizes_navigation_and_content`; 전체 최신 테스트는 상단 품질 게이트 기준 161 passed·4 ignored; 격리 release 기본 캡처 `target/visual-validation/captures/g003-default-003709.png`, `sidebar_width=320` 시드 복원 캡처 `target/visual-validation/captures/g003-restored-width-003742.png`; 최신 release 시작 캡처 `target/visual-validation/captures/next-g003-before-065645.png`에서 divider 위치를 재확인했으나 `-Action Drag -X 0.25 -Y 0.50 -ToX 0.32 -ToY 0.50`은 포그라운드 안전 검사(`현재 포그라운드=66246`)에서 차단되어 입력을 보내지 않음; 실제 mouse-up 저장 콜백과 독립 Visual Reviewer는 후속 |
+| G-003 | E2E | [x] | [x] | [ ] | [x] | [x] | [x] | `sidebar_width` 설정 필드와 200~360px 보정·기본 240px 복원; `sidebar_width_is_normalized_to_supported_range`, `update_config_preserves_unedited_fields`, GPUI `sidebar_divider_drag_resizes_navigation_and_content`; 전체 최신 테스트는 상단 품질 게이트 기준 161 passed·4 ignored; 격리 release 기본 캡처 `target/visual-validation/captures/g003-default-003709.png`, `sidebar_width=320` 시드 복원 캡처 `target/visual-validation/captures/g003-restored-width-003742.png`; 최신 release 시작 캡처 `target/visual-validation/captures/next-g003-before-065645.png`에서 divider 위치를 재확인했으나 `-Action Drag -X 0.25 -Y 0.50 -ToX 0.32 -ToY 0.50`은 포그라운드 안전 검사(`현재 포그라운드=66246`)에서 차단되어 입력을 보내지 않음; 2026-09-30 표시 검증은 기존 증거로 충족. 남은 일: 저장을 활성화한 GPUI drag/mouse-up→설정 재로드→새 화면 폭 복원 단언. 외부 입력 반복·독립 재조작은 선택 |
 | K-002 | RUST | [ ] | [ ] | — | — | [ ] | [ ] | macOS 메뉴 막대 지원은 macOS 실행 환경 확인 후 진행 |
 | K-003 | RUST | [ ] | [ ] | — | — | [ ] | [ ] | `launchd` 자동 시작은 macOS 실행 환경 확인 후 진행 |
 | K-004 | RUST | [ ] | [ ] | — | — | [ ] | [ ] | `.icns` 배포 아이콘은 macOS 패키징 환경 확인 후 진행 |
@@ -222,6 +237,11 @@ G-003의 실제 divider 드래그 경로는 검증 하네스에 `-Action Drag -X
 
 | ID | 프로필 | B | T | E | V | R | C | 증거 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| G-001 | E2E | [x] | [x] | [x] | [x] | [x] | [x] | `ButtonStyle` 기본값 통일 및 개별 덮어쓰기 제거; 검증 전용 `-InitialPanel`로 패널 전환 입력을 격리 실행에 주입; `cargo check -p gpui-convenience-tools --locked`; 관련 GPUI 테스트 `ad_block_cards_contain_long_content_at_supported_widths`, `service_rows_keep_names_readable_at_supported_window_widths`, `file_sync_sections_share_one_width_at_every_window_width`; 전체 테스트 145 passed·4 ignored; Clippy exit 0(기존 경고 7건); 격리 release 파일 동기화 캡처 `target/visual-validation/captures/g001-file-sync-013019.png`와 자동 시작 캡처 `target/visual-validation/captures/g001-auto-start-013004.png`에서 두 화면과 공용 버튼 스타일 확인, processCount=0·sessionCount=0; 2026-09-30 기존 bounds·릴리즈 화면 증거와 읽기 전용 코드 리뷰로 완료 재판정(새 UI 실행 아님); commits `0d7bf25` 및 후속 검증 경로 커밋 push 완료 |
+| VDE-024 | E2E | [x] | [x] | [x] | [x] | [x] | [x] | 지연 로딩 `GuestDirectoryTreeNode`와 좌우 `balanced_split` 탐색 영역을 추가해 폴더 트리 선택으로 중첩 경로를 바로 열고, 목록 행 높이·열 폭·탐색 카드 높이를 컴팩트하게 조정; `virtual_disk_folder_tree_navigates_nested_paths_without_repeated_list_clicks`, `virtual_disk_explorer_keeps_tree_and_file_list_inside_compact_card`와 전체 169 passed·4 ignored, Clippy `-D warnings` 통과; `Verify-Workspace.ps1` 필수 GPUI 테스트 29개 이름 검증; release 캡처 `target/visual-validation/captures/vde024-tree-920x700-121233.png`, `vde024-tree-1000x700-121200.png`, `vde024-tree-1280x900-121234.png`; 실제 트리 Click은 하네스 좌표 변환으로 상태 전환을 확정하지 않아 GPUI 이벤트 테스트로 대체, commit `4af7cc6` push 완료; 2026-09-30 새 기준으로 완료: 실제 GPUI 트리 클릭→직계 경로/목록 단언과 기존 캡처가 충분 |
+| VDE-022 | RUST | [x] | [x] | [x] | [x] | [x] | [x] | 실제 `D:\VMMachine\win11\TACS\TACS_1.vdi`를 읽기 전용으로 대조해 `VDI normal (base)`, `dynamic default`, GPT 1번 MSR, 2번 `-FVE-FS-` BitLocker를 확인; `classifies_bitlocker_and_microsoft_reserved_partitions_explicitly`, `encrypted_partition_error_explains_the_offline_boundary`, 전체 테스트 163 passed·4 ignored, release 캡처 `target/visual-validation/captures/vde022-final-095347.png`에서 MSR·BitLocker 라벨과 안내를 확인; commit `6b89a09` push 완료; 2026-09-30 새 기준으로 완료: 분류·안내 자동 테스트와 기존 릴리즈 화면 확인이 충분 |
+| VDE-012 | E2E | [x] | [x] | [x] | [x] | [x] | [x] | `cargo check -p gpui-convenience-tools --locked`; 최신 전체 `cargo test --all-targets --all-features --locked` 160 passed·4 ignored; `virtual_disk::copy::tests::collecting_copy_errors_removes_partial_output_and_keeps_issue`로 원본 단축 읽기 실패 뒤 부분 대상 파일 제거와 원본 `SourceChanged` 사유 보존을 확인하고, 오류 행 selector·억제 키 저장/재로드·미억제 토스트 게이트와 `virtual_disk_panel_renders_copy_progress_and_issue_summary`의 GPUI `simulate_click` 억제/재표시 dispatch를 검증; 실제 VBox 생성 VDI 릴리스 복사에서 `many_subdirs` 손상 사유·17개 파일 부분 결과를 확인; 2026-09-30 새 기준으로 완료: GPUI 억제/재표시 클릭·저장 단언과 릴리즈 오류 표시 증거가 충분하며 별도 외부 클릭은 선택 |
+| VDE-019 | E2E | [x] | [x] | [x] | [x] | [x] | [x] | `cargo check -p gpui-convenience-tools --locked`; 최신 전체 `cargo test --all-targets --all-features --locked` 160 passed·4 ignored, VDI 집중 60 passed·2 ignored; 표준 VDI 헤더 오프셋 수정 후 VirtualBox 7.2.14 `convertfromraw` 생성 VDI(`Storage format: VDI`, `State: created`)를 `GPUI_CONVENIENCE_TOOLS_VBOXMANAGE` 환경 변수와 함께 격리 릴리스 앱에 주입; 숨김/시스템 항목 17개·937,234바이트 복사와 `many_subdirs` 손상 사유 확인; 최신 release 1200×1000 캡처 `target/visual-validation/captures/continuation-vde019-current-release-040648.png`에서 숨김/시스템 행과 17개·915.3KB·실패 1건 요약을 재확인; 이번 구현 세션에서도 1200×1000 `target/visual-validation/captures/continuation-current-vde019-1200x1000-052717.png`와 920×700 `target/visual-validation/captures/continuation-current-vde019-920x700-052734.png`를 캡처해 안전 경계·NTFS 3.1·숨김/시스템 행·16개 선택과 compact 폭 경계를 확인; 선택 전 `0개 선택` 캡처와 `-SelectAllVdi` 후 `16개 선택` 캡처 `target/visual-validation/captures/vde019-vbox-key-before-024822.png`, `vde019-vbox-select-all-seed-025058.png`; 기본 포커스 전환·UI Automation `SetFocus`·`SetWindowPos` 모두 foreground를 바꾸지 못해 `Key Ctrl+A`는 안전 차단으로 미검증; 세션 종료 후 `PROCESS_COUNT=0`·`SESSION_COUNT=0`·대상 루트 삭제; 2026-09-29 격리 복사 17개·937,234바이트 및 독립 증거는 위 기록 참조. 2026-09-30 목록·호스트 복사 통합 범위만 완료로 재판정; 선택·단축키·복사 버튼·안전 가드의 잔여 단언은 VDE-014~017에서 추적; commits `87937dc`, `bed5914` |
 | AD-006 | E2E | [x] | [x] | [x] | [x] | [x] | [x] | `kakao_layout.rs`의 창 계층·크기 지문 및 6개 HWND 적용/역순 복원, GPUI 경계 테스트와 전체 199 passed·7 ignored, 릴리즈 빌드·Clippy `-D warnings` 통과(기존 기록). 실제 KakaoTalk 전후 캡처 `target/visual-validation/captures/ad006-before.png`·`target/visual-validation/captures/ad006-reclaimed.png`와 사용자 실기기 확인을 근거로 Phase A 종료. 독립 Visual Reviewer 세션은 수행하지 않았고, 이번 사용자 직접 수용을 V 게이트의 명시적 예외로 기록한다. 새 데스크톱 테스트를 수행했다는 뜻이 아니다. |
 | VDE-021 | DECISION | — | — | — | — | [x] | [x] | 2026-09-29 사용자 결정: 실행 중 VM 파일 접근은 VDI 직접 읽기와 `VBoxManage guestcontrol` 모두 구현하지 않는다. O-6을 종료했고, 과거 분리 설계(commit `28dc516`)는 `VIRTUAL_DISK_BACKENDS.md`에 미채택 이력으로 보존한다. 실행 중 VM 파일을 검증용으로 열거나 Guest Control E2E를 수행하지 않았다. |
 | C-001 | E2E | [x] | [x] | [x] | [x] | [x] | [x] | 실행파일 옆 `settings.json` 우선 경로·구버전 AppData `config.json` fallback·`GPUI_CONVENIENCE_TOOLS_DATA_DIR` 격리 경계와 `VirtualDiskConfig` 왕복을 구현; 정상 실행 경로가 실행파일 옆 `settings.json`을 가리키는 회귀 테스트와 설정 테스트 전용 환경 잠금 추가; GPUI `settings_page_keeps_user_config_actions_inside_the_card` 통과; 설정 화면에 현재 경로·`설정 저장`·`파일 위치 열기`를 추가했고 창 닫기/Drop 저장 경계를 연결; 전체 167 passed·4 ignored, Clippy `-D warnings` 통과, `DOCS_VERIFIED active=28 matrix=28`, `STRUCTURE_VERIFIED files=56 lines=22003 max=920 path=app/src/config.rs warnings=4`; release 설정 화면 1000×700 `target/visual-validation/captures/c001-settings-1000x700-111818.png`, 920×700 `c001-settings-920x700-111840.png`, VDI 입력 복원 `c001-vdi-restored-1000x700-112034.png`; commit `1d7b972` push 완료 |
