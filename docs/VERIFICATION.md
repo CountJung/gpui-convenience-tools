@@ -182,6 +182,82 @@ PID 44832는 유지됐다.
 에이전트 TOML 3개 파싱, 정본·절차 참조 경로 확인, `git diff --check`를 통과했다.
 제품 코드·설정·실행 중 앱은 변경하지 않았고 코드 테스트·새 화면 E2E는 실행하지 않았다.
 
+## 2026-09-30 Phase O 수용 범위와 O-5 실제 검증
+
+사용자는 현재 보이는 영역의 정상 표시를 우선하며 추가 입력 테스트 대부분의 필요성을
+느끼지 않는다고 명시했다. `VDE-014`·`VDE-015`·`VDE-016`·`VDE-025`의 추가 조합·버튼
+연결·대상 폴더 대화상자·단축키·드래그 저장 단언은 **선택 보강으로 전환**했다.
+기존 기능과 저장 계약·복사 엔진의 취소 및 부분 파일 정리 테스트는 그대로 유지한다.
+이 전환은 미수행 테스트의 `PASS`나 사용자 직접 조작 `USER_ACCEPTED`가 아니다.
+이전 필수 조건과 증거는 커밋 `74b4a49`의 이 문서에 보존한다.
+
+### 안전 E2E — VDE-017 PASS
+
+앱 제품 코드는 바꾸지 않고 기존 `target/release/gpui-convenience-tools.exe`를 사용했다.
+SHA-256은 `67D9F1F6F219F2327427D3447A98B8E9EAE7D11B09B66202257480987667F80F`다.
+`GPUI_CONVENIENCE_TOOLS_DATA_DIR`에 격리하고 광고·자동 동기화를 끈 뒤 합성 디스크와
+테스트 전용 VBoxManage 대역으로 실제 릴리즈의 시작→조회 프로세스→거부 화면을 검증했다.
+실제 실행 중인 TACS 디스크를 여는 시도는 하지 않았다.
+
+- 실행 중 VM 응답: `list runningvms`→`showvminfo ... --machinereadable` 2회 호출,
+  실행 중 사용 안내·미연결 헤더·파티션 없음 확인. PID 33900.
+  증거: `target/visual-validation/o5-running-2008c24274864cba95ef091b7125d782/running.png`.
+- 조회 실패: 대역 exit 7·`O5_PROBE_QUERY_FAILURE`, 조회 실패 차단과 파티션 없음 확인.
+  PID 21840. 증거:
+  `target/visual-validation/o5-queryfailure-5bbbe26044534c1b80eaf753d1f31318/query-failure.png`.
+- 잠금 표식: `fixture.vdi.lck`에서 조회 호출 0회, 잠금 사유·미연결·파티션 없음 확인.
+  PID 17748. 증거:
+  `target/visual-validation/o5-locked-bf2f85e5929d4b8ab81c828eb550a4c0/locked.png`.
+- 각 세션에서 원본 SHA-256·길이·수정시각 불변과 임시 대상 빈 상태를 확인했다.
+  `Assert`는 프로세스 조회·파일 불변만 단언하며 앱의 거부·미연결 판정은 위 실제 화면으로
+  확인했다. 내부 `source=None` 값을 테스트 API로 직접 단언한 것은 아니다.
+  초기 세션은 대상 입력과 임시 폴더가 연결되지 않았으므로 빈 폴더만으로 복사 차단을
+  증명하지 않는다. 이 연결은 후속 하네스 리뷰에서 보강했다.
+
+초기 하네스의 file log 단언은 실패했다. `push_log`가 이 메시지를 UI 로그에만 넣는 것을
+확인하고, 파일 로그를 근거로 앱 상태를 단언하지 않도록 수정했다. 조회 trace 1행의
+PowerShell scalar/array 차이도 수정한 뒤 조회 실패 시나리오 assertion을 다시 통과했다.
+후속 리뷰에서 하네스의 임의 이미지 입력을 제거하고 동봉 NTFS fixture 생성으로 고정,
+reparse-point 차단·동일 Process 핸들 종료·manifest 저장 실패 정리·앱 복사 대상 연결을
+보강했다. 보강 후 `Prepare`의 fixture export·대역 컴파일은 통과했지만, 사용자 입력
+감지 후 UI 실행을 중단했으므로 보강된 Start/Stop을 새 실제 앱으로 재실행한 것은 아니다.
+
+### 파일 선택 — VDE-023 PENDING(input)
+
+격리 PID 21100의 찾아보기 버튼으로 실제 네이티브 열기 대화상자와 파일 이름·선택·취소
+컨트롤 표시를 확인했다. 입력 도구가 부모 앱과 소유 대화상자의 대상 좌표를 일치시키지
+못했다. `set_value`는 `Cannot set a value for an element that is not settable`,
+취소 클릭은 `point ... is over ... "탐색 단추", not target window ...`로 실패했다.
+경로 선택과 취소 성공은 주장하지 않는다. 남은 확인은 종료된 VM의 VDI 선택→경로 반영,
+다시 찾아보기→취소→동일 경로 유지 각 1회다. 제품 결함으로 재현된 것은 아니다.
+
+커서 복원 API는 제공되지 않았다. 이전에 관찰한 탐색기 포커스 복원 시도도
+`user input was detected in this window; call get_window_state before continuing`로
+거부되어 추가 UI 조작을 중단했다. 포커스·커서 복원 성공으로 기록하지 않는다.
+4개 검증 PID는 모두 종료했고 사용자 앱 PID 8488은 유지했다. 증거 루트는 삭제하지 않았다.
+
+### 재실행과 자동 검증
+
+```powershell
+# Prepare는 fixture·대역만 만들며 앱 UI를 실행하지 않는다.
+pwsh -NoProfile -File scripts/Test-VdiSafetyE2E.ps1 -Action Prepare
+# 아래 Start는 실제 검증 창을 띄운다. 출력 sessionPath로 Assert/Stop을 수행한다.
+pwsh -NoProfile -File scripts/Test-VdiSafetyE2E.ps1 -Action Start -Scenario Running
+pwsh -NoProfile -File scripts/Test-VdiSafetyE2E.ps1 -Action Assert -SessionPath <session.json>
+pwsh -NoProfile -File scripts/Test-VdiSafetyE2E.ps1 -Action Stop -SessionPath <session.json>
+```
+
+`QueryFailure`·`Locked`도 같은 절차로 실행한다. 실제 화면의 거부/미연결 확인을 생략하고
+`O5_PROBE_ASSERT_PASSED`만으로 종합 PASS를 내지 않는다.
+`cargo test -p gpui-convenience-tools virtual_disk --locked`는 **81 passed·3 ignored**,
+`Prepare`의 동봉 fixture export는 **1 passed**다. ignored는 실제 이미지 주입용이므로
+실행 중 VM 파일을 주입해 해제하지 않았다. 제품 소스 구조는 67파일·25,452줄로 변경 없다.
+
+`cargo check -p gpui-convenience-tools --locked`, PowerShell parser(오류 0),
+테스트 대역 `rustc --edition=2021 -D warnings`·`rustfmt --check`, 문서 assertion
+`DOCS_VERIFIED active=12 matrix=12`, 구조 assertion과 `git diff --check`를 통과했다.
+새 제품 코드 변경이 없어 사용자 앱 종료·릴리즈 재빌드는 수행하지 않았다.
+
 ## 작업별 체크 매트릭스
 
 `TODO.md`의 모든 활성 ID는 이 표에 정확히 한 번 있어야 한다. `—`는 작업 성격상 해당
@@ -190,12 +266,7 @@ PID 44832는 유지됐다.
 | ID | 프로필 | B | T | E | V | R | C | 증거 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | C-002 | E2E | [x] | [x] | [ ] | [x] | [x] | [x] | 현재 AppData 구형 JSON 끝의 중괄호 초과를 읽기 전용으로 확인. 격리 복구·원본 불변·전체 설정/색상 모드 왕복·손상 설정 보존·동시 변경·새 설정 우선순위 및 GPUI Light/Dark 버튼 입력 테스트 추가. `config/persistence.rs`는 동시 갱신을 직렬화하고 임시 파일 완성 후 교체; 설정 읽기/저장 실패는 앱 로그에 표시. 전체 199 passed·7 ignored, `cargo check --locked`, Clippy `-D warnings`, 문서·구조 검사 통과. 사용자 승인 후 구 릴리즈를 정상 종료하고 release SHA-256 `67D9F1F6F219F2327427D3447A98B8E9EAE7D11B09B66202257480987667F80F` 빌드. `scripts/Test-SettingsPersistence.ps1`가 격리 프로세스 30956·31028을 차례로 시작/정상 종료해 구형 손상 파일 불변, 새 설정 파일 생성, 광고 자리 회수=true·색상 모드=dark·스캔 37초·서비스/동기화 off·즐겨찾기 유지 확인(`SETTINGS_E2E_PASSED`). 1000×700 실제 릴리즈 설정 화면 `target/visual-validation/captures/c002-dark-settings-restart-150840.png`에서 어두운 모드·카드 경계 확인; 검증 세션과 프로세스 정리. 2026-09-30 표시 검증은 기존 증거로 충족. 남은 일: 기존 사용자 프로필에서 광고 자리 회수를 다시 선택한 뒤 재시작 유지 여부 1회 확인. 격리 검증을 사용자 프로필 확인으로 표시하지 않음. |
-| VDE-025 | E2E | [x] | [x] | [ ] | [x] | [x] | [x] | 컬럼 폭 보정·설정 round-trip·조절 버튼·bounds 테스트와 기존 릴리즈 캡처 통과. `virtual_disk_tree_width_setting_is_clamped_and_persisted`는 setter 호출이며 저장 비활성 상태라 drag 저장의 증거가 아님. 남은 일: GPUI drag/mouse-up→설정 저장·재로드와 새 화면 폭 복원 단언. |
-| VDE-023 | GPUI | [x] | [x] | [ ] | [x] | [x] | [x] | `PathPromptOptions { files: true, directories: false, multiple: false }`와 찾아보기 버튼 배치 구현. 실제 OS 대화상자 선택→경로 반영, 취소→기존 경로 유지 각 1회가 남음. 자동화 미지원 시 USER_ACCEPTED로 기록하며 버튼 존재를 행동 검증으로 쓰지 않음. |
-| VDE-014 | GPUI | [x] | [x] | [ ] | [x] | [x] | [x] | 기존 더블클릭 폴더 진입 GPUI 이벤트·단순/Ctrl 선택과 Shift 선택 헬퍼 테스트 통과. 남은 일: modifier가 있는 실제 GPUI 행 이벤트의 선택 집합과 상위 버튼 경로·목록 단언. 외부 키보드 반복 검증은 요건에서 제외. |
-| VDE-015 | GPUI | [x] | [x] | [ ] | [x] | [x] | [x] | 청크 취소·부분 파일 정리 자동 테스트, 실제 합성 VDI 복사와 제어된 취소 증거는 기존 기록 참조. 남은 일: 대상 입력→시작/중지 버튼의 작업·취소 상태 자동 단언 및 대상 폴더 대화상자 선택/취소 1회. 자연 속도 초대형 파일 검증은 불필요. |
-| VDE-016 | GPUI | [x] | [x] | [ ] | [x] | [x] | [ ] | Ctrl+A 선택은 GPUI 결과 단언으로 검증됨. 기존 종합 단축키 테스트는 빈 화면의 요소 존재만 확인한다. 남은 일: 로드된 목록의 Enter/Backspace/F5/Ctrl+C 결과 및 입력창 포커스 시 비작동 단언. |
-| VDE-017 | GPUI | [x] | [x] | [ ] | [x] | [x] | [ ] | 미지원 파일시스템 안내의 GPUI 테스트·릴리즈 캡처는 2026-09-29 기록 참조. 실행 중 VM 경로 일치 테스트는 실제 열기 거부까지 확인하지 않는다. 남은 일: 모의 실행 VM 상태→VDI 열기 거부·소스 미연결 자동 단언. 실제 사용 중인 VM의 VDI를 여는 E2E는 수행하지 않음. |
+| VDE-023 | GPUI | [x] | [x] | [ ] | [x] | [x] | [x] | 2026-09-30 실제 release의 찾아보기 클릭으로 네이티브 열기 대화상자를 표시했다. `set_value`는 not settable 오류, 좌표/키 입력 후 파일 이름 포커스·값 불변, 취소 클릭은 부모/소유 창 target mismatch로 차단됐다. 선택→경로 반영·취소→기존 경로 유지 각 1회는 미검증. 검증 PID 21100만 종료했고 사용자 PID 8488은 유지. |
 | E-001 | E2E | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | — |
 | E-002 | E2E | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | — |
 | E-003 | E2E | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | — |
@@ -232,11 +303,19 @@ G-003의 실제 divider 드래그 경로는 검증 하네스에 `-Action Drag -X
 
 ## 완료 검증 기록
 
+`VDE-014`·`VDE-015`·`VDE-016`·`VDE-025`는 추가 검증을 선택 범위로 옮긴 기록이다.
+해당 행의 E `—`는 이번 수용 범위에서 제외했다는 뜻이며 이전 미검증 사실을 지우지 않는다.
+
 완료 작업은 `TODO.md`에서 제거하고 이곳에 게이트 결과를 보존한다. 상세 설계와 완료 단계는
 `MASTER_PLAN.md`에 한 번만 기록한다.
 
 | ID | 프로필 | B | T | E | V | R | C | 증거 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| VDE-017 | E2E | [x] | [x] | [x] | [x] | [x] | [ ] | 2026-09-30 실행 중 VM 모의 응답·조회 실패·잠금 표식 3개 실제 릴리즈 차단 화면과 원본 불변/조회 trace를 확인. 위 O-5 증거 참조. 실제 실행 중 VM 디스크는 열지 않음. 관련 자동 테스트 81 passed·3 ignored. |
+| VDE-025 | E2E | [x] | [x] | — | [x] | [x] | [ ] | 컬럼 폭 보정·설정 round-trip·조절 버튼·bounds 테스트와 기존 릴리즈 캡처 통과. `virtual_disk_tree_width_setting_is_clamped_and_persisted`는 setter 호출이며 저장 비활성 상태라 drag 저장의 증거가 아님. 선택 보강: GPUI drag/mouse-up→설정 저장·재로드와 새 화면 폭 복원 단언.  2026-09-30 사용자 요청으로 추가 검증을 필수 범위에서 제외. 미수행을 PASS로 표시하지 않음. |
+| VDE-014 | GPUI | [x] | [x] | — | [x] | [x] | [ ] | 기존 더블클릭 폴더 진입 GPUI 이벤트·단순/Ctrl 선택과 Shift 선택 헬퍼 테스트 통과. 선택 보강: modifier가 있는 실제 GPUI 행 이벤트의 선택 집합과 상위 버튼 경로·목록 단언. 외부 키보드 반복 검증은 요건에서 제외.  2026-09-30 사용자 요청으로 추가 검증을 필수 범위에서 제외. 미수행을 PASS로 표시하지 않음. |
+| VDE-015 | GPUI | [x] | [x] | — | [x] | [x] | [ ] | 청크 취소·부분 파일 정리 자동 테스트, 실제 합성 VDI 복사와 제어된 취소 증거는 기존 기록 참조. 선택 보강: 대상 입력→시작/중지 버튼의 작업·취소 상태 자동 단언 및 대상 폴더 대화상자 선택/취소 1회. 자연 속도 초대형 파일 검증은 불필요.  2026-09-30 사용자 요청으로 추가 검증을 필수 범위에서 제외. 미수행을 PASS로 표시하지 않음. |
+| VDE-016 | GPUI | [x] | [x] | — | [x] | [x] | [ ] | Ctrl+A 선택은 GPUI 결과 단언으로 검증됨. 기존 종합 단축키 테스트는 빈 화면의 요소 존재만 확인한다. 선택 보강: 로드된 목록의 Enter/Backspace/F5/Ctrl+C 결과 및 입력창 포커스 시 비작동 단언.  2026-09-30 사용자 요청으로 추가 검증을 필수 범위에서 제외. 미수행을 PASS로 표시하지 않음. |
 | G-001 | E2E | [x] | [x] | [x] | [x] | [x] | [x] | `ButtonStyle` 기본값 통일 및 개별 덮어쓰기 제거; 검증 전용 `-InitialPanel`로 패널 전환 입력을 격리 실행에 주입; `cargo check -p gpui-convenience-tools --locked`; 관련 GPUI 테스트 `ad_block_cards_contain_long_content_at_supported_widths`, `service_rows_keep_names_readable_at_supported_window_widths`, `file_sync_sections_share_one_width_at_every_window_width`; 전체 테스트 145 passed·4 ignored; Clippy exit 0(기존 경고 7건); 격리 release 파일 동기화 캡처 `target/visual-validation/captures/g001-file-sync-013019.png`와 자동 시작 캡처 `target/visual-validation/captures/g001-auto-start-013004.png`에서 두 화면과 공용 버튼 스타일 확인, processCount=0·sessionCount=0; 2026-09-30 기존 bounds·릴리즈 화면 증거와 읽기 전용 코드 리뷰로 완료 재판정(새 UI 실행 아님); commits `0d7bf25` 및 후속 검증 경로 커밋 push 완료 |
 | VDE-024 | E2E | [x] | [x] | [x] | [x] | [x] | [x] | 지연 로딩 `GuestDirectoryTreeNode`와 좌우 `balanced_split` 탐색 영역을 추가해 폴더 트리 선택으로 중첩 경로를 바로 열고, 목록 행 높이·열 폭·탐색 카드 높이를 컴팩트하게 조정; `virtual_disk_folder_tree_navigates_nested_paths_without_repeated_list_clicks`, `virtual_disk_explorer_keeps_tree_and_file_list_inside_compact_card`와 전체 169 passed·4 ignored, Clippy `-D warnings` 통과; `Verify-Workspace.ps1` 필수 GPUI 테스트 29개 이름 검증; release 캡처 `target/visual-validation/captures/vde024-tree-920x700-121233.png`, `vde024-tree-1000x700-121200.png`, `vde024-tree-1280x900-121234.png`; 실제 트리 Click은 하네스 좌표 변환으로 상태 전환을 확정하지 않아 GPUI 이벤트 테스트로 대체, commit `4af7cc6` push 완료; 2026-09-30 새 기준으로 완료: 실제 GPUI 트리 클릭→직계 경로/목록 단언과 기존 캡처가 충분 |
 | VDE-022 | RUST | [x] | [x] | [x] | [x] | [x] | [x] | 실제 `D:\VMMachine\win11\TACS\TACS_1.vdi`를 읽기 전용으로 대조해 `VDI normal (base)`, `dynamic default`, GPT 1번 MSR, 2번 `-FVE-FS-` BitLocker를 확인; `classifies_bitlocker_and_microsoft_reserved_partitions_explicitly`, `encrypted_partition_error_explains_the_offline_boundary`, 전체 테스트 163 passed·4 ignored, release 캡처 `target/visual-validation/captures/vde022-final-095347.png`에서 MSR·BitLocker 라벨과 안내를 확인; commit `6b89a09` push 완료; 2026-09-30 새 기준으로 완료: 분류·안내 자동 테스트와 기존 릴리즈 화면 확인이 충분 |

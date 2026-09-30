@@ -27,9 +27,14 @@
 | `app/src/app/virtual_disk_ops.rs` | **구현됨** — read-only VDI 열기·네이티브 VDI 파일 선택·파티션 검색/선택·게스트 경로 새로고침·폴더 이동·Ctrl 토글/Shift 범위 다중 선택·탐색기 포커스·실행 중/미지원 오류 메시지 | VDE-013~014·016~017·023 |
 | `app/src/app/virtual_disk_copy.rs` | **구현됨** — 대상 폴더 입력/선택, read-only VDI 재연결 백그라운드 복사, 진행·중지·완료 요약 이벤트, 탐색기 keymap 등록 | VDE-015~016; 실제 이미지 E2E는 VDE-019 |
 | `docs/VIRTUAL_DISK_BACKENDS.md` | **결정 정본** — 오프라인 VDI만 지원하고 실행 중 VM 파일 접근은 하지 않는다는 결정; Guest Control은 미채택 검토 이력 | VDE-021 |
+| `scripts/Test-VdiSafetyE2E.ps1` | 테스트 전용 격리 앱 시작·조회 호출/원본 불변 단언·PID 식별 종료. UI 판정은 별도 실제 화면 증거로 수행 | VDE-017·023 |
+| `scripts/testdata/vboxmanage-safety-probe.rs` | 실제 VM에 접근하지 않는 VBoxManage 프로세스 대역. 실행 중 응답·조회 실패·명령 trace를 제공 | VDE-017 |
 
 안전 경계: 원본 VDI는 read-only로만 열고, 실행 중 VM의 VDI 직접 읽기는 구현하지 않는다.
 실행 중 VM의 파일 접근은 직접 VDI 읽기와 Guest Control 모두 지원하지 않는다(VDE-021 종료).
+
+2026-09-30 O-5 검증 도구 추가: `Test-VdiSafetyE2E.ps1` 147줄,
+`vboxmanage-safety-probe.rs` 37줄. 제품 `app/src` 구조·줄 수는 변경하지 않았다.
 
 **최종 측정**: 2026-09-29 · `app/src` 총 67개 파일 · 25,452줄
 
