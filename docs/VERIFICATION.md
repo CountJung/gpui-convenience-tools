@@ -29,9 +29,11 @@ baseline 포맷 차이가 남아 있어 별도 구조 정리 범위로 유지한
 이번 실행에서는 `DOCS_VERIFIED active=23 matrix=23`도 먼저 통과해 활성 TODO와 검증
 매트릭스의 일대일 대응을 확인했다.
 
-AD-006을 포함한 현재 변경 코드의 검증 결과는 전체 199 passed·7 ignored 및 Clippy `-D warnings`
+AD-006을 포함한 이전 변경 코드의 검증 결과는 전체 199 passed·7 ignored 및 Clippy `-D warnings`
 통과다. 위 `IDE_VERIFIED`와 `DOCS_VERIFIED`는 이전 기준 실행 결과이므로 이 수치의
 재실행 증거로 간주하지 않는다.
+2026-10-12 탐색 작업 화면의 최종 결과는 전체 203 passed·0 failed·7 ignored이며,
+해시별 실제 화면 증거와 이전 결과의 구분은 아래 수용 완료 기록을 참조한다.
 
 ## 작업마다 적용하는 순서
 
@@ -262,6 +264,80 @@ pwsh -NoProfile -File scripts/Test-VdiSafetyE2E.ps1 -Action Stop -SessionPath <s
 선택 범위 변경은 커밋 `f91dc66`으로 `origin/main`까지 푸시했고 로컬/원격 해시 일치를
 확인한 뒤 아래 C 게이트를 체크했다. 리뷰어의 새 실제 UI 재현을 주장하지 않는다.
 
+<a id="vde-026-workspace-evidence"></a>
+
+## 2026-10-12 탐색 작업 화면 — 수용 완료 (커밋 직전)
+
+대상은 기준 HEAD `37c6353` 위의 VDE-026 작업 트리다. Windows 로컬에서 구현/검증
+담당자가 전달한 최종 결과와 실제 캡처를 기록한다. 문서 담당자는 소스·테스트 단언과
+캡처 파일을 읽었으며 제품 테스트·앱 조작을 별도로 재실행하지 않았다.
+사용자 흐름은 [README.md](README.md#virtualbox-workspace), 최종 실측은
+[PROJECT_MAP.md](PROJECT_MAP.md)를 정본으로 한다.
+
+### 자동 검증·리뷰
+
+구현·검증 담당자 확인 결과: 관련 테스트 **85 passed·0 failed·3 ignored**, 전체 테스트
+**203 passed·0 failed·7 ignored**. `cargo check`, Clippy
+`--all-targets --all-features --locked -- -D warnings`(경고 0), suffix 릴리즈 빌드,
+변경 파일 rustfmt 검사 모두 통과했다. 코드 reviewer의 수정 후 소스 재리뷰도 통과했고
+추가 finding은 없었다. 이전 전체 202 passed 결과는 reviewer 수정 전 중간 결과이므로
+최종 수치로 사용하지 않는다. ignored는 실행 성공으로 세지 않는다.
+
+첫 테스트 실패 뒤 결과 상세는 footer 일반 자식에서 `absolute` 보조 오버레이로 수정했다.
+`window/virtual_disk/copy.rs::render_details`의 현재 배치는 footer 기준 `bottom(76px)`·
+높이 `112px`이며 목록 할당 높이를 줄이지 않고 겹쳐 표시한다. 상세 내부에는 별도 스크롤을 둔다.
+GPUI 0.2.2 `Frame.clear`의 stale selector bounds 캐시 문제는 구현·검증 담당자가 확인한 진단이다.
+접은 뒤의 부재 확인만 표시 state 단언으로 전환했으며 최초 렌더 부재·공간 배분·스크롤·
+실제 클릭 후 상태 단언은 유지한다. 문서 담당자의 독립 캐시 재현으로 표시하지 않는다.
+
+- 연결 전 설정 단계: `virtual_disk_panel_registers_navigation_and_renders_read_only_shell`로
+  빈 탐색기·복사줄 미표시를 확인했다.
+- 탐색 공간·footer: `virtual_disk_workspace_prioritizes_files_at_all_supported_sizes`와
+  `virtual_disk_explorer_keeps_tree_and_file_list_inside_workspace`의 920×480·1000×700·
+  1600×1000 bounds, 최종 1000×700 릴리즈 기본 화면을 확인했다.
+- 설정 왕복·선택 보존·열 너비 접기: `virtual_disk_workspace_returns_to_setup_without_losing_selection`
+  통과. 실제 단계 왕복은 아래 이전 후보 해시의 증거로 구분한다.
+- 폭 조절·저장: `virtual_disk_layout_controls_update_and_reset_readable_column_widths`와
+  `virtual_disk_tree_width_setting_is_clamped_and_persisted` 통과. 기존 저장 계약은 유지한다.
+- 결과 상세: `virtual_disk_workspace_error_and_copy_details_remain_accessible`과
+  `virtual_disk_panel_renders_copy_progress_and_issue_summary`로 접힘·열기/닫기 state·목록
+  최소 높이·마지막 오류 스크롤 접근을 확인했다. 동일 높이의 직접 비교 단언으로 확대하지 않는다.
+- 복사 중 변경 차단·긴 오류 스크롤·중지 접근:
+  `virtual_disk_workspace_keeps_stop_visible_with_long_error_while_copying`으로 최대 48px
+  오류 영역·스크롤 offset·목록 공간·중지 버튼 경계·변경 클릭 차단·중지 상태를 확인했다.
+
+workspace 테스트 4개와 변경된 목록 경계 테스트는 `scripts/Verify-Workspace.ps1` 필수
+목록에 등록되어 있다. 이 등록 사실 자체를 별도 실행 성공으로 세지 않는다.
+최종 문서·구조 검사도 통과했다: `DOCS_VERIFIED active=12 matrix=12`,
+`STRUCTURE_VERIFIED files=70 lines=25803 max=938 warnings=6`. `git diff --check`도 통과했다.
+
+### 실제 릴리즈 증거 — 해시별 구분
+
+캡처 루트는 `target/visual-validation/vde026-c7adcc6baa9f416f90095b4d7a57c2a2/`다.
+
+- 이전 후보 SHA-256 `0EF177B5E235D2DA9E21FA6F795D85930CA926554FA08B77B93FF72647B06782`,
+  PID 25516, 1000×700: `explorer-default.png`·`setup-return.png`·`explorer-resumed.png`.
+  검증 담당자가 native 입력으로 활성화→디스크 변경 클릭→돌아가기 클릭을 수행해
+  연결 설정 카드 숨김·탐색 영역 우선 배분·하단 copy footer와 단계 왕복을 확인했다.
+  문서 담당자는 캡처 3개를 읽었다. 이후 reviewer 수정본의 실제 왕복 재현이라고 표시하지 않는다.
+- 최종 SHA-256 `5848B79C54915469C884629DBD72228A7B0AC730877C71E0D5F9CA1E2C28101D`,
+  PID 44472, 1000×700: `final-explorer.png`. reviewer 수정 후 suffix 릴리즈의 기본 탐색
+  화면을 실제로 확인해 레이아웃 수용 통과가 전달되었고 문서 담당자도 저장 캡처를 확인했다.
+  이 캡처는 기본 상태이며 복사 중 변경 차단·긴 오류·상세 스크롤의 실제 재조작 증거로 확대하지 않는다.
+- 검증은 원본 합성 fixture만 사용했다. SHA-256
+  `F642F04D87CBE4CCF671D9FEB78E2DEC77B7962766645C10CC0DF73BA478EB78` 전후 동일,
+  대상 파일 0개가 전달되었다. 실제 사용자 디스크나 실행 중 VM 파일은 열지 않았다.
+- 각 검증 PID 25516·44472만 확인 후 종료했고 사용자 PID 10856은 유지했다.
+  기존 사용자 앱·시스템 설정은 변경하지 않았다. 커서/포커스 복원 API가 없어 복원 성공을 주장하지 않는다.
+- 최종 바이너리는 사용자 실행 중인 기본 exe를 교체하지 않고 `target/release/deps`의
+  suffix 바이너리로 빌드했다. 기본 앱 갱신은 별도 사용자 앱 종료 후 빌드가 필요하다.
+
+2026-10-12 요청 범위의 구현·검증 완료에 따라 활성 TODO를 닫고 완료 검증 행으로 옮긴다.
+이는 수용 완료·커밋 직전 준비이며 **C 게이트는 [ ]**다. 메인 담당자가 검증 후 승인된
+커밋/푸시를 수행하고 결과를 전달한 뒤에만 체크한다. 남은 Phase O OS 파일 선택·취소
+작업은 그대로 유지한다. 최신 실제 디스크 진단은 이 구현 범위가 아니며 과거 MSR·BitLocker
+기록은 당시 조건의 역사로 보존한다.
+
 ## 작업별 체크 매트릭스
 
 `TODO.md`의 모든 활성 ID는 이 표에 정확히 한 번 있어야 한다. `—`는 작업 성격상 해당
@@ -306,6 +382,10 @@ G-003의 실제 divider 드래그 경로는 검증 하네스에 `-Action Drag -X
 회귀 테스트와 하네스 구문 검증은 통과했다.
 
 ## 완료 검증 기록
+
+| ID | 프로필 | B | T | E | V | R | C | 증거 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| VDE-026 | E2E | [x] | [x] | [x] | [x] | [x] | [ ] | 2026-10-12 구현·검증 담당자 확인 결과: 전체 203 passed·0 failed·7 ignored, 관련 85 passed·3 ignored, check·Clippy 경고 0·suffix release·변경 파일 rustfmt 및 코드 재리뷰 통과. 최종 1000×700 실제 화면 수용 완료, 단계 왕복은 이전 후보 해시로 구분. [해시별 증거·확인 한계](#vde-026-workspace-evidence) 참조. 요청 범위의 구현·검증 완료에 따라 TODO 종료·완료 이력 이동; C는 메인 담당자의 커밋/푸시 결과 전달 후 체크. |
 
 `VDE-014`·`VDE-015`·`VDE-016`·`VDE-025`는 추가 검증을 선택 범위로 옮긴 기록이다.
 해당 행의 E `—`는 이번 수용 범위에서 제외했다는 뜻이며 이전 미검증 사실을 지우지 않는다.

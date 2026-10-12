@@ -9,6 +9,7 @@ mod interval;
 mod layout;
 mod theme;
 mod virtual_disk;
+mod virtual_disk_workspace;
 
 use super::state::SyncRunning;
 use super::*;

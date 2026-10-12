@@ -137,7 +137,7 @@ fn loaded_entries() -> Vec<GuestFileEntry> {
     ]
 }
 
-fn loaded_virtual_disk_root() -> AppRoot {
+pub(super) fn loaded_virtual_disk_root() -> AppRoot {
     let mut root = test_app_root(ActivePanel::VirtualDisk);
     let entries = loaded_entries();
     root.virtual_disk.vdi_path = Some(std::path::PathBuf::from("fixture.vdi"));
@@ -183,40 +183,12 @@ fn virtual_disk_panel_registers_navigation_and_renders_read_only_shell(cx: &mut 
         "partition selection card should be rendered"
     );
     assert!(
-        cx.debug_bounds("virtual-disk-current-path").is_some(),
-        "current guest path should be rendered"
+        cx.debug_bounds("virtual-disk-directory-card").is_none(),
+        "unconnected source should show setup, not an empty explorer"
     );
     assert!(
-        cx.debug_bounds("virtual-disk-tree-scroll").is_some(),
-        "folder tree should be rendered"
-    );
-    assert!(
-        cx.debug_bounds("virtual-disk-entry-scroll").is_some(),
-        "file list should be rendered"
-    );
-    assert!(
-        cx.debug_bounds("virtual-disk-layout-controls").is_some(),
-        "file list layout controls should be rendered"
-    );
-    assert!(
-        cx.debug_bounds("virtual-disk-refresh").is_some(),
-        "directory refresh action should be rendered"
-    );
-    assert!(
-        cx.debug_bounds("virtual-disk-parent").is_some(),
-        "parent directory action should be rendered"
-    );
-    assert!(
-        cx.debug_bounds("virtual-disk-copy-card").is_some(),
-        "copy card should be rendered"
-    );
-    assert!(
-        cx.debug_bounds("virtual-disk-target-input").is_some(),
-        "copy target input should be rendered"
-    );
-    assert!(
-        cx.debug_bounds("virtual-disk-copy-start").is_some(),
-        "copy start action should be rendered"
+        cx.debug_bounds("virtual-disk-copy-card").is_none(),
+        "copy controls should wait for a connected filesystem"
     );
     assert!(
         cx.debug_bounds("virtual-disk-safety-notice").is_some(),
@@ -243,7 +215,6 @@ fn virtual_disk_folder_tree_navigates_nested_paths_without_repeated_list_clicks(
     });
     refresh(cx);
 
-    wheel_to_end(cx, "virtual-disk-page", -600.0);
     assert!(cx.debug_bounds("virtual-disk-tree-node-Users").is_some());
     click_debug_element(cx, "virtual-disk-tree-node-Users");
 
@@ -268,13 +239,13 @@ fn virtual_disk_folder_tree_navigates_nested_paths_without_repeated_list_clicks(
         !entries.iter().any(|path| path == "Users/Public/report.txt"),
         "tree navigation must not enumerate descendants before their folder is selected"
     );
-    assert!(cx.debug_bounds("virtual-disk-tree-node-Users-Public").is_some());
+    assert!(cx
+        .debug_bounds("virtual-disk-tree-node-Users-Public")
+        .is_some());
 }
 
 #[gpui::test]
-fn virtual_disk_explorer_keeps_tree_and_file_list_inside_compact_card(
-    cx: &mut TestAppContext,
-) {
+fn virtual_disk_explorer_keeps_tree_and_file_list_inside_workspace(cx: &mut TestAppContext) {
     initialize_components(cx);
     let (_view, cx) = cx.add_window_view(|_, _| loaded_virtual_disk_root());
 
@@ -317,9 +288,7 @@ fn virtual_disk_explorer_keeps_tree_and_file_list_inside_compact_card(
 }
 
 #[gpui::test]
-fn virtual_disk_layout_controls_update_and_reset_readable_column_widths(
-    cx: &mut TestAppContext,
-) {
+fn virtual_disk_layout_controls_update_and_reset_readable_column_widths(cx: &mut TestAppContext) {
     initialize_components(cx);
     let (view, cx) = cx.add_window_view(|_, _| loaded_virtual_disk_root());
 
@@ -333,6 +302,7 @@ fn virtual_disk_layout_controls_update_and_reset_readable_column_widths(
             root.virtual_disk.layout.size_width,
         )
     });
+    click_debug_element(cx, "virtual-disk-layout-toggle");
     click_debug_element(cx, "virtual-disk-layout-attributes-increase");
     click_debug_element(cx, "virtual-disk-layout-size-increase");
     let increased = cx.update(|_, app| {
@@ -429,7 +399,6 @@ fn virtual_disk_panel_renders_loaded_hidden_entries_and_selects_all_with_ctrl_a(
     cx.simulate_resize(size(px(DEFAULT_WINDOW_WIDTH), px(DEFAULT_WINDOW_HEIGHT)));
     refresh(cx);
 
-    wheel_to_end(cx, "virtual-disk-page", -600.0);
     assert!(cx.debug_bounds("virtual-disk-entry-0").is_some());
     assert!(cx.debug_bounds("virtual-disk-entry-1").is_some());
     assert!(cx.debug_bounds("virtual-disk-column-attributes").is_some());
@@ -497,7 +466,10 @@ fn virtual_disk_directory_row_double_click_enters_directory_and_refreshes_entrie
         )
     });
     assert_eq!(current_path, "broken");
-    assert_eq!(entry_count, 0, "double-click entry should refresh the folder");
+    assert_eq!(
+        entry_count, 0,
+        "double-click entry should refresh the folder"
+    );
     assert!(error
         .as_deref()
         .is_some_and(|message| message.contains("손상")));
@@ -582,10 +554,11 @@ fn virtual_disk_panel_renders_copy_progress_and_issue_summary(cx: &mut TestAppCo
         });
     });
     refresh(cx);
-    wheel_to_end(cx, "virtual-disk-page", -1200.0);
 
     assert!(cx.debug_bounds("virtual-disk-copy-summary").is_some());
     assert!(cx.debug_bounds("virtual-disk-copy-start").is_some());
+    assert!(cx.debug_bounds("virtual-disk-issue-suppress-0").is_none());
+    click_debug_element(cx, "virtual-disk-copy-details-toggle");
     assert!(
         cx.debug_bounds("virtual-disk-issue-suppress-0").is_some(),
         "each copy issue should expose a repeat-notification suppression action"
@@ -621,7 +594,7 @@ fn virtual_disk_panel_dispatches_explorer_shortcuts_when_directory_is_focused(
     cx: &mut TestAppContext,
 ) {
     initialize_components(cx);
-    let (_view, cx) = cx.add_window_view(|_, _| test_app_root(ActivePanel::VirtualDisk));
+    let (_view, cx) = cx.add_window_view(|_, _| loaded_virtual_disk_root());
 
     cx.simulate_resize(size(px(DEFAULT_WINDOW_WIDTH), px(DEFAULT_WINDOW_HEIGHT)));
     refresh(cx);

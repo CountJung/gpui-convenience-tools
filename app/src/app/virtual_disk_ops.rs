@@ -4,10 +4,16 @@
 //! `VdiReader`의 read-only 경계로 열며, 디스크·파티션·현재 경로·선택·포커스 상태와
 //! 안전/지원 범위 오류 메시지를 관리한다.
 
-use std::{collections::{BTreeSet, HashSet}, path::PathBuf};
+use std::{
+    collections::{BTreeSet, HashSet},
+    path::PathBuf,
+};
 
 use gpui::{AppContext, Context, Entity, FocusHandle, PathPromptOptions, ScrollHandle, Window};
-use gpui_component::{input::{InputEvent, InputState}, notification::NotificationType};
+use gpui_component::{
+    input::{InputEvent, InputState},
+    notification::NotificationType,
+};
 
 use crate::virtual_disk::{
     ntfs::NtfsGuestFileSource, partition::discover_partitions, vdi::VdiReader, GuestFileAttributes,
@@ -40,6 +46,12 @@ impl GuestDirectoryTreeNode {
 
 /// VDE-013에서 사용하는 오프라인 VDI 탐색 세션.
 pub(crate) struct VirtualDiskSession {
+    // 단계 이동과 상세 펼침은 일시적 화면 상태다. 경로·열 폭 등 사용자 설정은 별도 저장한다.
+    pub(crate) setup_visible: bool,
+    pub(crate) layout_controls_visible: bool,
+    pub(crate) copy_details_visible: bool,
+    pub(crate) copy_details_scroll: ScrollHandle,
+    pub(crate) error_scroll: ScrollHandle,
     pub(crate) path_text: String,
     pub(crate) path_input: Option<Entity<InputState>>,
     pub(crate) initial_guest_path: Option<GuestPath>,
@@ -66,6 +78,11 @@ pub(crate) struct VirtualDiskSession {
 impl Default for VirtualDiskSession {
     fn default() -> Self {
         Self {
+            setup_visible: false,
+            layout_controls_visible: false,
+            copy_details_visible: false,
+            copy_details_scroll: ScrollHandle::default(),
+            error_scroll: ScrollHandle::default(),
             path_text: String::new(),
             path_input: None,
             initial_guest_path: None,
@@ -186,11 +203,7 @@ impl AppRoot {
     ///
     /// 파일을 고르는 것과 실제 VDI를 여는 동작을 분리해, 사용자가 선택 결과를
     /// 확인한 뒤 명시적으로 읽기 전용 검사를 시작할 수 있게 한다.
-    pub(crate) fn pick_virtual_disk_file(
-        &mut self,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) {
+    pub(crate) fn pick_virtual_disk_file(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let receiver = cx.prompt_for_paths(PathPromptOptions {
             files: true,
             directories: false,
@@ -286,11 +299,10 @@ impl AppRoot {
         })();
         match result {
             Ok(source) => {
+                self.virtual_disk.setup_visible = false;
                 self.virtual_disk.source = Some(Box::new(source));
                 self.virtual_disk.selected_partition = Some(index);
-                let initial_guest_path = (self
-                    .virtual_disk
-                    .initial_guest_path_partition_number
+                let initial_guest_path = (self.virtual_disk.initial_guest_path_partition_number
                     == Some(partition_number))
                 .then(|| self.virtual_disk.initial_guest_path.take())
                 .flatten();
@@ -469,7 +481,11 @@ impl AppRoot {
         }
 
         let mut parent_path = GuestPath::root();
-        for component in path.as_str().split('/').filter(|component| !component.is_empty()) {
+        for component in path
+            .as_str()
+            .split('/')
+            .filter(|component| !component.is_empty())
+        {
             let child_path = parent_path
                 .join(component)
                 .expect("normalized guest path component must be valid");
@@ -479,18 +495,20 @@ impl AppRoot {
                 .iter()
                 .any(|node| node.entry.path == child_path)
             {
-                self.virtual_disk.directory_tree.push(GuestDirectoryTreeNode {
-                    entry: GuestFileEntry {
-                        path: child_path.clone(),
-                        kind: GuestFileKind::Directory,
-                        size_bytes: 0,
-                        attributes: GuestFileAttributes::default(),
-                        times: Default::default(),
-                    },
-                    children: Vec::new(),
-                    expanded: true,
-                    loaded: false,
-                });
+                self.virtual_disk
+                    .directory_tree
+                    .push(GuestDirectoryTreeNode {
+                        entry: GuestFileEntry {
+                            path: child_path.clone(),
+                            kind: GuestFileKind::Directory,
+                            size_bytes: 0,
+                            attributes: GuestFileAttributes::default(),
+                            times: Default::default(),
+                        },
+                        children: Vec::new(),
+                        expanded: true,
+                        loaded: false,
+                    });
             }
 
             let child_entry = self
@@ -688,7 +706,8 @@ mod tests {
     fn encrypted_partition_error_explains_the_offline_boundary() {
         let message = format_virtual_disk_error(&VirtualDiskError::UnsupportedFormat {
             kind: UnsupportedFormatKind::FileSystem,
-            detail: "BitLocker로 암호화된 파티션이라 복구 키 없이는 파일을 열 수 없습니다".to_string(),
+            detail: "BitLocker로 암호화된 파티션이라 복구 키 없이는 파일을 열 수 없습니다"
+                .to_string(),
         });
 
         assert!(message.contains("BitLocker"));

@@ -1023,6 +1023,20 @@ TACS의 `$Extend/$RmMetadata/$TxfLog`에서 2MiB 파일을 대상으로 `-ReadDe
 네이티브 대화상자 표시까지 확인했지만 소유 창 입력 제한으로 선택·취소가 남았다.
 이 단계는 Phase O 전체 완료가 아니다. 정확한 명령·캡처·후속 조건은 `VERIFICATION.md`다.
 
+### Phase O-36 — VDE-026 파일 탐색 중심 full-height 작업 화면 수용 완료 ✅
+
+2026-10-12 파일/파티션 설정 단계와 연결 후 탐색 작업 화면을 분리하고, 디스크 변경/탐색
+복귀·접이식 열 너비·하단 copy footer·목록 할당 높이를 유지하는 보조 결과 오버레이를
+구현했다. 복사 중 설정 단계 이동 차단과 긴 오류의 최대 48px 스크롤도 반영했다.
+사용자 흐름·Mermaid 배치는 [README.md](README.md#virtualbox-workspace), 모듈 책임·크기는
+[PROJECT_MAP.md](PROJECT_MAP.md), 구현·검증 담당자 확인 결과와 해시별 증거는
+[VERIFICATION.md](VERIFICATION.md#vde-026-workspace-evidence)를 참조한다.
+
+요청 범위의 구현·검증 완료에 따라 활성 TODO에서 제거했다. 커밋 게이트와 기본 앱 갱신
+상태는 위 검증 정본을 참조한다. Phase O 전체 완료가 아니며 OS 파일 선택·취소 확인은
+기존 작업으로 유지한다. 최신 실제 디스크 진단은 이 구현 범위가 아니고, 과거 MSR·BitLocker
+기록은 당시 조건의 역사로 보존한다.
+
 ### G-001 — 공용 버튼 스타일 검증 완료 ✅
 
 2026-09-30 실용 검증 기준에 따라 기존 관련 bounds 테스트와 파일 동기화·자동 시작
@@ -1158,6 +1172,7 @@ flowchart TD
 세부 오프라인 작업은 `TODO.md`의 O-2~O-5에서 추적한다. TODO의 실행 중 VM 후속
 구획(O-6)은 사용자 결정으로 종료했다. 이는 위의 과거 완료 이력 `Phase O-6`(NTFS 탐색)과
 다르다. `VDE-001`·`VDE-002`의 결정은 위의 Phase O-1 완료 기록을 정본으로 한다.
+
 
 ### Phase D — 파일 동기화 고도화 🗓
 
