@@ -266,7 +266,7 @@ pwsh -NoProfile -File scripts/Test-VdiSafetyE2E.ps1 -Action Stop -SessionPath <s
 
 <a id="vde-026-workspace-evidence"></a>
 
-## 2026-10-12 탐색 작업 화면 — 수용 완료 (커밋 직전)
+## 2026-10-12 탐색 작업 화면 — 구현·검증·커밋 완료
 
 대상은 기준 HEAD `37c6353` 위의 VDE-026 작업 트리다. Windows 로컬에서 구현/검증
 담당자가 전달한 최종 결과와 실제 캡처를 기록한다. 문서 담당자는 소스·테스트 단언과
@@ -332,9 +332,10 @@ workspace 테스트 4개와 변경된 목록 경계 테스트는 `scripts/Verify
 - 최종 바이너리는 사용자 실행 중인 기본 exe를 교체하지 않고 `target/release/deps`의
   suffix 바이너리로 빌드했다. 기본 앱 갱신은 별도 사용자 앱 종료 후 빌드가 필요하다.
 
-2026-10-12 요청 범위의 구현·검증 완료에 따라 활성 TODO를 닫고 완료 검증 행으로 옮긴다.
-이는 수용 완료·커밋 직전 준비이며 **C 게이트는 [ ]**다. 메인 담당자가 검증 후 승인된
-커밋/푸시를 수행하고 결과를 전달한 뒤에만 체크한다. 남은 Phase O OS 파일 선택·취소
+2026-10-12 요청 범위의 구현·검증 완료에 따라 활성 TODO를 닫고 완료 검증 행으로 옮겼다.
+구현 커밋 `7570a64`를 `origin/main`으로 푸시한 뒤 fetch, 로컬/원격 해시 일치,
+ahead/behind `0/0`과 clean 상태를 확인해 **C 게이트를 [x]**로 기록한다.
+남은 Phase O OS 파일 선택·취소
 작업은 그대로 유지한다. 최신 실제 디스크 진단은 이 구현 범위가 아니며 과거 MSR·BitLocker
 기록은 당시 조건의 역사로 보존한다.
 
@@ -385,7 +386,7 @@ G-003의 실제 divider 드래그 경로는 검증 하네스에 `-Action Drag -X
 
 | ID | 프로필 | B | T | E | V | R | C | 증거 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| VDE-026 | E2E | [x] | [x] | [x] | [x] | [x] | [ ] | 2026-10-12 구현·검증 담당자 확인 결과: 전체 203 passed·0 failed·7 ignored, 관련 85 passed·3 ignored, check·Clippy 경고 0·suffix release·변경 파일 rustfmt 및 코드 재리뷰 통과. 최종 1000×700 실제 화면 수용 완료, 단계 왕복은 이전 후보 해시로 구분. [해시별 증거·확인 한계](#vde-026-workspace-evidence) 참조. 요청 범위의 구현·검증 완료에 따라 TODO 종료·완료 이력 이동; C는 메인 담당자의 커밋/푸시 결과 전달 후 체크. |
+| VDE-026 | E2E | [x] | [x] | [x] | [x] | [x] | [x] | 2026-10-12 전체 203 passed·0 failed·7 ignored, 관련 85 passed·3 ignored, check·Clippy 경고 0·suffix release·변경 파일 rustfmt 및 코드 재리뷰 통과. 최종 1000×700 실제 화면 수용 완료, 단계 왕복은 이전 후보 해시로 구분. [해시별 증거·확인 한계](#vde-026-workspace-evidence) 참조. 구현·검증 완료로 TODO 종료; `7570a64` 푸시 후 fetch·원격 해시 일치·ahead/behind 0/0·clean 확인. |
 
 `VDE-014`·`VDE-015`·`VDE-016`·`VDE-025`는 추가 검증을 선택 범위로 옮긴 기록이다.
 해당 행의 E `—`는 이번 수용 범위에서 제외했다는 뜻이며 이전 미검증 사실을 지우지 않는다.
