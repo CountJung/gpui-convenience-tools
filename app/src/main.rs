@@ -15,6 +15,7 @@ mod openssl_codec;
 mod platform;
 mod process_monitor;
 mod quick_launcher;
+mod screenshot_tool;
 mod sync;
 mod sync_history;
 mod theme;
@@ -121,6 +122,9 @@ fn main() {
             |window, cx| {
                 window.set_window_title("gpui-convenience-tools");
                 let view = cx.new(AppRoot::new);
+                view.update(cx, |this, cx| {
+                    this.seed_screenshot_validation_preview(window, cx);
+                });
                 cx.new(|cx| Root::new(view, window, cx))
             },
         )

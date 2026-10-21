@@ -4,6 +4,27 @@
 당시 문맥이며 현재 규칙이나 열린 작업이 아니다. 현재 단계는 [MASTER_PLAN.md](MASTER_PLAN.md),
 규칙은 [DEVELOPMENT_GUIDE.md](DEVELOPMENT_GUIDE.md), 현재 구조는 [PROJECT_MAP.md](PROJECT_MAP.md)를 따른다.
 
+<a id="e004-implementation-stage"></a>
+<a id="e004-implementation-draft"></a>
+
+## 2026-10-21 — E-004 스크린샷 도구
+
+수동 캡처·영역 선택·PNG 저장/이미지 복사·설정 복원·자동 저장·전체 저장 통합과 자동 검증을 완료했다.
+격리 release의 합성 이미지 화면 검증을 완료했다. 개인 전체 화면·실제 OS 클립보드·mixed-DPI 실환경은 미검증이다.
+상세 근거·미검증 경계·Git 후속은 [검증 기록](VERIFICATION_RECORDS.md#e004-evidence)을 따른다.
+
+- `screenshot_tool.rs`와 하위 geometry·storage 모듈이 이미지 크기 한도·영역 좌표·자르기·
+  PNG 변환·기존 파일을 덮어쓰지 않는 저장을 맡는다. 현재 이미지 1장만 메모리에 유지한다.
+- `screenshot_tool/platform`은 모니터 신원·배치를 대조하고 Windows GDI 수동 캡처를 맡는다.
+  캡처 전후 배치가 달라지면 결과를 채택하지 않으며 시작·주기·전역 단축키 캡처는 없다.
+- `app/screenshot_ops.rs`와 하위 monitor·processing·export 모듈, `window/screenshot.rs`가
+  미리보기 드래그·선택 해제·자르기·PNG 저장·클립보드 쓰기/확인과 상태 표시를 제공한다.
+  캡처·픽셀 처리·파일 저장은 백그라운드 경로를 사용하며 메모리 지우기는 파일·클립보드를 변경하지 않는다.
+- `ScreenshotConfig`는 캡처 대상·모니터 식별/배치·저장 폴더·기본 OFF 자동 저장 옵션만 보존한다.
+  Windows 메뉴·시작 시 복원·개별 자동 저장·전체 저장에 연결했다.
+  자동 저장은 수동 캡처 직후 전체 원본을 저장한다. 사용법·개인정보 주의는
+  [README.md](README.md#스크린샷-도구--e-004)에 둔다.
+
 <a id="e003-implementation-stage"></a>
 <a id="e003-implementation-draft"></a>
 

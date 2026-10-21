@@ -9,6 +9,33 @@ Set-StrictMode -Version 2.0
 $repoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 $packageName = "gpui-convenience-tools"
 $visualTests = @(
+    "screenshot_default_window_preview_visible_with_many_monitors",
+    "screenshot_gdi_owned_memory_source_capture_and_cleanup",
+    "screenshot_global_save_and_navigation_preserve_only_preferences",
+    "screenshot_gpui_monitor_changes_latch_block_capture_and_autosave_until_reselected",
+    "screenshot_selection_snapshot_defers_crop_and_busy_reset_is_ignored",
+    "screenshot_gpui_drag_crop_copy_and_clear_use_only_mock_clipboard",
+    "screenshot_gpui_settings_restore_without_image_history",
+    "screenshot_gpui_png_dialog_cancel_save_unique_and_failure_stay_isolated",
+    "screenshot_gpui_empty_drag_does_not_silently_export_whole_image",
+    "screenshot_gpui_preview_scales_and_minimum_window_scroll_reaches_exports",
+    "screenshot_validation_requires_both_explicit_absolute_paths",
+    "screenshot_validation_rejects_escape_directory_wrong_format_and_size",
+    "screenshot_validation_png_limits_precede_pixel_allocation_and_crop_is_immutable",
+    "screenshot_validation_gpui_seeds_preview_without_autosave_then_crops_synthetic",
+    "screenshot_validation_gpui_invalid_seed_keeps_preview_selection_and_settings",
+    "screenshot_config_updates_preserve_other_fields_and_legacy_loads",
+    "screenshot_config_has_private_compatible_defaults",
+    "screenshot_png_roundtrip_and_crop_preserve_original_pixels",
+    "screenshot_dimensions_and_crop_edges_fail_closed",
+    "screenshot_preview_letterbox_reverse_drag_scale_and_clamp",
+    "screenshot_preview_rejects_empty_nonfinite_and_letterbox_points",
+    "screenshot_monitor_union_preserves_negative_origins_and_different_sizes",
+    "screenshot_png_save_creates_unique_names_without_overwrite_and_handles_failure",
+    "screenshot_failed_write_removes_only_its_new_partial_file",
+    "screenshot_failed_partial_cleanup_is_reported_not_hidden",
+    "screenshot_monitor_primary_change_and_disconnect_require_reselection",
+    "screenshot_monitor_legacy_ambiguous_and_layout_changes_fail_closed",
     "mock_settings_actions_do_not_write_without_side_effects",
     "launcher_gpui_register_search_select_script_cancel_edit_delete",
     "launcher_gpui_hotkey_event_only_navigates_and_restores_without_panel_entry",
@@ -127,6 +154,9 @@ try {
         throw ("Visual harness syntax errors: " + (($parseErrors | ForEach-Object Message) -join "; "))
     }
     Write-Host "VISUAL_HARNESS_SYNTAX_VERIFIED"
+    Invoke-CheckedCommand -Executable "pwsh" -Arguments @(
+        "-NoProfile", "-File", (Join-Path $repoRoot "scripts\visual-validation\Test-ScreenshotSeed.ps1")
+    )
 
     Invoke-CheckedCommand -Executable "cargo" -Arguments @(
         "check", "-p", $packageName

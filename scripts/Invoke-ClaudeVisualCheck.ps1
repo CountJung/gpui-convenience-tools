@@ -47,6 +47,9 @@ param(
     # Start 전용. 합성 텍스트 이력 index만 격리 루트에 넣는다. 사용자 클립보드는 읽지 않는다.
     [string]$SeedClipboardHistory,
 
+    # Start 전용. 합성 PNG만 격리 data_dir로 복사하여 screenshot preview를 채운다.
+    [string]$SeedScreenshotPNG,
+
     # Start 전용. 검증 전용 격리 VDI 복사본을 만들 원본 경로.
     [string]$SeedVdi,
 
@@ -76,7 +79,7 @@ param(
     [int]$VdiPartitionNumber,
 
     # Start 전용. 검증 전용 환경 변수로 패널 전환 입력 없이 특정 화면을 연다.
-    [ValidateSet("Dashboard", "FileSync", "VirtualDisk", "OpenSsl", "Timestamp", "ProcessMonitor", "ClipboardHistory", "QuickLauncher", "AutoStart", "Settings")]
+    [ValidateSet("Dashboard", "FileSync", "VirtualDisk", "OpenSsl", "Timestamp", "ProcessMonitor", "ClipboardHistory", "QuickLauncher", "Screenshot", "AutoStart", "Settings")]
     [string]$InitialPanel = "Dashboard",
 
     [string]$Name = "capture",
@@ -96,6 +99,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version 2.0
+. (Join-Path $PSScriptRoot 'visual-validation\ScreenshotSeed.ps1')
 
 $repoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 $validationRoot = Join-Path $repoRoot "target\visual-validation"
@@ -518,11 +522,14 @@ switch ($Action) {
             Copy-Item -LiteralPath $clipboardSeedPath -Destination (Join-Path $clipboardSeedRoot "index.json")
         }
 
+        $validationScreenshotPath = Copy-ValidationScreenshotSeed -SeedPath $SeedScreenshotPNG -DataDir $appData
+
         # 앱은 `dirs::config_dir()`(= `SHGetKnownFolderPath`)로 데이터 루트를 찾으므로
         # `APPDATA`만 바꿔서는 격리되지 않는다. 전용 변수를 프로세스 범위로 지정해야
         # 사용자의 실제 config.json·로그를 건드리지 않는다.
         $previousAppData = $env:APPDATA
         $previousDataDir = $env:GPUI_CONVENIENCE_TOOLS_DATA_DIR
+        $previousScreenshotPng = $env:GPUI_CONVENIENCE_TOOLS_VALIDATION_SCREENSHOT_PNG
         $previousInitialPanel = $env:GPUI_CONVENIENCE_TOOLS_INITIAL_PANEL
         $previousValidationVdiPath = $env:GPUI_CONVENIENCE_TOOLS_VALIDATION_VDI_PATH
         $previousValidationVdiTarget = $env:GPUI_CONVENIENCE_TOOLS_VALIDATION_VDI_TARGET
@@ -536,6 +543,11 @@ switch ($Action) {
         try {
             $env:APPDATA = $appData
             $env:GPUI_CONVENIENCE_TOOLS_DATA_DIR = $appData
+            Remove-Item Env:\GPUI_CONVENIENCE_TOOLS_VALIDATION_SCREENSHOT_PNG -ErrorAction SilentlyContinue
+            Remove-Item Env:\GPUI_CONVENIENCE_TOOLS_INITIAL_PANEL -ErrorAction SilentlyContinue
+            if ($null -ne $validationScreenshotPath) {
+                $env:GPUI_CONVENIENCE_TOOLS_VALIDATION_SCREENSHOT_PNG = $validationScreenshotPath
+            }
             if ($InitialPanel -eq "FileSync") {
                 $env:GPUI_CONVENIENCE_TOOLS_INITIAL_PANEL = "file_sync"
             }
@@ -556,6 +568,9 @@ switch ($Action) {
             }
             elseif ($InitialPanel -eq "QuickLauncher") {
                 $env:GPUI_CONVENIENCE_TOOLS_INITIAL_PANEL = "quick_launcher"
+            }
+            elseif ($InitialPanel -eq "Screenshot") {
+                $env:GPUI_CONVENIENCE_TOOLS_INITIAL_PANEL = "screenshot"
             }
             elseif ($InitialPanel -eq "AutoStart") {
                 $env:GPUI_CONVENIENCE_TOOLS_INITIAL_PANEL = "auto_start"
@@ -602,6 +617,10 @@ switch ($Action) {
                 Remove-Item Env:\GPUI_CONVENIENCE_TOOLS_DATA_DIR -ErrorAction SilentlyContinue
             }
             else { $env:GPUI_CONVENIENCE_TOOLS_DATA_DIR = $previousDataDir }
+            if ($null -eq $previousScreenshotPng) {
+                Remove-Item Env:\GPUI_CONVENIENCE_TOOLS_VALIDATION_SCREENSHOT_PNG -ErrorAction SilentlyContinue
+            }
+            else { $env:GPUI_CONVENIENCE_TOOLS_VALIDATION_SCREENSHOT_PNG = $previousScreenshotPng }
             if ($null -eq $previousInitialPanel) {
                 Remove-Item Env:\GPUI_CONVENIENCE_TOOLS_INITIAL_PANEL -ErrorAction SilentlyContinue
             }

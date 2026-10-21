@@ -45,6 +45,7 @@ impl AppRoot {
         let process_monitor = self.process_monitor.config.clone();
         let clipboard = self.clipboard.config.clone();
         let launcher = self.launcher.config.clone();
+        let screenshot = self.screenshot.config.clone();
         let virtual_disk = VirtualDiskConfig {
             last_vdi_path: non_empty_string(&self.virtual_disk.path_text),
             last_partition_number: self
@@ -75,12 +76,14 @@ impl AppRoot {
             config.process_monitor = process_monitor;
             config.clipboard = clipboard;
             config.launcher = launcher;
+            config.screenshot = screenshot;
         });
         self.openssl.save_error = result.is_err();
         self.timestamp.save_error = result.is_err();
         self.process_monitor.save_error = result.is_err();
         self.clipboard.save_error = result.is_err();
         self.launcher.save_error = result.is_err();
+        self.screenshot.save_error = result.is_err();
         result?;
 
         Ok(())

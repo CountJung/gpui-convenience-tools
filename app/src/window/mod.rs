@@ -7,6 +7,7 @@ pub mod launcher;
 pub mod log_view;
 pub mod openssl;
 pub mod process;
+pub mod screenshot;
 pub mod service_mgr;
 pub mod service_view;
 pub mod settings;

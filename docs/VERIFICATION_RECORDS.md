@@ -4,6 +4,57 @@
 현재 코드의 재검증 결과로 보지 않는다. 현재 절차와 열린 게이트는 [VERIFICATION.md](VERIFICATION.md),
 남은 일은 [TODO.md](TODO.md)를 따른다. 2026-10-19 문서 정리에서 원문 근거를 이관했다.
 
+<a id="e004-evidence"></a>
+
+## 2026-10-21 — E-004 스크린샷 도구 통합 검증
+
+- 대상·환경: `fba164c` 이후 Windows E-004 통합 작업 트리. 합성 PNG와 격리 저장소,
+  GPUI 메모리 클립보드만 사용한다. 실제 사용자 화면 캡처·OS 클립보드 변경은 검증 범위에서 제외했다.
+- 자동: `cargo test --workspace --all-targets --all-features --offline` 최종 **317 passed /
+  9 ignored / 0 failed**. 같은 범위 check·clippy `-D warnings`, 변경 Rust fmt와 변경
+  PowerShell 4개 파일 구문 검사 통과. 필수 테스트 이름 103개의 유일한 등록도 확인했다.
+  이 결과는 전체 `Verify-Workspace.ps1` 재실행과는 구분한다.
+- GPUI: 메뉴 이동·기본/최소 창·12개 모니터의 대상 목록 제한·이미지 fit·역방향/여백/빈 영역
+  선택·자르기·선택 취소·메모리 지우기·PNG 대화상자 결과/취소/실패·기존 파일 비덮어쓰기·
+  부분 파일 정리 실패·동시 작업 차단을 단언했다. 개별 자동 저장·전체 저장·기존 설정 호환·
+  재로드 시 설정만 복원하고 이미지·선택은 남기지 않는 경로를 확인했다.
+- 모니터 식별은 표시 번호가 아닌 장치 인터페이스 ID와 배치·주 모니터 정보를 묶는다.
+  교체·분리·주 모니터 전환·구형 인덱스의 모호함은 재선택 전 캡처/자동 저장을 차단한다.
+  이 토폴로지 변화는 합성 입력으로 검증했으며 실제 핫플러그를 수행한 결과가 아니다.
+- 실제 Windows GDI: 화면 DC 없이 소유 32×24 top-down 32bpp DIB에 적/청 패턴을 만들고
+  제품 `capture_rect → BitBlt/CAPTUREBLT → GetDIBits → PNG`를 8회 실행했다.
+  전체 픽셀의 상하 방향·채널 순서·불투명 alpha와 해제 API 성공·핸들 초기화를 단언했다.
+  숨겨진 STATIC 창의 PrintWindow가 0을 반환한 초기 fixture와, 해제 후 핸들 조회가 병렬
+  핸들 재사용과 경합한 실패를 보존하고 이 경로 의존을 제거했다. 별도 표시 팝업/PrintWindow
+  ignored fixture는 추가 승인 없이 실행하지 않았다. 개인 데스크톱 합성 캡처의 성공으로 확대하지 않는다.
+- 영역 변환은 f32 중간값의 ceil 오차로 선택 높이가 1px 늘어나는 실패를 수정하고 f64
+  중간 계산으로 회귀를 통과했다. 첫 실제 PNG `e004-default-140253.png`에서 이미지 하단 잘림을
+  발견했다. Img의 고유 비율 레이아웃이 컨테이너를 넘는 것을 새 bounds 단언으로 재현했고,
+  최종적으로 Canvas가 선택 좌표와 동일한 fit 영역에 직접 그리도록 수정했다.
+  성공한 실제 paint bounds와 fit 일치·컨테이너 내부 포함을 단언하며 첫 PNG는 통과 증거가 아니다.
+- 합성 PNG 검증 seam은 명시적 절대 data_dir와 그 내부 PNG가 모두 있을 때만 동작한다.
+  경로 이탈·다른 파일 형식·크기/디코드 한도·기존 이미지 보존을 검증했다. 하네스는
+  `-SeedScreenshotPNG`로 격리 파일만 신규 복사한다. `Test-ScreenshotSeed.ps1`의 파일 전용
+  복사·기존 파일 거부·잘못된 헤더/초과 크기 거부 회귀는 `SCREENSHOT_SEED_COPY_VERIFIED` 통과했다.
+- 최종 별도 release: `cargo rustc -p gpui-convenience-tools --release --offline -- -o
+  .../target/screenshot-validation.exe` 성공(출력 경로 경고 2개).
+  SHA-256 `9bf0198339ea372896667c5da674fc66e9622c5e17eac27581c64c43de2747a1`.
+  OFF 설정의 `e003-config.json`과 자체 생성 `e004-preview.png`(640×360)를 주입해
+  `target/visual-validation/captures/e004-fit-default-140905.png`(1000×700),
+  `e004-fit-minimum-140905.png`(920×480)를 직접 관찰했다. 기본 창에서 전체 이미지·주요
+  내보내기 버튼이 보이며 최소 창의 아래 내용은 페이지 스크롤 대상이다. 끝 도달은 GPUI로 확인했다.
+- 검증 PID 46888·17948과 각 세션 임시 루트는 정리(`sessionRootExists=false`)했다.
+  최종 루트는 `gpui-claude-visual-f9ea882db837412da7b2e5cdfaa69f50`.
+  시작 포커스를 복원했고 종료 때 바뀐 사용자 포커스는 덮어쓰지 않았다. 전역 키/마우스 입력
+  없이 소유 앱 창만 캡처·리사이즈했으며 사용자 PID 10208과 일반 release EXE는 유지했다.
+- 구조 검사: 전체 130파일·38,180줄·최대 907줄·경고 4개·1,000줄 위반 없음.
+  Code Reviewer Sagan의 준비 모듈 검토와 Error Reviewer Noether의 중앙 연결·GDI·Canvas
+  정적 검토를 통과했다. Noether도 최종 PNG 두 장을 직접 관찰해 첫 잘림 해소와
+  컨트롤 비겹침을 시각 PASS로 판정했다(독립 앱 재실행이 아닌 기존 증거 검토).
+  실제 OS 파일 대화상자 조작·OS 클립보드 읽기/쓰기·개인 화면 캡처·
+  혼합 DPI/핫플러그·DRM/잠금/원격 세션은 미실행이다. UI 스레드의 GPU 업로드·OS 클립보드
+  재인코딩/확인 지연도 실측하지 않았다. 자동 수집·시작 캡처·주기 캡처는 구현하지 않는다.
+
 <a id="e003-evidence"></a>
 
 ## 2026-10-21 — E-003 빠른 실행기 통합 검증
@@ -43,6 +94,8 @@
   macOS 실행은 미실행이며 내부 결과 전달·Windows 메시지/프로세스 검증과 구분한다.
 - 구조 측정은 E-003 포함 111개·34,523줄·최대 907줄·경고 4개, 위반 0개다.
   미통합 E-004는 제외했으므로 전체 작업 트리 구조 assertion의 통과로 표현하지 않는다.
+- Git 후속: `fba164ca2a1bad85f016eb36e9bc8011d1c56d4c`로 E-003을 독립 커밋·푸시했다.
+  fetch 후 HEAD와 origin/main 일치, ahead/behind 0/0. E-004 미추적 소스는 해당 커밋에서 제외했다.
 
 <a id="e001-evidence"></a>
 

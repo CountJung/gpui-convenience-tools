@@ -150,7 +150,6 @@ SHA-256을 기록한다. Visual Reviewer는 필요한 항목만 선택 검토하
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | C-002 | E2E | [x] | [x] | [ ] | [x] | [x] | [x] | [기존 설정 검증](VERIFICATION_RECORDS.md#c002-settings-evidence). 사용자 프로필 재시작 확인 미완료. |
 | VDE-023 | GPUI | [x] | [x] | [ ] | [x] | [x] | [x] | 2026-09-30 실제 release의 찾아보기 클릭으로 네이티브 열기 대화상자를 표시했다. `set_value`는 not settable 오류, 좌표/키 입력 후 파일 이름 포커스·값 불변, 취소 클릭은 부모/소유 창 target mismatch로 차단됐다. 선택→경로 반영·취소→기존 경로 유지 각 1회는 미검증. 검증 PID 21100만 종료했고 사용자 PID 8488은 유지. |
-| E-004 | E2E | [ ] | [ ] | [ ] | [ ] | [ ] | [ ] | — |
 | K-001 | RUST | [ ] | [ ] | — | — | [ ] | [ ] | — |
 | G-003 | E2E | [x] | [x] | [ ] | [x] | [x] | [x] | [기존 폭 검증](VERIFICATION_RECORDS.md#g003-splitter-evidence). GPUI drag/mouse-up 저장·복원 단언 미완료. |
 | K-002 | RUST | [ ] | [ ] | — | — | [ ] | [ ] | macOS 메뉴 막대 지원은 macOS 실행 환경 확인 후 진행 |

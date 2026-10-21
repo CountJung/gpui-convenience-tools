@@ -244,6 +244,7 @@ pub enum ActivePanel {
     ProcessMonitor,
     ClipboardHistory,
     QuickLauncher,
+    Screenshot,
     Services,
     AutoStart,
     Logs,
@@ -256,7 +257,7 @@ pub enum ActivePanel {
 /// 대응물이 없다. **그 플랫폼에서는 메뉴 자체를 노출하지 않는다** — 눌러 봐야 미지원
 /// 안내만 나오는 항목을 남겨 두면 앱이 고장 난 것처럼 보인다.
 #[cfg(target_os = "windows")]
-pub(crate) const NAV_TOOLS: [(ActivePanel, &str, &str); 9] = [
+pub(crate) const NAV_TOOLS: [(ActivePanel, &str, &str); 10] = [
     (
         ActivePanel::AdBlock,
         "웹뷰 광고 차단",
@@ -301,6 +302,11 @@ pub(crate) const NAV_TOOLS: [(ActivePanel, &str, &str); 9] = [
         ActivePanel::QuickLauncher,
         "빠른 실행기",
         "신뢰 등록한 앱·폴더·스크립트 실행",
+    ),
+    (
+        ActivePanel::Screenshot,
+        "스크린샷",
+        "수동 캡처·영역 선택·PNG 저장",
     ),
 ];
 

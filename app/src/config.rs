@@ -8,6 +8,7 @@ pub(crate) mod launcher;
 mod openssl;
 mod persistence;
 pub(crate) mod process;
+pub(crate) mod screenshot;
 mod timestamp;
 pub use clipboard::ClipboardConfig;
 pub use launcher::LauncherConfig;
@@ -19,6 +20,7 @@ pub use persistence::{
     update_config,
 };
 pub use process::{ProcessMonitorConfig, ProcessSort};
+pub use screenshot::{CaptureTarget, ScreenshotConfig};
 pub use timestamp::TimestampConfig;
 
 use crate::app::TargetApp;
@@ -94,6 +96,8 @@ pub struct AppConfig {
     pub clipboard: ClipboardConfig,
     #[serde(default)]
     pub launcher: LauncherConfig,
+    #[serde(default)]
+    pub screenshot: ScreenshotConfig,
 }
 
 fn default_scan_interval_secs() -> u32 {
@@ -395,6 +399,7 @@ impl Default for AppConfig {
             process_monitor: ProcessMonitorConfig::default(),
             clipboard: ClipboardConfig::default(),
             launcher: LauncherConfig::default(),
+            screenshot: ScreenshotConfig::default(),
         }
     }
 }
