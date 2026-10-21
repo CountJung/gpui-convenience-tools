@@ -12,6 +12,7 @@ mod config_layout;
 mod logging;
 mod openssl_codec;
 mod platform;
+mod process_monitor;
 mod sync;
 mod sync_history;
 mod theme;

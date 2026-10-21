@@ -19,7 +19,8 @@ GPUI 기반 다용도 데스크탑 보조 도구 모음의 단계 범위와 현�
   [구현 이력](IMPLEMENTATION_HISTORY.md#time001-implementation-stage)과
   [검증 기록](VERIFICATION_RECORDS.md#time001-evidence)을 따른다.
 - 신규 편의 기능 `E-001`~`E-004`: 2026-10-21 사용자가 전체 구현과 각 작업의 커밋·푸시를 승인했다.
-  클립보드·프로세스 모니터·빠른 실행기·스크린샷은 병행 구현 중이고 통합·검증 전이다.
+  프로세스 모니터는 통합·자동/Windows 화면 검증을 완료했다. [완료 근거](VERIFICATION_RECORDS.md#e002-evidence)를 참조한다.
+  클립보드·빠른 실행기·스크린샷은 병행 구현 중이고 통합·검증 전이다.
   [사용 안내 초안](README.md#phase-e-사용-안내-초안)과
   [안전 기본값](DEVELOPMENT_GUIDE.md#phase-e-승인-범위와-안전-기본값)을 따른다.
 - macOS 네이티브 확장: 범위 결정과 환경 확보 후 진행한다.

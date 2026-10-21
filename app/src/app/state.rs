@@ -241,6 +241,7 @@ pub enum ActivePanel {
     VirtualDisk,
     OpenSsl,
     Timestamp,
+    ProcessMonitor,
     Services,
     AutoStart,
     Logs,
@@ -253,7 +254,7 @@ pub enum ActivePanel {
 /// 대응물이 없다. **그 플랫폼에서는 메뉴 자체를 노출하지 않는다** — 눌러 봐야 미지원
 /// 안내만 나오는 항목을 남겨 두면 앱이 고장 난 것처럼 보인다.
 #[cfg(target_os = "windows")]
-pub(crate) const NAV_TOOLS: [(ActivePanel, &str, &str); 6] = [
+pub(crate) const NAV_TOOLS: [(ActivePanel, &str, &str); 7] = [
     (
         ActivePanel::AdBlock,
         "웹뷰 광고 차단",
@@ -283,6 +284,11 @@ pub(crate) const NAV_TOOLS: [(ActivePanel, &str, &str); 6] = [
         ActivePanel::Timestamp,
         "타임스탬프 변환",
         "Unix 초 ↔ 한국 시간·UTC",
+    ),
+    (
+        ActivePanel::ProcessMonitor,
+        "프로세스 모니터",
+        "CPU·메모리 사용량 확인 및 안전한 종료",
     ),
 ];
 

@@ -5,6 +5,7 @@ use std::{fs, path::PathBuf};
 
 mod openssl;
 mod persistence;
+pub(crate) mod process;
 mod timestamp;
 pub use openssl::OpenSslConfig;
 #[cfg(test)]
@@ -13,6 +14,7 @@ pub use persistence::{
     effective_config_path, load_config, open_config_file, save_theme_mode, save_theme_selection,
     update_config,
 };
+pub use process::{ProcessMonitorConfig, ProcessSort};
 pub use timestamp::TimestampConfig;
 
 use crate::app::TargetApp;
@@ -82,6 +84,8 @@ pub struct AppConfig {
     pub openssl: OpenSslConfig,
     #[serde(default)]
     pub timestamp: TimestampConfig,
+    #[serde(default)]
+    pub process_monitor: ProcessMonitorConfig,
 }
 
 fn default_scan_interval_secs() -> u32 {
@@ -380,6 +384,7 @@ impl Default for AppConfig {
             virtual_disk: VirtualDiskConfig::default(),
             openssl: OpenSslConfig::default(),
             timestamp: TimestampConfig::default(),
+            process_monitor: ProcessMonitorConfig::default(),
         }
     }
 }

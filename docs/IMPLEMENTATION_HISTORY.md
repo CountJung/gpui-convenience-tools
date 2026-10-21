@@ -4,6 +4,19 @@
 당시 문맥이며 현재 규칙이나 열린 작업이 아니다. 현재 단계는 [MASTER_PLAN.md](MASTER_PLAN.md),
 규칙은 [DEVELOPMENT_GUIDE.md](DEVELOPMENT_GUIDE.md), 현재 구조는 [PROJECT_MAP.md](PROJECT_MAP.md)를 따른다.
 
+<a id="e002-implementation-stage"></a>
+
+## 2026-10-21 — E-002 프로세스 모니터
+
+- 별도 작업 스레드로 CPU·메모리 스냅샷을 갱신하고 이름/PID/경로 검색·정렬·표시 개수를
+  제공한다. 해당 패널이 열렸을 때만 자동 갱신하며 정렬·주기·개수는 자동 저장한다.
+- 종료는 선택→확인이 필요하다. 보호/다른 사용자/불명확한 신원을 거부하고 Windows의
+  동일 핸들로 생성 시각·경로·critical 여부를 검증한 뒤 요청한다. 자동 승격·트리 종료는 없다.
+- 조회 실패 시 이전 행을 오래된 정보로 표시하고 선택을 해제한다. 실제 화면에서 발견한
+  도움말 압축은 독립 행과 폭/비겹침 회귀 단언으로 수정했다.
+- 자동·실제 소유 프로세스·화면 검증의 수치·해시·범위는
+  [검증 결과 기록](VERIFICATION_RECORDS.md#e002-evidence)을 따른다.
+
 <a id="time001-implementation-stage"></a>
 
 ## 2026-10-21 — TIME-001 Unix 초·한국어 날짜 변환 구현

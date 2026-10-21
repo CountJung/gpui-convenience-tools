@@ -17,6 +17,7 @@ pub(super) fn initial_panel_from_validation_env() -> ActivePanel {
         Some("virtual_disk") => ActivePanel::VirtualDisk,
         Some("openssl") => ActivePanel::OpenSsl,
         Some("timestamp") => ActivePanel::Timestamp,
+        Some("process_monitor") => ActivePanel::ProcessMonitor,
         Some("auto_start") => ActivePanel::AutoStart,
         Some("settings") => ActivePanel::Settings,
         _ => ActivePanel::Dashboard,
