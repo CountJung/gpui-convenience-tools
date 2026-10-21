@@ -10,6 +10,7 @@ mod app;
 mod config;
 mod config_layout;
 mod logging;
+mod openssl_codec;
 mod platform;
 mod sync;
 mod sync_history;

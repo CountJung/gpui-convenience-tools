@@ -19,25 +19,23 @@ You are the documentation synchronization agent for gpui-convenience-tools.
 
 ## Required reading
 
-Read the relevant portions of:
-
-1. `docs/README.md`
-2. `docs/DEVELOPMENT_GUIDE.md`
-3. `docs/PROJECT_MAP.md`
-4. `docs/TODO.md`, `docs/MASTER_PLAN.md`, and `docs/VERIFICATION.md`
-5. The changed source, tests, scripts, and agent adapters related to the request
+Start with `docs/README.md`, the relevant open work, and applicable common rules in
+`docs/DEVELOPMENT_GUIDE.md`. Select only affected sections of the structure, plan, verification,
+source, tests, scripts, and adapters. Do not require full-map reading or a fixed document set.
 
 ## Synchronization method
 
 1. Inspect the current diff and source-backed facts before editing. Treat `docs/README.md` as the
    user-facing index, `DEVELOPMENT_GUIDE.md` as common rules, `TODO.md` as unfinished work,
-   `MASTER_PLAN.md` as plan/history, `VERIFICATION.md` as evidence, and `PROJECT_MAP.md` as the
-   measured structure map.
+   `MASTER_PLAN.md` as current plan, `IMPLEMENTATION_HISTORY.md` as completed stages,
+   `VERIFICATION.md` as current procedure/open gates, `VERIFICATION_RECORDS.md` as execution
+   evidence, and `PROJECT_MAP.md` as the measured structure map.
 2. Edit only the canonical documents under `docs/` unless the user explicitly requests an agent
    adapter change. Do not copy common rules into `AGENTS.md`, `CLAUDE.md`, or runtime adapters.
 3. Keep each active work ID exactly once in `TODO.md` and `VERIFICATION.md`. When an item is truly
-   complete, remove it from `TODO.md`, preserve its evidence in `VERIFICATION.md`, and record one
-   completion entry in `MASTER_PLAN.md`.
+   complete, remove it from `TODO.md`, preserve execution evidence in `VERIFICATION_RECORDS.md`,
+   and put the stage result once in `IMPLEMENTATION_HISTORY.md`, linked by `MASTER_PLAN.md`.
+   Update only affected owners; preserve unique evidence and user edits before moving it.
 4. Refresh `PROJECT_MAP.md` line counts and responsibilities after structural changes. A source
    file over 1,000 lines requires a structural redesign, not a mechanical split; repeated helpers
    across three or more files should be consolidated in the current task or explicitly blocked.
@@ -46,9 +44,10 @@ Read the relevant portions of:
    evidence matrices, and measured file lists. Never add fixed-width ASCII diagrams.
 6. Preserve user-visible commands and paths exactly, keep links valid, and distinguish automated,
    fixture, desktop, E2E, visual, and unverified evidence.
-7. Validate with `git diff --check`, work-ID/reference assertions, and the narrowest relevant
-   project verification command. Report baseline failures separately and do not silently remove
-   historical evidence.
+7. Follow `docs/VERIFICATION.md` for full/changed format checking, `git diff --check`, work-ID
+   assertions, and separate content review. Long lines are advisory. Check moved anchors and
+   evidence preservation separately; a checker pass is not semantic sync or product test success.
+   Report baseline failures separately and do not silently remove historical evidence.
 
 ## Hard boundaries
 

@@ -3,6 +3,7 @@ pub mod dashboard;
 pub mod file_sync;
 pub mod interval;
 pub mod log_view;
+pub mod openssl;
 pub mod service_mgr;
 pub mod service_view;
 pub mod settings;

@@ -227,6 +227,7 @@ pub enum ActivePanel {
     AdBlock,
     FileSync,
     VirtualDisk,
+    OpenSsl,
     Services,
     AutoStart,
     Logs,
@@ -239,7 +240,7 @@ pub enum ActivePanel {
 /// 대응물이 없다. **그 플랫폼에서는 메뉴 자체를 노출하지 않는다** — 눌러 봐야 미지원
 /// 안내만 나오는 항목을 남겨 두면 앱이 고장 난 것처럼 보인다.
 #[cfg(target_os = "windows")]
-pub(crate) const NAV_TOOLS: [(ActivePanel, &str, &str); 4] = [
+pub(crate) const NAV_TOOLS: [(ActivePanel, &str, &str); 5] = [
     (
         ActivePanel::AdBlock,
         "웹뷰 광고 차단",
@@ -252,10 +253,12 @@ pub(crate) const NAV_TOOLS: [(ActivePanel, &str, &str); 4] = [
         "종료된 VM의 VDI를 읽기 전용 탐색",
     ),
     (ActivePanel::Services, "Windows 서비스", "서비스 시작·중지·삭제"),
+    (ActivePanel::OpenSsl, "OpenSSL 암복호화", "PCF 호환 텍스트 인코딩·디코딩"),
 ];
 
 #[cfg(not(target_os = "windows"))]
-pub(crate) const NAV_TOOLS: [(ActivePanel, &str, &str); 2] = [
+pub(crate) const NAV_TOOLS: [(ActivePanel, &str, &str); 3] = [
+    (ActivePanel::OpenSsl, "OpenSSL 암복호화", "PCF 호환 텍스트 인코딩·디코딩"),
     (
         ActivePanel::FileSync,
         "파일 동기화",

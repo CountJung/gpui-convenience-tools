@@ -4,6 +4,8 @@ use serde::{Deserialize, Serialize};
 use std::{fs, path::PathBuf};
 
 mod persistence;
+mod openssl;
+pub use openssl::OpenSslConfig;
 pub use persistence::{
     effective_config_path, load_config, open_config_file, save_theme_mode, save_theme_selection,
     update_config,
@@ -73,6 +75,9 @@ pub struct AppConfig {
     /// VirtualBox 디스크 탐색에서 사용자가 마지막으로 선택한 입력값.
     #[serde(default)]
     pub virtual_disk: VirtualDiskConfig,
+    /// PCF 호환 암복호화의 사용자 조정값. 작업 텍스트는 저장하지 않는다.
+    #[serde(default)]
+    pub openssl: OpenSslConfig,
 }
 
 fn default_scan_interval_secs() -> u32 {
@@ -369,6 +374,7 @@ impl Default for AppConfig {
             virtual_disk_suppressed_issue_keys: Vec::new(),
             log: LogConfig::default(),
             virtual_disk: VirtualDiskConfig::default(),
+            openssl: OpenSslConfig::default(),
         }
     }
 }
@@ -488,19 +494,19 @@ pub fn ensure_bundled_themes() -> Result<PathBuf> {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
 
     static DATA_DIR_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
-    struct IsolatedDataDir {
+    pub(crate) struct IsolatedDataDir {
         previous: Option<std::ffi::OsString>,
         path: PathBuf,
         _lock: std::sync::MutexGuard<'static, ()>,
     }
 
     impl IsolatedDataDir {
-        fn new(name: &str) -> Self {
+        pub(crate) fn new(name: &str) -> Self {
             let lock = DATA_DIR_LOCK.lock().expect("lock isolated config environment");
             let path = std::env::temp_dir().join(format!(
                 "gct-config-test-{name}-{}",

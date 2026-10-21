@@ -19,6 +19,7 @@ mod events;
 mod inputs;
 mod interval;
 mod ops;
+mod openssl_ops;
 mod state;
 mod sync_ops;
 mod ui_state;
@@ -100,6 +101,7 @@ pub struct AppRoot {
     pub(crate) services: ServiceState,
     pub(crate) sync: SyncState,
     pub(crate) ad_block: AdBlockState,
+    pub(crate) openssl: openssl_ops::OpenSslState,
 
     // ── VirtualBox 오프라인 디스크 탐색 ──
     pub(crate) virtual_disk: VirtualDiskSession,
@@ -126,6 +128,7 @@ impl AppRoot {
         let mut sidebar_width = DEFAULT_SIDEBAR_WIDTH;
         let mut virtual_disk_suppressed_issue_keys = BTreeSet::new();
         let mut virtual_disk_config = VirtualDiskConfig::default();
+        let mut openssl_config = crate::config::OpenSslConfig::default();
         let initial_sync_history = crate::sync_history::load_recent(20).unwrap_or_else(|err| {
             log::warn!("동기화 이력 불러오기 실패: {err:#}");
             Vec::new()
@@ -140,6 +143,7 @@ impl AppRoot {
             });
         }
         if let Ok(Some(cfg)) = loaded_config {
+            openssl_config = cfg.openssl.clone();
             virtual_disk_config = cfg.virtual_disk.clone();
             sync_enabled = cfg.sync_enabled;
             sidebar_width = normalize_sidebar_width(cfg.sidebar_width);
@@ -286,6 +290,7 @@ impl AppRoot {
                 external_side_effects_enabled: true,
             },
             ad_block: AdBlockState::default(),
+            openssl: openssl_ops::OpenSslState::from_config(openssl_config),
 
             virtual_disk: VirtualDiskSession {
                 path_text: virtual_disk_config
@@ -608,6 +613,7 @@ impl Render for AppRoot {
             ActivePanel::AdBlock => ad_block::render(self, window, cx),
             ActivePanel::FileSync => file_sync::render(self, window, cx),
             ActivePanel::VirtualDisk => virtual_disk::render(self, window, cx),
+            ActivePanel::OpenSsl => crate::window::openssl::render(self, window, cx),
             ActivePanel::Services => service_mgr::render(self, window, cx),
             ActivePanel::AutoStart => service_view::render(self, window, cx),
             ActivePanel::Logs => log_view::render(self, cx),
@@ -640,6 +646,7 @@ impl Render for AppRoot {
                 | ActivePanel::AdBlock
                 | ActivePanel::FileSync
                 | ActivePanel::VirtualDisk
+                | ActivePanel::OpenSsl
         );
         let sidebar_scroll = self.sidebar_scroll_handle.clone();
         let content_scroll = self.content_scroll_handle.clone();

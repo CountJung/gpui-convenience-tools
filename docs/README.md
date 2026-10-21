@@ -7,12 +7,17 @@
 
 | 문서 | 역할 |
 | --- | --- |
-| `DEVELOPMENT_GUIDE.md` | 공통 개발·아키텍처·검증 규칙의 단일 정본 |
-| `MASTER_PLAN.md` | 단계 계획과 완료 이력 |
-| `PROJECT_MAP.md` | 실제 구조·줄 수·공용 유틸 지도 |
-| `VERIFICATION.md` | E2E 사용법과 작업 ID별 검증 체크·증거 |
-| `TODO.md` | 고유 작업 ID가 있는 미완료 대기열 |
-| `VIRTUAL_DISK_BACKENDS.md` | VirtualBox 오프라인 전용 파일 접근 결정과 미채택 검토 이력 |
+| [DEVELOPMENT_GUIDE.md](DEVELOPMENT_GUIDE.md) | 공통 개발·아키텍처·검증 규칙의 단일 정본 |
+| [MASTER_PLAN.md](MASTER_PLAN.md) | 현재 단계와 완료 이력 진입점 |
+| [PROJECT_MAP.md](PROJECT_MAP.md) | 실제 구조·줄 수·공용 유틸 지도 |
+| [VERIFICATION.md](VERIFICATION.md) | E2E 사용법과 열린 작업의 검증 게이트 |
+| [TODO.md](TODO.md) | 고유 작업 ID가 있는 미완료 대기열 |
+| [TEST_FIXTURES.md](TEST_FIXTURES.md) | 합성 VDI fixture와 검증 데이터 계약 |
+| [VIRTUAL_DISK_BACKENDS.md](VIRTUAL_DISK_BACKENDS.md) | VirtualBox 오프라인 전용 파일 접근 결정과 미채택 검토 이력 |
+
+완료 단계 상세는 [구현 이력](IMPLEMENTATION_HISTORY.md), 지난 명령·수치·해시와 미검증
+경계는 [검증 결과 기록](VERIFICATION_RECORDS.md)으로 연결한다. 기존 제목의 과거 상태를
+현재 대기열로 해석하지 않는다. 작업 시작 시 위 문서를 전부 읽지 않고 관련 절만 고른다.
 
 협업 에이전트 역할 정본은 `.github/agents/`에 있으며, Claude와 Codex 실행 환경은 각각
 `.claude/agents/`와 `.codex/agents/`의 얇은 어댑터를 사용한다. 공통 역할 경계와 호출 흐름은
@@ -32,6 +37,7 @@
 | **파일 동기화** | 원본 폴더를 대상 폴더로 주기적으로 복사한다. 숨김·시스템 파일 포함. | 공통 |
 | **Windows 서비스** | 설치된 Win32 서비스를 조회·시작·중지·삭제한다. | Windows |
 | **VirtualBox 디스크 탐색** | 종료된 VM의 VDI를 읽기 전용으로 탐색하고 숨김·시스템 파일을 호스트로 복사한다. | Windows 1차 |
+| **OpenSSL 암복호화** | PCF 호환 AES-256-CBC 텍스트를 Base64로 인코딩·디코딩한다. | 공통 |
 
 부가 요소로 대시보드, 자동 시작 등록(작업 스케줄러), 롤링 파일 로그, 21종 테마를 제공한다.
 
@@ -62,6 +68,7 @@ flowchart LR
     sidebar -.-> dashboard["대시보드"]
     sidebar -.-> ad["웹뷰 광고 차단"]
     sidebar -.-> sync["파일 동기화"]
+    sidebar -.-> openssl["OpenSSL 암복호화<br/>PCF 호환 텍스트 변환"]
     sidebar -.-> vdi["VirtualBox 디스크 탐색<br/>설정 단계 ↔ full-height 탐색"]
     sidebar -.-> service["Windows 서비스"]
     sidebar -.-> startup["자동 시작"]
@@ -130,7 +137,7 @@ cargo build -p gpui-convenience-tools --release  # 릴리즈
 광고 자리 회수는 **웹뷰 광고 차단** 패널의 선택 옵션이며 기본값은 꺼짐이다. 카카오톡
 기본 채팅창의 확인된 창 계층·크기가 맞을 때만 하단 광고 슬롯을 접고 목록 영역을 늘린다.
 옵션이나 차단을 끄거나 앱을 종료하면 저장한 크기로 복원을 시도한다. 사용자 실기기 확인과
-검증 범위는 `VERIFICATION.md`의 `AD-006` 완료 기록을 참조한다. 이 옵션은
+검증 범위는 [검증 결과 기록](VERIFICATION_RECORDS.md)의 `AD-006` 완료 기록을 참조한다. 이 옵션은
 대화형 GUI 세션 전용이며 Session 0의 `--service` 모드에는 적용되지 않는다.
 
 ```powershell
@@ -196,6 +203,29 @@ flowchart TD
 - **`실패 알림 표시`** 스위치 — 동기화 실패 토스트 전체를 끈다
 
 이미 목록에 있는 실패는 다시 토스트를 띄우지 않으므로, 매 주기마다 같은 알림이 반복되지 않는다.
+
+## OpenSSL 암복호화 — PCF 호환
+
+사이드바 **편의 기능 → OpenSSL 암복호화**에서 암호 문구를 확인하고 입력란에 평문 또는
+Base64 암호문을 붙여 넣는다. **인코딩 (암호화)** / **디코딩 (복호화)**을 누른 뒤 결과를
+선택해 `Ctrl+C`로 복사한다. 결과는 편집 가능하며 **작업 텍스트 지우기**는 입력·결과만 지운다.
+
+- 암호 문구 기본값은 `911`, **인코딩 시 끝에 LF 추가**는 기본 켜짐이다. 켜면 기존 개행
+  유무와 관계없이 LF 하나를 추가한다(Linux `echo`/PCF 호환). 디코딩은 끝의 CR/LF만 제거한다.
+- 암호 문구와 LF 옵션은 변경 시 `settings.json`에 자동 저장되고 다음 실행에서 복원된다.
+  암호 문구 위젯은 기본 마스킹·표시 토글을 제공하지만 **파일에는 평문 저장**된다.
+  저장 경로와 격리 설정은 위 「저장 위치」를 따른다. 작업 텍스트 지우기는 저장된 암호 문구를 지우지 않는다.
+- 입력·결과는 앱 메모리에만 두고 설정·로그에 기록하지 않는다. 암호 문구도 로그에 기록하지
+  않는다. 사용자가 결과를 복사하면 클립보드에는 남을 수 있다.
+- 평문은 UTF-8 기준 32 KiB, Base64 입력은 공백 포함 64 KiB까지다. 암호 문구 UI 입력은
+  1,024바이트, 코덱 내부 한도는 32 KiB다. OpenSSL 설치나 외부 프로세스 실행은 필요 없다.
+
+호환 형식은 `Base64(Salted__ + 무작위 8바이트 salt + AES-256-CBC 암호문)`이며 PKCS#7,
+`EVP_BytesToKey` 1회 반복을 사용한다. 인코딩은 SHA-256, 디코딩은 SHA-256 후 MD5를 시도한다.
+매번 salt가 달라 같은 입력도 암호문은 달라진다. **인증 없는 레거시 호환 형식**이므로
+복호화 성공만으로 암호 문구의 정확성·위변조 여부를 보장하지 않으며 새 보안 설계용이 아니다.
+구현 단계는 [SSL-001 이력](IMPLEMENTATION_HISTORY.md#ssl001-implementation-stage),
+최종 검증·남은 게이트는 [VERIFICATION.md](VERIFICATION.md)를 참조한다.
 
 ## 로그
 
@@ -315,5 +345,6 @@ git push origin v1.0.0
 
 ### macOS 지원 범위
 
-macOS 빌드에는 **파일 동기화**와 테마·로그·설정만 포함된다.
+macOS 공통 메뉴에는 **파일 동기화·VirtualBox 디스크 탐색·OpenSSL 암복호화**와 테마·로그·설정이 포함된다.
+이번 OpenSSL 실행 검증은 Windows에서만 수행했으며 macOS 빌드·실제 화면은 미검증이다.
 웹뷰 광고 차단·Windows 서비스 관리·자동 시작은 Win32/SCM 전용이라 해당 메뉴가 노출되지 않는다.

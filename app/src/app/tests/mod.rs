@@ -7,6 +7,7 @@ mod file_sync_browse;
 mod file_sync_history;
 mod interval;
 mod layout;
+mod openssl;
 mod theme;
 mod virtual_disk;
 mod virtual_disk_workspace;
@@ -120,6 +121,7 @@ fn test_app_root(active_panel: ActivePanel) -> AppRoot {
             external_side_effects_enabled: false,
         },
         ad_block: AdBlockState::default(),
+        openssl: super::openssl_ops::OpenSslState::default(),
         virtual_disk: super::virtual_disk_ops::VirtualDiskSession::default(),
         virtual_disk_page_scroll: ScrollHandle::default(),
         log_config: LogConfig::default(),

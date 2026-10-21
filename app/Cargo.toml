@@ -16,6 +16,12 @@ tokio = { workspace = true }
 dirs = { workspace = true }
 ntfs = { workspace = true }
 filetime = "0.2"
+aes = "0.8"
+cbc = { version = "0.1", features = ["alloc", "block-padding"] }
+sha2 = "0.10"
+md-5 = "0.10"
+base64 = "0.22"
+getrandom = "0.2"
 
 [target.'cfg(target_os = "windows")'.dependencies]
 windows-sys = { workspace = true }

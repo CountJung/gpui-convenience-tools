@@ -3,13 +3,11 @@
 이 파일은 Claude Code용 저장소 어댑터다. 공통 규칙과 프로젝트 설명은 `docs/` 문서를
 정본으로 사용한다.
 
-## 필수 참조
+## 착수 경로
 
-- `docs/README.md` — 사용자 문서와 문서 인덱스
-- `docs/DEVELOPMENT_GUIDE.md` — Rust·GPUI·Windows·검증 규칙
-- `docs/PROJECT_MAP.md` — 모듈 책임과 줄 수 추적
-- `docs/MASTER_PLAN.md` — 계획·완료 이력
-- `docs/TODO.md` — 고유 작업 ID 기반 대기열
+[문서 등록부](docs/README.md)와 관련 열린 [작업](docs/TODO.md)을 확인한 뒤
+[공통 규칙](docs/DEVELOPMENT_GUIDE.md)을 적용한다. 구조·계획·검증은 등록부에서
+이번 변경의 **관련 절만** 선택한다. 모든 지도·이력을 매번 읽지 않는다.
 
 ## Claude Code 전용 잊기 쉬운 항목
 

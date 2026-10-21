@@ -3,13 +3,12 @@
 이 파일은 에이전트별 진입점이다. 공통 프로젝트 규칙과 현재 상태를 복사하지 않고
 `docs/`의 정본을 참조한다.
 
-## 먼저 읽을 문서
+## 착수 경로
 
-1. `docs/README.md` — 프로젝트 목적과 사용 범위
-2. `docs/DEVELOPMENT_GUIDE.md` — 공통 구현·검증 규칙
-3. `docs/PROJECT_MAP.md` — 실제 코드 구조와 공용 유틸
-4. `docs/TODO.md` — 작업 ID와 현재 미완료 항목
-5. `docs/MASTER_PLAN.md` — 단계 범위와 완료 이력
+1. [문서 등록부](docs/README.md)에서 책임과 관련 열린 [작업](docs/TODO.md)을 확인한다.
+2. [공통 규칙](docs/DEVELOPMENT_GUIDE.md)의 해당 변경 기준을 적용한다.
+3. 구조는 [PROJECT_MAP](docs/PROJECT_MAP.md), 범위는 [MASTER_PLAN](docs/MASTER_PLAN.md),
+   검증은 [VERIFICATION](docs/VERIFICATION.md)의 **관련 절만** 읽는다. 전체 필독 목록이 아니다.
 
 ## AGENTS 전용 잊기 쉬운 항목
 

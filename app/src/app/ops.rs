@@ -19,7 +19,7 @@ impl AppRoot {
     ///
     /// 각 입력 이벤트도 기존처럼 즉시 저장하지만, 설정 화면의 명시적 저장 버튼과
     /// 창 닫기 직전에는 이 경로를 사용해 마지막 입력값까지 놓치지 않는다.
-    pub(crate) fn save_current_config(&self) -> anyhow::Result<()> {
+    pub(crate) fn save_current_config(&mut self) -> anyhow::Result<()> {
         #[cfg(test)]
         if !self.sync.external_side_effects_enabled {
             return Ok(());
@@ -40,6 +40,7 @@ impl AppRoot {
             .cloned()
             .collect::<Vec<_>>();
         let log_config = self.log_config.clone();
+        let openssl = self.openssl.config.clone();
         let virtual_disk = VirtualDiskConfig {
             last_vdi_path: non_empty_string(&self.virtual_disk.path_text),
             last_partition_number: self
@@ -52,7 +53,7 @@ impl AppRoot {
             layout: self.virtual_disk.layout.clone(),
         };
 
-        update_config(move |config| {
+        let result = update_config(move |config| {
             carry_over_engine_progress(&config.sync_jobs, &mut sync_jobs);
             config.service_enabled = service_enabled;
             config.kakao_reclaim_ad_space = kakao_reclaim_ad_space;
@@ -65,7 +66,10 @@ impl AppRoot {
             config.virtual_disk_suppressed_issue_keys = suppressed_issue_keys;
             config.log = log_config;
             config.virtual_disk = virtual_disk;
-        })?;
+            config.openssl = openssl;
+        });
+        self.openssl.save_error = result.is_err();
+        result?;
 
         Ok(())
     }
