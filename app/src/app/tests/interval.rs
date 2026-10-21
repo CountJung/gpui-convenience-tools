@@ -55,7 +55,11 @@ fn scan_interval_starts_from_the_default_presets(cx: &mut TestAppContext) {
 
     // 드롭다운과 프리셋 목록이 실제로 그려진다.
     assert!(cx.debug_bounds("interval-select").is_some());
-    for selector in ["interval-preset-10", "interval-preset-30", "interval-preset-60"] {
+    for selector in [
+        "interval-preset-10",
+        "interval-preset-30",
+        "interval-preset-60",
+    ] {
         assert!(
             cx.debug_bounds(selector).is_some(),
             "{selector} should be rendered"

@@ -8,7 +8,11 @@ fn drag_divider(
     start: gpui::Point<gpui::Pixels>,
     end: gpui::Point<gpui::Pixels>,
 ) {
-    let direction = if end.x >= start.x { px(12.0) } else { px(-12.0) };
+    let direction = if end.x >= start.x {
+        px(12.0)
+    } else {
+        px(-12.0)
+    };
     cx.simulate_mouse_move(start, None, Modifiers::none());
     cx.simulate_mouse_down(start, MouseButton::Left, Modifiers::none());
     refresh(cx);
@@ -204,12 +208,25 @@ fn kakao_reclaim_option_is_visible_and_toggleable(cx: &mut TestAppContext) {
     for width in [MIN_SUPPORTED_WINDOW_WIDTH, DEFAULT_WINDOW_WIDTH, 1280.0] {
         cx.simulate_resize(size(px(width), px(DEFAULT_WINDOW_HEIGHT)));
         refresh(cx);
-        let row = cx.debug_bounds("kakao-reclaim-ad-space-row").expect("옵션 행");
-        let title = cx.debug_bounds("kakao-reclaim-ad-space-title").expect("옵션 제목");
-        let description = cx.debug_bounds("kakao-reclaim-ad-space-description").expect("옵션 설명");
-        let switch = cx.debug_bounds("kakao-reclaim-ad-space").expect("옵션 스위치");
-        assert!(title.origin.x >= row.origin.x && title.origin.x + title.size.width <= switch.origin.x);
-        assert!(description.origin.x >= row.origin.x && description.origin.x + description.size.width <= switch.origin.x);
+        let row = cx
+            .debug_bounds("kakao-reclaim-ad-space-row")
+            .expect("옵션 행");
+        let title = cx
+            .debug_bounds("kakao-reclaim-ad-space-title")
+            .expect("옵션 제목");
+        let description = cx
+            .debug_bounds("kakao-reclaim-ad-space-description")
+            .expect("옵션 설명");
+        let switch = cx
+            .debug_bounds("kakao-reclaim-ad-space")
+            .expect("옵션 스위치");
+        assert!(
+            title.origin.x >= row.origin.x && title.origin.x + title.size.width <= switch.origin.x
+        );
+        assert!(
+            description.origin.x >= row.origin.x
+                && description.origin.x + description.size.width <= switch.origin.x
+        );
         assert!(switch.origin.x + switch.size.width <= row.origin.x + row.size.width);
     }
     click_option_switch(cx, "kakao-reclaim-ad-space");
@@ -226,11 +243,16 @@ fn ad_block_settings_scroll_reaches_last_process_at_compact_height(cx: &mut Test
             cx.notify();
         });
     });
-    cx.simulate_resize(size(px(MIN_SUPPORTED_WINDOW_WIDTH), px(COMPACT_WINDOW_HEIGHT)));
+    cx.simulate_resize(size(
+        px(MIN_SUPPORTED_WINDOW_WIDTH),
+        px(COMPACT_WINDOW_HEIGHT),
+    ));
     refresh(cx);
     wheel_to_end(cx, "ad-block-right", -2400.0);
     let viewport = cx.debug_bounds("ad-block-right").expect("설정 뷰포트");
-    let last = cx.debug_bounds("ad-block-process-row-11").expect("마지막 프로세스 행");
+    let last = cx
+        .debug_bounds("ad-block-process-row-11")
+        .expect("마지막 프로세스 행");
     assert!(last.origin.y >= viewport.origin.y);
     assert!(last.origin.y + last.size.height <= viewport.origin.y + viewport.size.height);
 }
@@ -256,7 +278,12 @@ fn ad_block_cards_contain_long_content_at_supported_widths(cx: &mut TestAppConte
         });
     });
 
-    for width in [MIN_SUPPORTED_WINDOW_WIDTH, 994.0, DEFAULT_WINDOW_WIDTH, 1280.0] {
+    for width in [
+        MIN_SUPPORTED_WINDOW_WIDTH,
+        994.0,
+        DEFAULT_WINDOW_WIDTH,
+        1280.0,
+    ] {
         cx.simulate_resize(size(px(width), px(DEFAULT_WINDOW_HEIGHT)));
         refresh(cx);
         assert_ad_cards_contain_long_target_content(cx);

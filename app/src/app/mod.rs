@@ -18,10 +18,11 @@ mod background;
 mod events;
 mod inputs;
 mod interval;
-mod ops;
 mod openssl_ops;
+mod ops;
 mod state;
 mod sync_ops;
+mod timestamp_ops;
 mod ui_state;
 mod validation;
 mod virtual_disk_copy;
@@ -67,8 +68,8 @@ use crate::config::{
     default_interval_presets, load_config, normalize_interval_presets, normalize_sidebar_width,
     update_config, LogConfig, VirtualDiskConfig, DEFAULT_SIDEBAR_WIDTH,
 };
-use crate::platform::{NativePlatform, Platform};
 use crate::platform::KakaoLayoutSnapshot;
+use crate::platform::{NativePlatform, Platform};
 use crate::window::{
     ad_block, dashboard, file_sync, log_view, service_mgr, service_view, settings, ui, virtual_disk,
 };
@@ -102,6 +103,7 @@ pub struct AppRoot {
     pub(crate) sync: SyncState,
     pub(crate) ad_block: AdBlockState,
     pub(crate) openssl: openssl_ops::OpenSslState,
+    pub(crate) timestamp: timestamp_ops::TimestampState,
 
     // ── VirtualBox 오프라인 디스크 탐색 ──
     pub(crate) virtual_disk: VirtualDiskSession,
@@ -129,6 +131,7 @@ impl AppRoot {
         let mut virtual_disk_suppressed_issue_keys = BTreeSet::new();
         let mut virtual_disk_config = VirtualDiskConfig::default();
         let mut openssl_config = crate::config::OpenSslConfig::default();
+        let mut timestamp_config = crate::config::TimestampConfig::default();
         let initial_sync_history = crate::sync_history::load_recent(20).unwrap_or_else(|err| {
             log::warn!("동기화 이력 불러오기 실패: {err:#}");
             Vec::new()
@@ -144,6 +147,7 @@ impl AppRoot {
         }
         if let Ok(Some(cfg)) = loaded_config {
             openssl_config = cfg.openssl.clone();
+            timestamp_config = cfg.timestamp.clone();
             virtual_disk_config = cfg.virtual_disk.clone();
             sync_enabled = cfg.sync_enabled;
             sidebar_width = normalize_sidebar_width(cfg.sidebar_width);
@@ -291,6 +295,7 @@ impl AppRoot {
             },
             ad_block: AdBlockState::default(),
             openssl: openssl_ops::OpenSslState::from_config(openssl_config),
+            timestamp: timestamp_ops::TimestampState::from_config(timestamp_config),
 
             virtual_disk: VirtualDiskSession {
                 path_text: virtual_disk_config
@@ -614,6 +619,7 @@ impl Render for AppRoot {
             ActivePanel::FileSync => file_sync::render(self, window, cx),
             ActivePanel::VirtualDisk => virtual_disk::render(self, window, cx),
             ActivePanel::OpenSsl => crate::window::openssl::render(self, window, cx),
+            ActivePanel::Timestamp => crate::window::timestamp::render(self, window, cx),
             ActivePanel::Services => service_mgr::render(self, window, cx),
             ActivePanel::AutoStart => service_view::render(self, window, cx),
             ActivePanel::Logs => log_view::render(self, cx),
@@ -647,6 +653,7 @@ impl Render for AppRoot {
                 | ActivePanel::FileSync
                 | ActivePanel::VirtualDisk
                 | ActivePanel::OpenSsl
+                | ActivePanel::Timestamp
         );
         let sidebar_scroll = self.sidebar_scroll_handle.clone();
         let content_scroll = self.content_scroll_handle.clone();

@@ -64,9 +64,17 @@ pub(crate) enum PlatformEvent {
     /// 파일 동기화 자동 실행 전역 스위치 변경.
     SyncAutoToggled(bool),
     /// 실시간 감시를 시작하지 못해 해당 작업을 주기 모드로 강등한다.
-    SyncWatchFallback { id: String, reason: String },
-    TargetToggled { index: usize, enabled: bool },
-    TargetRemoved { index: usize },
+    SyncWatchFallback {
+        id: String,
+        reason: String,
+    },
+    TargetToggled {
+        index: usize,
+        enabled: bool,
+    },
+    TargetRemoved {
+        index: usize,
+    },
     SyncStarted {
         id: String,
         label: String,
@@ -81,7 +89,11 @@ pub(crate) enum PlatformEvent {
         skipped: usize,
         failed: usize,
     },
-    SyncFinished { id: String, label: String, outcome: SyncOutcome },
+    SyncFinished {
+        id: String,
+        label: String,
+        outcome: SyncOutcome,
+    },
     VirtualDiskCopyStarted {
         total_entries: usize,
     },
@@ -228,6 +240,7 @@ pub enum ActivePanel {
     FileSync,
     VirtualDisk,
     OpenSsl,
+    Timestamp,
     Services,
     AutoStart,
     Logs,
@@ -240,25 +253,51 @@ pub enum ActivePanel {
 /// 대응물이 없다. **그 플랫폼에서는 메뉴 자체를 노출하지 않는다** — 눌러 봐야 미지원
 /// 안내만 나오는 항목을 남겨 두면 앱이 고장 난 것처럼 보인다.
 #[cfg(target_os = "windows")]
-pub(crate) const NAV_TOOLS: [(ActivePanel, &str, &str); 5] = [
+pub(crate) const NAV_TOOLS: [(ActivePanel, &str, &str); 6] = [
     (
         ActivePanel::AdBlock,
         "웹뷰 광고 차단",
         "카카오톡 등 WebView 광고 창 0×0 축소",
     ),
-    (ActivePanel::FileSync, "파일 동기화", "폴더 → 폴더 주기적 복사"),
+    (
+        ActivePanel::FileSync,
+        "파일 동기화",
+        "폴더 → 폴더 주기적 복사",
+    ),
     (
         ActivePanel::VirtualDisk,
         "VirtualBox 디스크 탐색",
         "종료된 VM의 VDI를 읽기 전용 탐색",
     ),
-    (ActivePanel::Services, "Windows 서비스", "서비스 시작·중지·삭제"),
-    (ActivePanel::OpenSsl, "OpenSSL 암복호화", "PCF 호환 텍스트 인코딩·디코딩"),
+    (
+        ActivePanel::Services,
+        "Windows 서비스",
+        "서비스 시작·중지·삭제",
+    ),
+    (
+        ActivePanel::OpenSsl,
+        "OpenSSL 암복호화",
+        "PCF 호환 텍스트 인코딩·디코딩",
+    ),
+    (
+        ActivePanel::Timestamp,
+        "타임스탬프 변환",
+        "Unix 초 ↔ 한국 시간·UTC",
+    ),
 ];
 
 #[cfg(not(target_os = "windows"))]
-pub(crate) const NAV_TOOLS: [(ActivePanel, &str, &str); 3] = [
-    (ActivePanel::OpenSsl, "OpenSSL 암복호화", "PCF 호환 텍스트 인코딩·디코딩"),
+pub(crate) const NAV_TOOLS: [(ActivePanel, &str, &str); 4] = [
+    (
+        ActivePanel::OpenSsl,
+        "OpenSSL 암복호화",
+        "PCF 호환 텍스트 인코딩·디코딩",
+    ),
+    (
+        ActivePanel::Timestamp,
+        "타임스탬프 변환",
+        "Unix 초 ↔ 한국 시간·UTC",
+    ),
     (
         ActivePanel::FileSync,
         "파일 동기화",
@@ -273,7 +312,11 @@ pub(crate) const NAV_TOOLS: [(ActivePanel, &str, &str); 3] = [
 
 #[cfg(target_os = "windows")]
 pub(crate) const NAV_SYSTEM: [(ActivePanel, &str, &str); 3] = [
-    (ActivePanel::AutoStart, "자동 시작", "로그온 시 자동 실행 등록"),
+    (
+        ActivePanel::AutoStart,
+        "자동 시작",
+        "로그온 시 자동 실행 등록",
+    ),
     (ActivePanel::Logs, "로그", "앱 활동 기록"),
     (ActivePanel::Settings, "설정", "테마 · 로그 보관"),
 ];

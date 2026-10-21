@@ -73,7 +73,7 @@ param(
     [int]$VdiPartitionNumber,
 
     # Start 전용. 검증 전용 환경 변수로 패널 전환 입력 없이 특정 화면을 연다.
-    [ValidateSet("Dashboard", "FileSync", "VirtualDisk", "OpenSsl", "AutoStart", "Settings")]
+    [ValidateSet("Dashboard", "FileSync", "VirtualDisk", "OpenSsl", "Timestamp", "AutoStart", "Settings")]
     [string]$InitialPanel = "Dashboard",
 
     [string]$Name = "capture",
@@ -527,6 +527,9 @@ switch ($Action) {
             }
             elseif ($InitialPanel -eq "OpenSsl") {
                 $env:GPUI_CONVENIENCE_TOOLS_INITIAL_PANEL = "openssl"
+            }
+            elseif ($InitialPanel -eq "Timestamp") {
+                $env:GPUI_CONVENIENCE_TOOLS_INITIAL_PANEL = "timestamp"
             }
             elseif ($InitialPanel -eq "AutoStart") {
                 $env:GPUI_CONVENIENCE_TOOLS_INITIAL_PANEL = "auto_start"

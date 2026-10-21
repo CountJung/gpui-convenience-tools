@@ -7,6 +7,7 @@ pub mod openssl;
 pub mod service_mgr;
 pub mod service_view;
 pub mod settings;
+pub mod timestamp;
 pub mod ui;
 pub mod virtual_disk;
 
@@ -129,13 +130,7 @@ pub fn scroll_pane(id: &'static str, handle: &ScrollHandle, content: AnyElement)
                 .overflow_x_hidden()
                 .overflow_y_scroll()
                 .track_scroll(handle)
-                .child(
-                    div()
-                        .w_full()
-                        .min_w_0()
-                        .overflow_x_hidden()
-                        .child(content),
-                ),
+                .child(div().w_full().min_w_0().overflow_x_hidden().child(content)),
         )
         .child(
             div()

@@ -4,12 +4,28 @@
 당시 문맥이며 현재 규칙이나 열린 작업이 아니다. 현재 단계는 [MASTER_PLAN.md](MASTER_PLAN.md),
 규칙은 [DEVELOPMENT_GUIDE.md](DEVELOPMENT_GUIDE.md), 현재 구조는 [PROJECT_MAP.md](PROJECT_MAP.md)를 따른다.
 
+<a id="time001-implementation-stage"></a>
+
+## 2026-10-21 — TIME-001 Unix 초·한국어 날짜 변환 구현
+
+- `timestamp.rs`는 부동소수점 없이 음수·최대 나노초 정밀도의 Unix 초와 한국어 날짜를
+  양방향 변환한다. KST/UTC 및 명시적 ISO 8601 offset을 처리하고 잘못된 날짜·윤초를 거부한다.
+- `app/timestamp_ops.rs`와 `window/timestamp.rs`가 변환·현재 시간·복사·시간대 선택을
+  제공한다. `config/timestamp.rs`는 시간대만 저장하고 작업 입력·결과는 저장하지 않는다.
+- 관련 필터 자동 테스트와 별도 출력 release 빌드·1000×700/920×480 실제 화면 확인은
+  메인 담당자가 수행했다. 정확한 수치·명령·해시·캡처·정리 경계는
+  [검증 결과 기록](VERIFICATION_RECORDS.md#time001-evidence)에 한 번 기록한다.
+- 최종 자동 검증·리뷰 후 열린 작업에서 이관했다. Git 반영은 아래 검증 기록의 후속 결과를 따른다.
+  E 기능 통합·실제 OS 클립보드 조작·macOS 실행의 성공으로 확대하지 않는다.
+
 <a id="ssl001-implementation-stage"></a>
 
 ## 2026-10-20 — SSL-001 PCF 호환 암복호화 구현 단계
 
 2026-10-21 사용자가 “ssl-001은 확인했으니 닫고”라고 명시해 기능 수용을 종료했다.
-열린 TODO·검증 매트릭스에서 이관했으며 커밋·푸시는 승인되지 않아 미수행이다.
+열린 TODO·검증 매트릭스에서 이관했으며 당시에는 커밋·푸시가 승인되지 않아 미수행이었다.
+이후 2026-10-21 `e065ae1`로 반영됐다. 이번 Git 상태와 재실행 범위는
+[후속 검증 기록](VERIFICATION_RECORDS.md#ssl001-20261021-followup)을 따른다.
 
 - `openssl_codec.rs`는 RustCrypto 기반 프로세스 내부 코덱으로 PCF `OpenSslAes` 호환을
   담당한다. 구체 형식·제한·사용법·설정/개인정보 주의는 [사용 안내](README.md#openssl-암복호화--pcf-호환)를 따른다.

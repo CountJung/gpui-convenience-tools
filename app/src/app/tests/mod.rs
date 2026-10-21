@@ -9,6 +9,7 @@ mod interval;
 mod layout;
 mod openssl;
 mod theme;
+mod timestamp;
 mod virtual_disk;
 mod virtual_disk_workspace;
 
@@ -62,7 +63,7 @@ impl Platform for TestPlatform {
     }
 }
 
-fn test_app_root(active_panel: ActivePanel) -> AppRoot {
+pub(crate) fn test_app_root(active_panel: ActivePanel) -> AppRoot {
     let app_state = AppState::default();
     let (event_tx, event_rx) = unbounded_channel();
 
@@ -122,6 +123,7 @@ fn test_app_root(active_panel: ActivePanel) -> AppRoot {
         },
         ad_block: AdBlockState::default(),
         openssl: super::openssl_ops::OpenSslState::default(),
+        timestamp: super::timestamp_ops::TimestampState::default(),
         virtual_disk: super::virtual_disk_ops::VirtualDiskSession::default(),
         virtual_disk_page_scroll: ScrollHandle::default(),
         log_config: LogConfig::default(),
@@ -130,7 +132,7 @@ fn test_app_root(active_panel: ActivePanel) -> AppRoot {
     }
 }
 
-fn initialize_components(cx: &mut TestAppContext) {
+pub(crate) fn initialize_components(cx: &mut TestAppContext) {
     cx.update(|cx| {
         gpui_component::init(cx);
         crate::app::init_virtual_disk_keymap(cx);
@@ -138,12 +140,12 @@ fn initialize_components(cx: &mut TestAppContext) {
     });
 }
 
-fn refresh(cx: &mut gpui::VisualTestContext) {
+pub(crate) fn refresh(cx: &mut gpui::VisualTestContext) {
     cx.update(|window, _| window.refresh());
     cx.run_until_parked();
 }
 
-fn click_debug_element(cx: &mut gpui::VisualTestContext, selector: &'static str) {
+pub(crate) fn click_debug_element(cx: &mut gpui::VisualTestContext, selector: &'static str) {
     let bounds = cx
         .debug_bounds(selector)
         .unwrap_or_else(|| panic!("{selector} should be rendered"));

@@ -41,6 +41,7 @@ impl AppRoot {
             .collect::<Vec<_>>();
         let log_config = self.log_config.clone();
         let openssl = self.openssl.config.clone();
+        let timestamp = self.timestamp.config.clone();
         let virtual_disk = VirtualDiskConfig {
             last_vdi_path: non_empty_string(&self.virtual_disk.path_text),
             last_partition_number: self
@@ -67,8 +68,10 @@ impl AppRoot {
             config.log = log_config;
             config.virtual_disk = virtual_disk;
             config.openssl = openssl;
+            config.timestamp = timestamp;
         });
         self.openssl.save_error = result.is_err();
+        self.timestamp.save_error = result.is_err();
         result?;
 
         Ok(())
@@ -180,7 +183,10 @@ impl AppRoot {
         self.persist_config();
         self.push_log(
             "INFO",
-            format!("카카오톡 광고 자리 회수 모드: {}", if enabled { "켜짐" } else { "꺼짐" }),
+            format!(
+                "카카오톡 광고 자리 회수 모드: {}",
+                if enabled { "켜짐" } else { "꺼짐" }
+            ),
         );
         cx.notify();
     }
@@ -302,7 +308,12 @@ impl AppRoot {
     }
 
     /// 서비스 뷰에서 발생하는 동작 결과를 로그 패널에 기록한다.
-    pub fn push_service_log(&mut self, message: &str, _window: &mut Window, cx: &mut Context<Self>) {
+    pub fn push_service_log(
+        &mut self,
+        message: &str,
+        _window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         self.push_log("INFO", message.to_string());
         cx.notify();
     }

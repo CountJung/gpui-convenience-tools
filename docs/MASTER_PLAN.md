@@ -15,10 +15,22 @@ GPUI 기반 다용도 데스크탑 보조 도구 모음의 단계 범위와 현�
   구현과 반영 상태는 [구현 이력](IMPLEMENTATION_HISTORY.md#ssl001-implementation-stage),
   검증·사용자 확인은 [검증 기록](VERIFICATION_RECORDS.md#ssl001-evidence)을 따른다.
 - 구조 개선: 스플리터 입력→저장→재로드 단언 보강이 남아 있다.
-- 신규 편의 기능·macOS 네이티브 확장: 범위 결정과 환경 확보 후 진행한다.
+- 타임스탬프 변환 `TIME-001`: 양방향 변환·시간대 저장·Windows 화면과 자동 검증 완료.
+  [구현 이력](IMPLEMENTATION_HISTORY.md#time001-implementation-stage)과
+  [검증 기록](VERIFICATION_RECORDS.md#time001-evidence)을 따른다.
+- 신규 편의 기능 `E-001`~`E-004`: 2026-10-21 사용자가 전체 구현과 각 작업의 커밋·푸시를 승인했다.
+  클립보드·프로세스 모니터·빠른 실행기·스크린샷은 병행 구현 중이고 통합·검증 전이다.
+  [사용 안내 초안](README.md#phase-e-사용-안내-초안)과
+  [안전 기본값](DEVELOPMENT_GUIDE.md#phase-e-승인-범위와-안전-기본값)을 따른다.
+- macOS 네이티브 확장: 범위 결정과 환경 확보 후 진행한다.
 
 위 상태는 새 제품 검증 결과가 아니다. 정확한 열린 ID와 다음 조작은
 [TODO.md](TODO.md), 게이트 상태는 [VERIFICATION.md](VERIFICATION.md)를 따른다.
+
+TIME·E 작업의 커밋·푸시는 메인 담당자가 검증 결과에 맞춰 개별 수행한다.
+전체 구현 승인은 기존 사용자 설정 변경·실제 사용자 프로세스 종료·민감정보 수집을
+검증용으로 실행하라는 뜻이 아니다. 이번 착수의 전달 근거와 미검증 경계는
+[검증 기록](VERIFICATION_RECORDS.md#time-e-20261021-progress)을 참조한다.
 
 ## 경계와 정본
 

@@ -3,15 +3,17 @@ use gpui_component::theme::ThemeMode;
 use serde::{Deserialize, Serialize};
 use std::{fs, path::PathBuf};
 
-mod persistence;
 mod openssl;
+mod persistence;
+mod timestamp;
 pub use openssl::OpenSslConfig;
+#[cfg(test)]
+use persistence::{config_path, fallback_config_path, save_config};
 pub use persistence::{
     effective_config_path, load_config, open_config_file, save_theme_mode, save_theme_selection,
     update_config,
 };
-#[cfg(test)]
-use persistence::{config_path, fallback_config_path, save_config};
+pub use timestamp::TimestampConfig;
 
 use crate::app::TargetApp;
 pub use crate::config_layout::{
@@ -78,6 +80,8 @@ pub struct AppConfig {
     /// PCF 호환 암복호화의 사용자 조정값. 작업 텍스트는 저장하지 않는다.
     #[serde(default)]
     pub openssl: OpenSslConfig,
+    #[serde(default)]
+    pub timestamp: TimestampConfig,
 }
 
 fn default_scan_interval_secs() -> u32 {
@@ -375,6 +379,7 @@ impl Default for AppConfig {
             log: LogConfig::default(),
             virtual_disk: VirtualDiskConfig::default(),
             openssl: OpenSslConfig::default(),
+            timestamp: TimestampConfig::default(),
         }
     }
 }
@@ -507,11 +512,11 @@ pub(crate) mod tests {
 
     impl IsolatedDataDir {
         pub(crate) fn new(name: &str) -> Self {
-            let lock = DATA_DIR_LOCK.lock().expect("lock isolated config environment");
-            let path = std::env::temp_dir().join(format!(
-                "gct-config-test-{name}-{}",
-                std::process::id()
-            ));
+            let lock = DATA_DIR_LOCK
+                .lock()
+                .expect("lock isolated config environment");
+            let path =
+                std::env::temp_dir().join(format!("gct-config-test-{name}-{}", std::process::id()));
             let _ = fs::remove_dir_all(&path);
             fs::create_dir_all(&path).expect("create isolated config directory");
             let previous = std::env::var_os(DATA_DIR_ENV);
@@ -698,7 +703,10 @@ pub(crate) mod tests {
             std::env::set_var(DATA_DIR_ENV, previous);
         }
 
-        assert_eq!(path.file_name().and_then(|name| name.to_str()), Some(SETTINGS_FILE_NAME));
+        assert_eq!(
+            path.file_name().and_then(|name| name.to_str()),
+            Some(SETTINGS_FILE_NAME)
+        );
         assert_eq!(path.parent(), Some(expected_parent.as_path()));
     }
 
@@ -854,7 +862,10 @@ pub(crate) mod tests {
         }];
         carry_over_engine_progress(&stored, &mut incoming);
 
-        assert_eq!(incoming[0].name, "이름 변경", "사용자 수정은 그대로 반영된다");
+        assert_eq!(
+            incoming[0].name, "이름 변경",
+            "사용자 수정은 그대로 반영된다"
+        );
         assert_eq!(incoming[0].last_run_unix, Some(1_700_000_000));
         assert_eq!(
             incoming[0].resume_cursor.as_deref(),
@@ -893,8 +904,8 @@ pub(crate) mod tests {
         initial.log.max_files = 17;
         save_config(&initial).expect("save initial config");
 
-        let updated = update_config(|config| config.scan_interval_secs = 45)
-            .expect("update config");
+        let updated =
+            update_config(|config| config.scan_interval_secs = 45).expect("update config");
 
         assert_eq!(updated.scan_interval_secs, 45);
         assert!(!updated.service_enabled);

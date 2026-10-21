@@ -96,9 +96,15 @@ fn settings_theme_mode_buttons_apply_both_modes(cx: &mut TestAppContext) {
         ("theme-dark", ThemeMode::Dark),
         ("theme-light", ThemeMode::Light),
     ] {
-        assert!(cx.debug_bounds(selector).is_some(), "{selector} button should render");
+        assert!(
+            cx.debug_bounds(selector).is_some(),
+            "{selector} button should render"
+        );
         click_debug_element(cx, selector);
         let actual = cx.update(|_, app| app.theme().mode);
-        assert_eq!(actual, expected, "{selector} should change the visible theme");
+        assert_eq!(
+            actual, expected,
+            "{selector} should change the visible theme"
+        );
     }
 }

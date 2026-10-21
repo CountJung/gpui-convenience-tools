@@ -15,6 +15,7 @@ mod platform;
 mod sync;
 mod sync_history;
 mod theme;
+mod timestamp;
 mod util;
 pub(crate) mod virtual_disk;
 mod window;

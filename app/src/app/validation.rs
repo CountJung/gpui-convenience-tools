@@ -16,6 +16,7 @@ pub(super) fn initial_panel_from_validation_env() -> ActivePanel {
         Some("file_sync") => ActivePanel::FileSync,
         Some("virtual_disk") => ActivePanel::VirtualDisk,
         Some("openssl") => ActivePanel::OpenSsl,
+        Some("timestamp") => ActivePanel::Timestamp,
         Some("auto_start") => ActivePanel::AutoStart,
         Some("settings") => ActivePanel::Settings,
         _ => ActivePanel::Dashboard,
@@ -37,12 +38,11 @@ pub(super) fn seed_validation_virtual_disk(root: &mut AppRoot, cx: &mut Context<
     root.virtual_disk.path_text = path;
     root.open_virtual_disk(cx);
     if !root.virtual_disk.partitions.is_empty() {
-        let requested_partition_number = std::env::var(
-            "GPUI_CONVENIENCE_TOOLS_VALIDATION_VDI_PARTITION_NUMBER",
-        )
-        .ok()
-        .and_then(|value| value.parse::<u32>().ok())
-        .filter(|number| *number > 0);
+        let requested_partition_number =
+            std::env::var("GPUI_CONVENIENCE_TOOLS_VALIDATION_VDI_PARTITION_NUMBER")
+                .ok()
+                .and_then(|value| value.parse::<u32>().ok())
+                .filter(|number| *number > 0);
         let partition_index = requested_partition_number
             .and_then(|number| {
                 root.virtual_disk
@@ -54,8 +54,7 @@ pub(super) fn seed_validation_virtual_disk(root: &mut AppRoot, cx: &mut Context<
                 if requested_partition_number.is_some() {
                     root.push_log(
                         "ERROR",
-                        "검증용 VDI 파티션 번호를 찾지 못했습니다. 선택을 생략합니다."
-                            .to_string(),
+                        "검증용 VDI 파티션 번호를 찾지 못했습니다. 선택을 생략합니다.".to_string(),
                     );
                     root.virtual_disk.entries.clear();
                     root.virtual_disk.error = Some(
@@ -92,9 +91,7 @@ pub(super) fn seed_validation_virtual_disk(root: &mut AppRoot, cx: &mut Context<
         }
     }
 
-    if std::env::var("GPUI_CONVENIENCE_TOOLS_VALIDATION_VDI_SELECT_ALL").as_deref()
-        == Ok("1")
-    {
+    if std::env::var("GPUI_CONVENIENCE_TOOLS_VALIDATION_VDI_SELECT_ALL").as_deref() == Ok("1") {
         root.select_all_virtual_disk_entries(cx);
     }
 

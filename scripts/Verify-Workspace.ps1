@@ -9,6 +9,8 @@ Set-StrictMode -Version 2.0
 $repoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 $packageName = "gpui-convenience-tools"
 $visualTests = @(
+    "timestamp_buttons_convert_both_directions_and_report_invalid_input",
+    "timestamp_zone_autosaves_restores_and_inputs_fit_supported_sizes",
     "openssl_buttons_transform_validate_and_clear_text",
     "openssl_settings_autosave_and_rehydrate_inputs",
     "openssl_page_contains_inputs_and_scrolls_at_supported_sizes",

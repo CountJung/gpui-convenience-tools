@@ -4,6 +4,91 @@
 현재 코드의 재검증 결과로 보지 않는다. 현재 절차와 열린 게이트는 [VERIFICATION.md](VERIFICATION.md),
 남은 일은 [TODO.md](TODO.md)를 따른다. 2026-10-19 문서 정리에서 원문 근거를 이관했다.
 
+## 2026-10-21 — 작업 목록 전역 규칙 재확인·충돌 해소
+
+- 범위: SSL-001은 사용자 수용 종료 이력에 있고 열린 TODO·검증 매트릭스에는 없는 것을
+  재확인했다. 별도 진행 중인 TIME·E 소스 변경은 이번 문서 작업의 검증 대상이 아니다.
+- 전역 docs-canon 정본에 대기·차단 사유와 다음 행동 주체를 남기는 기준을 보강했다.
+  Codex 어댑터와 Claude는 같은 정본을 참조한다. 다른 저장소의 기존 문서는 일괄 변경하지 않았다.
+  전역 기록 예시에도 대기 이유·다음 주체를 추가해 사용자가 제공할 정보와 에이전트의 후속 작업을 구분했다.
+- 프로젝트 지침의 「추정 진행률 금지」를 확인된 범위의 대략적 추정 허용으로 정정해
+  「작업 목록 표기」와 충돌을 없앴다. 빌드 성공만으로 기능 완료를 주장하지 않는 제한은 유지했다.
+- 형식 검사: `python -X utf8 .../check_docs.py . --changed`에서 38개 Markdown의
+  상대 링크·표·도달성 오류 및 앵커·완료 TODO 경고 0. `Assert-ProjectDocs.ps1`은
+  현재 병행 작업을 포함해 `active=15 matrix=15`. 전역 원본·Codex 어댑터의
+  `quick_validate.py` 통과, `git diff --check` 오류 없음(기존 LF/CRLF 알림만 표시).
+- 내용 검토: ID·진행률·남은 일·큰 작업의 하위 ID·차단 주체·완료 이관 기준과
+  기존 수용 근거 보존을 확인했다. 이번 보강에서 제품 테스트·Git 반영은 수행하지 않았다.
+
+<a id="ssl001-20261021-followup"></a>
+
+## 2026-10-21 — SSL-001 Git 반영·관련 테스트 후속
+
+- 메인 담당자 전달: SSL-001의 기존 변경을 `e065ae1`로 커밋·푸시 완료.
+  Documentation Sync는 읽기 전용 `git show --no-patch --format=fuller e065ae1`,
+  `git log -1`·`git rev-parse origin/main`으로 로컬 HEAD와 로컬 원격 추적 참조가
+  `e065ae1144845568aaca4540db5abf8c8144ec4e`인 것을 확인했다. 새 fetch나 push는 하지 않았다.
+- 메인 전달 재실행 결과: 오늘 `cargo test`의 `openssl` 필터 **20/20 통과**,
+  확장 착수 전 docs assertion **12/12 통과**. 정확한 명령 옵션·실행 로그는 메인 후속 기록 대상이다.
+  아래의 과거 전체 회귀 수치나 새 TIME·E 작업의 게이트 통과로 확대하지 않는다.
+- 아래 수용 종료 당시의 C 미수행·승인 대기 문구는 당시 경위로 보존한다.
+  현재 반영 상태는 이 후속 기록을 따른다. 사용자 설정·기존 미검증 경계는 변경하지 않는다.
+
+<a id="time-e-20261021-progress"></a>
+
+## 2026-10-21 — TIME-001·Phase E 착수 시점 기록
+
+- 대상: `e065ae1` 이후 병행 구현 중인 Windows 작업 트리. 사용자가 Unix timestamp 및
+  `E-001`~`E-004` 전체 구현·작업별 커밋·푸시를 승인했고 Git 작업은 메인 담당자가 수행한다.
+- 메인 전달: TIME 코드 구현 후 관련 필터 테스트 **6 passed / 0 failed**.
+  그중 기존 NTFS 테스트 1개가 포함되어 실제 추가 TIME 테스트는 5개다.
+  소스에서 순수 변환 테스트 3개와 GPUI 변환·시간대 저장/재로드 테스트 2개를 확인했다.
+  후속 명령·빌드·화면 결과는 [TIME 검증 기록](#time001-evidence)으로 연결한다.
+- E 기능은 4개 담당자의 병행 구현·통합 전 단계다. 소스와 설정 기본값을 읽어
+  [사용 안내 초안](README.md#phase-e-사용-안내-초안)을 작성했으며 테스트·OS 경계·화면 확인
+  성공이나 완료 이력을 만들지 않았다. 최신 ID·게이트는 TODO·VERIFICATION 정본을 따른다.
+- Documentation Sync 작업 범위: 허용된 안내·계획·공통 규칙·SSL 이력·이 기록만 갱신.
+  TODO·VERIFICATION·PROJECT_MAP과 타 담당자의 소스 변경은 편집하지 않는다.
+  제품 실행·테스트·사용자 설정 변경·checker·커밋·푸시는 수행하지 않는다.
+  최종 문서 checker와 프로젝트 검사는 메인 담당자가 수행하고 결과를 별도로 전달한다.
+
+<a id="time001-evidence"></a>
+
+## 2026-10-21 — TIME-001 자동·Windows release 화면 확인
+
+아래는 메인 담당자가 전달한 실행·화면 관찰 결과다. Documentation Sync는 소스·테스트를
+읽어 문서화했으며 제품·테스트를 재실행하거나 캡처를 직접 열어 새 독립 검증을 하지 않았다.
+
+- 대상·환경: `e065ae1` 이후 미커밋 TIME 구현, Windows 별도 출력 release 바이너리.
+  E 기능은 병행 구현 중으로 이 검증의 완료 범위에 포함하지 않는다.
+- 자동: `cargo test timestamp --offline -- --nocapture` **6 passed / 0 failed**.
+  신규 TIME 순수 테스트 3개·GPUI 테스트 2개와 기존 NTFS 테스트 1개다.
+  변환 왕복·소수/음수·잘못된 날짜, UI 양방향 변환·오류, 격리 시간대 저장/재로드·
+  입력 폭을 확인했다. 신규 테스트 6개나 전체 회귀 통과로 계산하지 않는다.
+- 빌드: `cargo rustc --release --offline -- -o target/timestamp-validation.exe` 성공.
+  `-o` 관련 컴파일러 경고 2건은 출력 지정에 관한 것으로 전달됐으며 소스 경고 2건으로
+  기록하지 않는다. Clippy 성공이나 전체 소스 무경고 판정으로 대신하지 않는다.
+- 바이너리 SHA-256: `edb043f4dd1444203c8e8906553083c91f41f86ece1b8af686f5298c1078a81b`.
+- 실제 화면: 하네스 `InitialPanel=Timestamp`, 1000×700·920×480 캡처를 메인이 열어 정상 확인.
+  - `target/visual-validation/captures/time-001-default-121812.png`
+  - `target/visual-validation/captures/time-001-minimum-121814.png`
+  OS 전역 입력은 전혀 보내지 않았다. 화면 확인을 실제 OS 클립보드 복사·붙여넣기나
+  전역 입력을 통한 UI 왕복 조작 증거로 표현하지 않는다.
+- 정리·사용자 환경: 검증 PID `46844` 종료, `sessionRootExists=false`.
+  `focusRestore=skipped-focus-changed`로 실제 포커스 복원은 미수행이다.
+  사용자 앱 PID `10208`은 그대로 보존했다.
+- 최종 보강: 날짜의 소수 9자리 초과를 ISO offset 포함 모든 지원 형식에서 거부하고,
+  날짜 범위의 상한에 KST offset을 더할 때 panic 대신 오류를 반환한다. 독립 Code Reviewer
+  Noether가 이 수정 후 TIME 동작을 읽기 전용 검토해 PASS 판정했다. Error Reviewer 진단도 추가 오류 없음.
+- 보강 후 재실행: `cargo test -p gpui-convenience-tools timestamp --offline -- --nocapture`
+  **6 passed**, `cargo test -p gpui-convenience-tools --offline --all-targets --all-features`
+  **228 passed / 7 ignored / 0 failed**. 기존 제외 테스트는 새로 성공으로 계산하지 않는다.
+  `cargo clippy -p gpui-convenience-tools --offline --all-targets -- -D warnings` 통과.
+- 앞의 release 해시·캡처는 보강 전 빌드의 실제 증거다. 보강은 변환 파서·범위 가드만 바꾸었고
+  UI는 동일하므로 화면 증거를 재사용했다. 보강 후 바이너리의 새 캡처라고 주장하지 않는다.
+- B/T/E/V/R 검증 완료 후 열린 작업에서 이관. Git 반영은 다음 커밋·푸시로 수행한다.
+  구조 지도는 TIME 커밋 범위만 실측하며 미통합 E 파일을 포함한 전체 구조 게이트 통과로 확대하지 않는다.
+
 ## 2026-10-21 — 작업 목록 표기 전역 적용·SSL-001 수용 종료
 
 - 대상: 기존 미커밋 작업 트리의 문서만 수정. 제품 소스·사용자 설정·실행 앱은 변경하지 않았다.
@@ -33,7 +118,8 @@
 2026-10-21 사용자 확인: “ssl-001은 확인했으니 닫고” 요청으로 **USER_ACCEPTED / 기능 수용 종료**.
 구체적인 추가 조작이나 자동 테스트 재실행을 수행한 것으로 확대하지 않는다.
 기존 B/T/E/V/R 근거는 아래에 보존하고 열린 TODO·매트릭스에서 이관했다.
-**C: 미수행(커밋·푸시 별도 승인 없음)**이며 수용 종료 요청을 외부 작업 승인으로 보지 않는다.
+**당시 C: 미수행(커밋·푸시 별도 승인 없음)**이며 수용 종료 요청을 외부 작업 승인으로 보지 않는다.
+이후 Git 반영은 [2026-10-21 후속 기록](#ssl001-20261021-followup)으로 구분한다.
 
 - 대상: Windows 작업 트리, 기준 HEAD `6e4f1dfa4589f8ed49d9656fdd15ab25b7217df9` 이후
   미커밋 변경. PCF `common/common_util/OpenSslAes.cs`와 `OpenSslPasswordTests.cs`를
