@@ -20,7 +20,10 @@ GPUI 기반 다용도 데스크탑 보조 도구 모음의 단계 범위와 현�
   [검증 기록](VERIFICATION_RECORDS.md#time001-evidence)을 따른다.
 - 신규 편의 기능 `E-001`~`E-004`: 2026-10-21 사용자가 전체 구현과 각 작업의 커밋·푸시를 승인했다.
   프로세스 모니터는 통합·자동/Windows 화면 검증을 완료했다. [완료 근거](VERIFICATION_RECORDS.md#e002-evidence)를 참조한다.
-  클립보드·빠른 실행기·스크린샷은 병행 구현 중이고 통합·검증 전이다.
+  클립보드 히스토리 `E-001`: 로컬 정책·보관·UI·설정 복원과 Windows 합성 화면 검증 완료.
+  [구현 이력](IMPLEMENTATION_HISTORY.md#e001-implementation-stage)과
+  [검증 기록](VERIFICATION_RECORDS.md#e001-evidence)을 따른다.
+  빠른 실행기 `E-003`·스크린샷 `E-004`는 미통합이며 완료로 처리하지 않는다.
   [사용 안내 초안](README.md#phase-e-사용-안내-초안)과
   [안전 기본값](DEVELOPMENT_GUIDE.md#phase-e-승인-범위와-안전-기본값)을 따른다.
 - macOS 네이티브 확장: 범위 결정과 환경 확보 후 진행한다.
@@ -28,7 +31,7 @@ GPUI 기반 다용도 데스크탑 보조 도구 모음의 단계 범위와 현�
 위 상태는 새 제품 검증 결과가 아니다. 정확한 열린 ID와 다음 조작은
 [TODO.md](TODO.md), 게이트 상태는 [VERIFICATION.md](VERIFICATION.md)를 따른다.
 
-TIME·E 작업의 커밋·푸시는 메인 담당자가 검증 결과에 맞춰 개별 수행한다.
+TIME·E 작업의 Git 반영·후속 결과는 [검증 기록](VERIFICATION_RECORDS.md)을 따른다.
 전체 구현 승인은 기존 사용자 설정 변경·실제 사용자 프로세스 종료·민감정보 수집을
 검증용으로 실행하라는 뜻이 아니다. 이번 착수의 전달 근거와 미검증 경계는
 [검증 기록](VERIFICATION_RECORDS.md#time-e-20261021-progress)을 참조한다.
@@ -46,6 +49,9 @@ TIME·E 작업의 커밋·푸시는 메인 담당자가 검증 결과에 맞춰 
 
 [구현 이력](IMPLEMENTATION_HISTORY.md)의 각 단계에서 당시 구현·커밋·검증 경계를 찾는다.
 이력의 '진행 예정'·'착수' 표기는 당시 상태이며 현재 대기열이 아니다.
+
+- [E-001 — 클립보드 히스토리](IMPLEMENTATION_HISTORY.md#e001-implementation-stage):
+  로컬 정책·보관·UI·설정 복원과 Windows 합성 화면 검증 완료.
 
 ## 2026-10-19 — 문서 체계 간소화
 

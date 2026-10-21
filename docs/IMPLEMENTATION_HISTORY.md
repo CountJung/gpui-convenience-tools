@@ -4,6 +4,26 @@
 당시 문맥이며 현재 규칙이나 열린 작업이 아니다. 현재 단계는 [MASTER_PLAN.md](MASTER_PLAN.md),
 규칙은 [DEVELOPMENT_GUIDE.md](DEVELOPMENT_GUIDE.md), 현재 구조는 [PROJECT_MAP.md](PROJECT_MAP.md)를 따른다.
 
+<a id="e001-implementation-stage"></a>
+<a id="e001-implementation-draft"></a>
+
+## 2026-10-21 — E-001 클립보드 히스토리
+
+로컬 정책·보관·UI·설정 복원과 Windows 합성 화면 검증을 완료했다.
+상세 근거·미검증 경계·Git 후속은 [검증 기록](VERIFICATION_RECORDS.md#e001-evidence)을 따른다.
+
+- `clipboard_history.rs`와 하위 저장소·이미지·Windows 모듈이 수집 정책, 로컬 이력,
+  보관 한도·만료 정리와 OS 보호/크기 확인을 소유한다. OS 읽기는 잠금 상태에서 크기를
+  먼저 확인하는 bounded 경계를 사용하며, 개인정보 본문은 로그에 남기지 않는다.
+- `app/clipboard_ops.rs`와 `background.rs`가 수집·저장·정리를 동시에 하나의 작업만
+  처리하는 흐름으로 연결한다. 로드·재복사 시의 만료 정리를 디스크에 반영하고,
+  worker 대기 중 만료된 항목도 중복·동일 fingerprint 조기 반환과 무관하게 정리해 저장한다.
+  초기화 후에는 현재 OS 클립보드를 즉시 재수집하지 않도록 변경 번호를 기억한다.
+- `window/clipboard.rs`는 이력 우선 단일 스크롤 화면에서 검색·선택·고정·재복사·삭제를
+  제공하고 정책 설정은 이력 아래에 둔다. `ClipboardConfig`를 시작 시 복원·개별 저장·
+  전체 저장에 연결했으며, Windows 메뉴에만 노출한다. 보관 위치·개인정보 주의·한도·
+  저장 복원의 사용자 안내는 [README.md](README.md#클립보드-히스토리--e-001)에 둔다.
+
 <a id="e002-implementation-stage"></a>
 
 ## 2026-10-21 — E-002 프로세스 모니터

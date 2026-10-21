@@ -61,13 +61,35 @@ flowchart LR
 [README.md](README.md#openssl-암복호화--pcf-호환), 구현 단계는
 [구현 이력](IMPLEMENTATION_HISTORY.md#ssl001-implementation-stage)을 참조한다.
 
+## 구조 — 클립보드 히스토리
+
+Windows 메뉴·수집 타이머는 `ClipboardState`를 통해 연결한다. 수집은 기본 꺼짐이며,
+수집 허용 상태에서도 OS 형식·보호 마커·변경 번호·본문 크기를 먼저 확인한다.
+실제 클립보드 본문 읽기와 PNG/파일 처리는 단일 백그라운드 작업이 소유하고, 테스트는
+GPUI 메모리 클립보드와 주입한 메타데이터만 사용한다.
+
+```mermaid
+flowchart LR
+    timer["app/startup.rs<br/>기능별 상태 복원 · 갱신 루프"] --> ops["app/clipboard_ops.rs<br/>동의 · 검색 · 선택 · 복사 · 삭제"]
+    panel["window/clipboard.rs<br/>이력 우선 · 보관 정책은 하단"] --> ops
+    ops --> worker["clipboard_ops/background.rs<br/>한 번에 한 작업 · 결과 반영"]
+    worker --> os["clipboard_history/windows<br/>Win32 잠금 · 크기 제한 후 읽기"]
+    worker --> domain["clipboard_history.rs<br/>제외 · 한도 · 고정 · 만료"]
+    domain --> store["clipboard_history/storage.rs<br/>로컬 index · PNG · 정리"]
+```
+
+설정 계약은 `config/clipboard.rs`, 시작 복원은 `app/startup.rs`, 전체 설정 저장은
+`app/ops.rs`가 소유한다. 검색어·선택·본문은 설정에 넣지 않는다. 기존 `config.rs`의
+테스트는 `config/tests.rs`로 옮겨 설정 모델과 테스트 환경 격리 책임을 분리했다.
+사용 안내와 검증 상태는 [README](README.md#클립보드-히스토리--e-001)·
+[TODO](TODO.md)를 참조한다.
+
 ## 현재 소스 실측
 
-**최종 측정**: 2026-10-21 · E-002 커밋 범위 `app/src` 총 89개 파일 · 29,012줄
+**최종 측정**: 2026-10-21 · E-001 통합 작업 범위 `app/src` 총 103개 파일 · 32,174줄
 
-`git ls-files -- app/src`의 추적 Rust 파일과 E-002 전용 신규 파일 8개를 `Get-Content`로
-실측했다. 프로세스 도메인·작업 상태·화면·설정·테스트가 대상이며, 다른 미추적 E 파일은
-이번 커밋 범위에서 제외했다.
+`git ls-files -- app/src`의 추적 Rust 파일과 E-001 전용 신규 파일·시작/설정 테스트 분리
+파일을 `Get-Content`로 실측했다. 다른 미추적 E 파일은 이번 범위에서 제외했다.
 전체 작업 트리 실측이나 제품 검증 결과가 아니며, E 통합 뒤 전체 대조는 main이 수행한다.
 화면 배치는 [README.md](README.md#virtualbox-workspace), 자동·실제 화면 검증과
 해시별 당시 근거는 [검증 결과 기록](VERIFICATION_RECORDS.md#vde-026-workspace-evidence)을 참조한다.
@@ -86,7 +108,7 @@ flowchart LR
 | 800~1,000 | 🟡 경고 | 다음 작업 전에 구조 리팩터링 |
 | 1,000 초과 | 🔴 위반 | **즉시 리팩터링.** 다른 작업보다 우선 |
 
-현재 측정 범위에서 🔴 위반 **없음**, 🟡 경고 **6개**. 최대 파일은 960줄(`config.rs`)이며, `app/virtual_disk_ops.rs`는 907줄, `app/mod.rs`는 823줄이다. 기존 `window/virtual_disk.rs`의 탐색·복사 표시 책임은 하위 모듈로 이동했다. 다음 구조 작업은 설정·VDI 조작·앱 루트의 책임 증가를 먼저 검토한다.
+현재 측정 범위에서 🔴 위반 **없음**, 🟡 경고 **4개**. 최대 파일은 907줄(`virtual_disk/vdi.rs`)이며, `app/virtual_disk_ops.rs`도 907줄이다. E-001에서 설정 테스트와 앱 시작 책임을 분리해 설정/루트 파일의 경고 크기를 해소했다. 다음 구조 작업은 VDI 도메인·조작의 책임 증가를 먼저 검토한다.
 줄 수와 무관하게 처리하는 중복 헬퍼는 아래 「중복 헬퍼 추적」에서 관리한다.
 
 `scripts/Assert-ProjectStructure.ps1`가 이 측정값을 자동 대조한다. 소스 파일을 추가·삭제·
@@ -108,13 +130,13 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 
 ## 파일 목록
 
-### 루트 (`app/src/`) — 2,861줄 / 10파일
+### 루트 (`app/src/`) — 2,662줄 / 11파일
 
 | 파일 | 줄 | 책임 |
 | --- | ---: | --- |
-| `main.rs` | 137 | 진입점 — 로거 설치 → 테마 시드 → 윈도우 오픈, `--service`/`--tray` 플래그 분기·OpenSSL 및 timestamp 도메인 등록 |
+| `main.rs` | 138 | 진입점 — 로거 설치 → 테마 시드 → 윈도우 오픈, `--service`/`--tray` 플래그 분기·OpenSSL 및 timestamp 도메인 등록 |
 | `theme.rs` | 143 | 테마 모드 적용과 스위치 팔레트 최소 대비 보정·번들 테마 감사 테스트 |
-| `config.rs` | 960 | `AppConfig`·동기화/로그/VDI 모델·주기 프리셋·사이드바 폭·카카오톡 옵션·색상 모드·OpenSSL/시간대 설정 연결과 왕복 테스트 |
+| `config.rs` | 512 | `AppConfig`·동기화/로그/VDI 모델·주기 프리셋·사이드바 폭·기능별 설정 연결과 보정 |
 | `config_layout.rs` | 103 | VDI 탐색기 트리·파일명 우선 열 폭 설정, 기본값·최소/최대 보정·구버전 역직렬화 기본값 |
 | `logging.rs` | 560 | 롤링 파일 로거 (`log::Log` 구현, 테스트용 출력 경로 주입) |
 | `sync_history.rs` | 223 | 동기화 완료 이력의 JSON 배열 저장·순서 보장·손상 파일 보존·개수/기간 보존·최신 목록 로드·소요 시간 계산 |
@@ -122,8 +144,9 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `openssl_codec.rs` | 152 | PCF Salted__·AES-256-CBC·PKCS#7·EVP_BytesToKey 호환 코덱·무작위 salt·SHA-256/MD5·입력 제한과 안전 오류 |
 | `timestamp.rs` | 218 | Unix 초·한국어/ISO 날짜 양방향 변환·UTC/KST·나노초 정밀도 제한·날짜 범위 가드와 순수 회귀 테스트 |
 | `process_monitor.rs` | 226 | 프로세스 신원·정책·검색/정렬·CPU/메모리 스냅샷·종료 전 메타데이터 재확인 |
+| `clipboard_history.rs` | 248 | 최근 텍스트/PNG 이력 모델·중복·민감 패턴·한도·고정·만료 정책 |
 
-### 사용자 설정 저장 (`app/src/config/`) — 428줄 / 4파일
+### 사용자 설정 저장 (`app/src/config/`) — 967줄 / 6파일
 
 | 파일 | 줄 | 책임 |
 | --- | ---: | --- |
@@ -131,6 +154,8 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `openssl.rs` | 64 | `OpenSslConfig` 암호 문구/LF 기본값·구버전 호환·Debug 마스킹·설정 저장/재로드 회귀 |
 | `timestamp.rs` | 8 | `TimestampConfig` UTC/KST 선택과 구버전 기본값 |
 | `process.rs` | 81 | 정렬·갱신 주기·표시 개수 설정과 구버전/격리 저장 회귀 |
+| `clipboard.rs` | 87 | 수집 동의·보관 한도·제외 문구 설정·기본 OFF·보정·Debug 마스킹 |
+| `tests.rs` | 452 | 기존 설정 모델·저장·복원 회귀와 테스트 데이터 루트 격리 |
 
 ### 프로세스 모니터 (`app/src/process_monitor/`) — 424줄 / 3파일
 
@@ -139,6 +164,17 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `termination.rs` | 113 | Windows 동일 핸들의 생성 FILETIME·경로·critical 검사 후 종료, RAII 핸들 해제 |
 | `worker.rs` | 149 | 제한 명령 큐·한 번에 한 작업·백그라운드 샘플링/종료 결과 전달 |
 | `tests.rs` | 162 | 필터/정렬·보호 정책·PID 신원 변경 거부·테스트 소유 자식 종료 |
+
+### 클립보드 이력 (`app/src/clipboard_history/`) — 1,078줄 / 6파일
+
+| 파일 | 줄 | 책임 |
+| --- | ---: | --- |
+| `image_data.rs` | 29 | PNG 크기/픽셀/할당 상한 검증과 정규화 |
+| `storage.rs` | 229 | 로컬 index·digest PNG의 제한 로드·원자 저장·만료/고아 파일 정리·손상 보존 |
+| `tests.rs` | 376 | 합성 텍스트/PNG·보관 정책·제외·저장/재로드·손상·개인정보 경계 회귀 |
+| `windows.rs` | 145 | OS snapshot 공통 유형/크기/변경 번호 사전·사후 검증과 테스트 주입 경계 |
+| `windows/native.rs` | 155 | Win32 클립보드 RAII 잠금·마커·형식·GlobalSize 확인 후 제한된 본문 읽기 |
+| `windows/tests.rs` | 144 | 본문 복사 전 크기/유형 차단·변경 번호 race·마커·UTF-16 제한 회귀 |
 
 ### OpenSSL 코덱 테스트 (`app/src/openssl_codec/`) — 278줄 / 1파일
 
@@ -174,31 +210,35 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `browse.rs` | 82 | 숨김·시스템 항목 포함 원본 직계 탐색·링크 내부 진입 차단 |
 | `link_tests.rs` | 250 | Windows 링크·정션 Follow/Recreate·탈출·순환·대상 충돌 안전 회귀 |
 
-### 앱 루트 (`app/src/app/`) — 6,346줄 / 17파일
+### 앱 루트 (`app/src/app/`) — 7,816줄 / 21파일
 
 `app.rs`(1,798줄)를 책임별로 분할한 결과다.
 
 | 파일 | 줄 | 책임 |
 | --- | ---: | --- |
-| `mod.rs` | 823 | `AppRoot` 정의·생성자·설정 복원·동기화 이력 초기 로드·백그라운드 UI wake·OpenSSL 포함 패널/사이드바·최상위 레이아웃·종료 복원/저장 |
+| `mod.rs` | 588 | `AppRoot`·패널/사이드바·최상위 레이아웃·종료 복원/저장; 시작 책임은 startup 모듈 소유 |
 | `sync_ops.rs` | 592 | 동기화 작업 조작·원본 직계 탐색/제외 선택·링크 모드 저장·실행 큐·커서 무효화 |
 | `interval.rs` | 313 | 주기 선택 상태(`IntervalPicker`)와 조작 — 프리셋 추가·삭제·드롭다운 동기화 |
 | `events.rs` | 329 | `PlatformEvent` 채널 소비, 진행 상태·동기화 이력·감시 실패 강등 반영, 로그·토스트 유틸 |
 | `background.rs` | 624 | 스캔 스레드와 동기화 스레드 (다중 광고 창 추적·복원·카카오톡 레이아웃 적용/복원·진행 이벤트 빈도 제한·중지·실행 위치·동기화 이력 영속화·실시간 watcher 연동) |
-| `state.rs` | 334 | 순수 데이터 타입 (`AppState`, `PlatformEvent`, `SyncRunning`, `ActivePanel::OpenSsl`, 카카오톡 옵션, 감시 실패 이벤트, 공통/타깃별 `NAV_*`) |
-| `ops.rs` | 348 | 광고 차단·카카오톡 옵션·서비스·로그 조작·OpenSSL 포함 사용자 설정 일괄 저장과 저장 오류 상태 갱신 |
+| `state.rs` | 340 | 순수 데이터 타입 (`AppState`, `PlatformEvent`, `SyncRunning`, `ActivePanel::OpenSsl`, 카카오톡 옵션, 감시 실패 이벤트, 공통/타깃별 `NAV_*`) |
+| `ops.rs` | 351 | 광고 차단·카카오톡 옵션·서비스·로그 조작·OpenSSL 포함 사용자 설정 일괄 저장과 저장 오류 상태 갱신 |
 | `openssl_ops.rs` | 165 | 일시적 입력/결과·마스킹 암호 위젯·입력 구독 수명·undo 이력 제거·변환·개별 설정 자동 저장과 오류 상태 |
 | `inputs.rs` | 142 | 입력 위젯 지연 생성·제외 패턴 편집기·원본 탐색 초기화 |
 | `ui_state.rs` | 87 | 기능별 UI 상태와 동기화 이력·원본 탐색 상태 |
 | `virtual_disk_ops.rs` | 907 | VDI 경로 입력·read-only 열기·파티션 연결·지연 트리/게스트 목록/다중 선택·안전 오류·설정/열 너비/결과 상세의 일시적 표시 상태·오류 스크롤·기존 설정 저장 |
 | `virtual_disk_copy.rs` | 564 | VDI 대상 폴더 입력·선택, 백그라운드 read-only 복사, 청크 단위 중지 요청, 진행·중지·완료 요약·항목별 오류 로그·미억제 토스트 게이트·탐색기 keymap·검증 자동 복사·검증 자동 중지·검증 전용 읽기 지연 |
 | `watch.rs` | 303 | `notify` 재귀 watcher 소유·작업별 변경 이벤트 전달·2초 quiet debounce·감시 실패 중복 억제·작업 변경 시 정리 |
-| `validation.rs` | 111 | 릴리스 화면 검증 전용 OpenSsl 포함 초기 패널·VDI·파티션·게스트 경로·자동 중지·읽기 지연 시드; 사용자 설정에는 저장하지 않는 격리 입력 |
+| `validation.rs` | 112 | 릴리스 화면 검증 전용 OpenSsl 포함 초기 패널·VDI·파티션·게스트 경로·자동 중지·읽기 지연 시드; 사용자 설정에는 저장하지 않는 격리 입력 |
 | `timestamp_ops.rs` | 119 | 타임스탬프 입력·시간대 자동 저장·양방향 변환·현재 시간·복사 조작 |
 | `process_ops.rs` | 307 | 프로세스 입력·설정 저장·활성 패널 주기 갱신·선택/확인·결과/실패 상태 |
 | `process_ops/tests.rs` | 278 | GPUI 정렬·검색·주기·확인 취소·보호 실패·설정 복원·열/스크롤·도움말 폭/비겹침 수용 테스트 |
+| `clipboard_ops.rs` | 606 | 수집 동의·설정 저장·검색·선택·복사·삭제·초기화와 디스크 정리 요청 |
+| `clipboard_ops/background.rs` | 306 | 단일 작업의 OS bounded snapshot·PNG/이력 I/O·중복 수집의 만료 정리·결과 반영 |
+| `clipboard_ops/tests.rs` | 535 | GPUI 동의·검색·고정·복사·삭제·만료 디스크 정리·초기화 baseline·복원·표시 회귀 |
+| `startup.rs` | 248 | 앱 생성·기존/기능별 설정 복원·백그라운드 초기화·UI 갱신 루프 |
 
-### GPUI 회귀 테스트 (`app/src/app/tests/`) — 3,176줄 / 11파일
+### GPUI 회귀 테스트 (`app/src/app/tests/`) — 3,177줄 / 11파일
 
 테스트는 시나리오별 모듈과 공용 픽스처의 11개 파일로 나뉘며, 공용 픽스처는 `mod.rs`가 소유하고 하위 모듈은
 `use super::*`로 가져다 쓴다.
@@ -211,14 +251,14 @@ VDI 연결 픽스처 `loaded_virtual_disk_root`는 `virtual_disk.rs`에서 탐�
 | `file_sync_history.rs` | 59 | 이력 3행의 상태·건수·소요 시간 카드 경계, 최소 높이 마지막 행 스크롤 진입 |
 | `layout.rs` | 499 | 사이드바·스플리터·카드 경계·divider drag·스크롤·사용자 설정 저장 카드·카카오톡 회수 옵션 클릭·컴팩트 높이 설정 목록 끝 도달 |
 | `interval.rs` | 230 | 주기 드롭다운·프리셋 추가/삭제·패널 간 공유 |
-| `mod.rs` | 212 | 공용 픽스처 (`test_app_root`·`TestPlatform`·`refresh`·`click_debug_element` 등)·OpenSSL 상태 초기화와 시나리오 모듈 등록 |
+| `mod.rs` | 213 | 공용 픽스처 (`test_app_root`·`TestPlatform`·`refresh`·`click_debug_element` 등)·OpenSSL 상태 초기화와 시나리오 모듈 등록 |
 | `openssl.rs` | 265 | 공통 메뉴·키 입력/복사/붙여넣기·변환/지우기/undo·설정 재로드·저장 실패/재시도·지원 화면 크기/스크롤 회귀 |
 | `theme.rs` | 110 | 테마 전환·설정 화면 Light/Dark 버튼 조작과 스위치 가시성 |
 | `virtual_disk.rs` | 614 | VirtualBox 미연결 셸·게스트 탐색/선택·작업 화면 트리/목록 경계·접이식 열 폭/결과 상세·오류 억제·단축키·stale 목록·안전 안내 회귀와 연결 픽스처 |
 | `virtual_disk_workspace.rs` | 165 | 탐색 공간 우선 배분·설정 왕복/선택 보존·열 너비 접기·결과 오버레이 스크롤·긴 오류 높이 제한/스크롤·복사 중 변경 차단/중지 수용 테스트 |
 | `timestamp.rs` | 86 | 양방향 변환 버튼·오류·시간대 저장/복원·지원 창 크기 경계 테스트 |
 
-### 패널 (`app/src/window/`) — 5,486줄 / 18파일
+### 패널 (`app/src/window/`) — 5,759줄 / 19파일
 
 | 파일 | 줄 | 책임 |
 | --- | ---: | --- |
@@ -233,13 +273,14 @@ VDI 연결 픽스처 `loaded_virtual_disk_root`는 `virtual_disk.rs`에서 탐�
 | `dashboard.rs` | 161 | 개요 — 전체 상태 요약과 최근 활동 (플랫폼별 요약 카드 + 동기화 상태 배지) |
 | `interval.rs` | 154 | 주기 선택 렌더 — 드롭다운 + (값·단위·추가) 행 + 등록된 프리셋 목록 |
 | `log_view.rs` | 110 | 시스템 — 화면 로그 가상 리스트와 로그 파일 현황 |
-| `mod.rs` | 146 | OpenSSL 포함 패널 모듈 선언 + 균형/초기 폭 지정 스플리터·`scroll_pane` 레이아웃 헬퍼 |
+| `mod.rs` | 147 | OpenSSL 포함 패널 모듈 선언 + 균형/초기 폭 지정 스플리터·`scroll_pane` 레이아웃 헬퍼 |
 | `openssl.rs` | 72 | PCF 호환 단일 스크롤 작업 화면·암호 마스킹/표시·LF 토글·변환/지우기·편집 가능한 결과·평문 저장/보안 경고 |
 | `virtual_disk.rs` | 351 | 편의 기능 — VDI 파일/파티션 설정 단계·연결 요약·복사 중 변경 차단·탐색 복귀·48px 오류 스크롤·full-height 화면 조합 |
 | `virtual_disk/explorer.rs` | 554 | 가용 높이 기반 트리/파일 목록·현재 경로/행 선택/단축키·사용자 폭 설정·접이식 열 너비 UI |
 | `virtual_disk/copy.rs` | 231 | copy footer의 대상 폴더/시작/중지/요약과 높이 112px absolute 보조 결과 오버레이·내부 스크롤·오류 억제 UI |
 | `timestamp.rs` | 38 | Unix 초·날짜 입력과 변환·현재 시간·복사·시간대 선택 화면 |
 | `process.rs` | 273 | 프로세스 검색/정렬·확인 영역·독립 행 도움말·이름 우선 목록과 CPU/메모리 공통 열 폭 |
+| `clipboard.rs` | 272 | 수집 토글·검색/선택/이력 우선 배치·하단 보관 정책·스크롤 |
 
 ### 플랫폼 (`app/src/platform/`) — 2,829줄 / 9파일
 
@@ -280,8 +321,8 @@ VDI 연결 픽스처 `loaded_virtual_disk_root`는 `virtual_disk.rs`에서 탐�
 | `.claude/agents/docs-sync.md` | 11 | Claude용 Documentation Sync 얇은 어댑터 |
 | `.codex/agents/code-reviewer.toml` | 9 | Codex용 Code Reviewer 얇은 어댑터 |
 | `.codex/agents/docs-sync.toml` | 9 | Codex용 Documentation Sync 얇은 어댑터 |
-| `scripts/Verify-Workspace.ps1` | 220 | VS Code용 Rust/GPUI 자동 검증·OpenSSL/탐색 작업 화면 수용 테스트 등록, 시각 하네스 구문 검사와 ChatGPT 데스크톱 handoff manifest·해시 고정 빌드 생성 |
-| `scripts/Invoke-ClaudeVisualCheck.ps1` | 885 | `CLAUDE_LOCAL` 시각 검증 하네스 — 격리 실행·OpenSsl 초기 패널·상태 시드·VDI 검증, 창 단위 캡처·입력·커서/포커스 조건부 복원·세션 정리 |
+| `scripts/Verify-Workspace.ps1` | 239 | Rust/GPUI 필수 수용 테스트 등록·하네스 구문 검사·해시 고정 handoff 생성 |
+| `scripts/Invoke-ClaudeVisualCheck.ps1` | 911 | 격리 실행·합성 클립보드 시드·초기 패널·소유 창 캡처/입력·조건부 복원·세션 정리 |
 | `scripts/Verify-AdWindowState.ps1` | 282 | 지정 PID와 앱 조상·자손의 최상위·선택적 자식 창 상태와 클래스 후보를 읽기 전용 점검(AD-002·AD-005 진단) |
 | `scripts/Start-DesktopVisualValidation.ps1` | 126 | manifest 해시 검증 후 단일 임시 데이터 루트 격리 프로세스·세션 파일 생성과 실패 롤백 |
 | `scripts/Stop-DesktopVisualValidation.ps1` | 75 | 기록된 검증 PID·시작 시각과 작업 전용 임시 루트만 검증 후 정리 |
@@ -290,7 +331,7 @@ VDI 연결 픽스처 `loaded_virtual_disk_root`는 `virtual_disk.rs`에서 탐�
 | `.github/workflows/release.yml` | 140 | `v*` 태그 → Windows·macOS 병렬 빌드 후 단일 Release 생성 |
 | `.github/workflows/macos-build.yml` | 47 | push/PR마다 macOS check·test·패키징 — 비Windows cfg 경로의 **유일한** 검증 지점 |
 
-> `Invoke-ClaudeVisualCheck.ps1`은 885줄이지만 분할하지 않는다. 하나의 Win32 시퀀스
+> `Invoke-ClaudeVisualCheck.ps1`은 911줄이지만 분할하지 않는다. 하나의 Win32 시퀀스
 > (P/Invoke 선언 → 세션 → 캡처 → 입력 → 정리)를 공유하고, 쪼개면 각 파일이 같은 `Add-Type`
 > 블록과 세션 스키마를 중복 소유하게 되어 응집도가 깨진다.
 > 정본의 「구조 리팩터링 기준 > 예외」 조항을 적용한다.
@@ -403,6 +444,7 @@ G-001 판단: `muted`는 비활성 의미이므로 테두리와 hover를 추가�
 
 | 날짜 | 대상 | 종류 | 이전 | 이후 | 비고 |
 | --- | --- | --- | ---: | --- | --- |
+| 2026-10-21 | `app/mod.rs`·`app/startup.rs`·`config.rs`·`config/tests.rs` | E-001 통합 시 시작/설정 테스트 책임 이동 | 앱 루트 823줄·설정 960줄 | 앱 루트 588줄·시작 248줄·설정 512줄·설정 테스트 452줄 | 기준 커밋 대조로 기존 설정 복원·루프·Drop 보존; 검증은 [E-001 기록](VERIFICATION_RECORDS.md#e001-evidence) 참조 |
 | 2026-09-17 | 프로젝트 문서 | 정본 디렉터리 통합 | 루트 문서 5개 + 에이전트 규칙 중복 | `docs/` 5개 정본 + 루트 에이전트 어댑터 | 공통 내용은 `DEVELOPMENT_GUIDE.md`로 통합하고 어댑터에는 표면별 주의사항만 유지 |
 | 2026-09-17 | `virtual_disk/mod.rs` | VDE-003 도메인 경계 추가 | VirtualBox 탐색 모델 없음 | 403줄의 플랫폼 비의존 모델·읽기 계약·오류 분류 | VDI 실제 파서와 GPUI 화면은 VDE-004 이후 연결 |
 | 2026-09-21 | `virtual_disk/vdi.rs` | VDE-004 VDI 블록 리더 추가 | VDI 헤더·블록 맵 구현 없음 | 512줄의 read-only 헤더·맵 검증·동적/고정 블록 읽기 | 파티션·NTFS·잠금 안정성은 VDE-005~008에서 연결 |
@@ -538,9 +580,9 @@ G-001 판단: `muted`는 비활성 의미이므로 테두리와 hover를 추가�
 
 ### 2순위 — 책임 재배치·분할 (중복 제거 후에도 크면)
 
-- **`config.rs` (944)**·**`app/virtual_disk_ops.rs` (907)** — 설정 모델/왕복 테스트와 VDI
+- **`config.rs`**·**`app/virtual_disk_ops.rs`** — 설정 모델/왕복 테스트와 VDI
   조작/상태 책임이 경고 구간이다. 다음 구조 작업에서 소유 책임과 테스트 분리를 먼저 검토한다.
-- **`app/mod.rs` (808)** — 800줄 경고 구간이다. `AppRoot` 필드가 30개에
+- **`app/mod.rs`** — 경고 구간이다. 정확한 크기는 위 현재 실측을 따른다. `AppRoot` 필드가 30개에
   가깝다. 다음에 커지면 사이드바 렌더를
   `app/sidebar.rs`로 떼는 것이 가장 자연스럽다.
 - **`app/tests/file_sync.rs` (786)** — 시나리오가 늘어 800줄 경고에 근접했다. 다음 감시·이력 시나리오가 추가되면

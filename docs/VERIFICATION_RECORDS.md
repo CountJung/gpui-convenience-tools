@@ -4,6 +4,48 @@
 현재 코드의 재검증 결과로 보지 않는다. 현재 절차와 열린 게이트는 [VERIFICATION.md](VERIFICATION.md),
 남은 일은 [TODO.md](TODO.md)를 따른다. 2026-10-19 문서 정리에서 원문 근거를 이관했다.
 
+<a id="e001-evidence"></a>
+
+## 2026-10-21 — E-001 클립보드 히스토리 통합 검증
+
+- 대상·환경: `d80b1e1` 이후 Windows E-001 통합 작업 트리. 기본 수집 OFF,
+  합성 텍스트/PNG·GPUI 메모리 클립보드·격리 저장소만 검증에 사용했다.
+- 자동: `cargo test --all-targets --all-features --offline` **269 passed / 8 ignored /
+  0 failed**. E-001 필터 30개, all-targets/all-features check와 clippy `-D warnings`,
+  변경 Rust 파일 fmt 통과. OS 기본 본문 읽기는 테스트에서 실행하지 않는다.
+- GPUI는 수집 opt-in·유형/민감정보/제외 정책·검색·선택·텍스트/PNG 재복사·고정·삭제·
+  확인형 초기화·한도/만료·손상 차단·설정 자동 저장과 복원·worker 단일 실행을 단언했다.
+  설정 적용 버튼의 스크롤 끝 도달과 920/1000/1500px 폭, 기본 창의 첫 이력 가시성을 확인했다.
+- 독립 리뷰 지적은 모두 수정했다. 만료 재복사의 디스크 정리, 재복사→초기화 후 재수집 기준,
+  OS 데이터 크기 검사 이전 복사, worker 대기 중 만료되는 중복 항목의 저장 누락을 각각
+  회귀로 남겼다. 마지막 회귀는 일반 중복/동일 fingerprint 두 경로에서 PNG 삭제뿐 아니라
+  원문 index의 정리까지 단언한다. Sagan 최종 Code Reviewer 정적 PASS.
+- Windows 본문 경계는 형식·GlobalSize를 먼저 검사하고 잠금 범위에서 제한된 본문만
+  읽는다. 읽기 전후 sequence·privacy marker 변경과 이미지 OFF의 무복사를 가짜 source로
+  단언했다. 실제 개인정보 수집·시스템 클립보드 쓰기 성공의 증거는 아니다.
+- 구조: 설정 테스트 20개를 `config/tests.rs`, 시작·설정 복원을 `app/startup.rs`로 옮겼다.
+  Noether가 `d80b1e1`과 대조해 기존 복원·루프 시작·Drop 보존을 확인했고 Error Reviewer
+  정적 검토에서도 추가 오류 후보가 없었다. 실행 진단의 근거는 위 check/clippy다.
+- 최종 별도 출력 release: `cargo rustc -p gpui-convenience-tools --release --offline --
+  -o .../target/clipboard-validation.exe` 성공. 출력 경로 관련 Cargo 경고 2개만 있었다.
+  SHA-256 `3fa071f80eb48d244ae0ce698357992bbece2361af370a0bee316a10db184b9b`.
+- 하네스 `-SeedConfig .../e001-config.json -SeedClipboardHistory .../e001-history.json
+  -InitialPanel ClipboardHistory`로 수집 OFF·합성 2건을 격리 실행했다.
+  `target/visual-validation/captures/e001-default-131722.png`(1000×700)와
+  `e001-minimum-131729.png`(920×480)를 직접 열어 이력 우선 배치·보이는 텍스트와 버튼의
+  비겹침을 확인했다. 최소 높이의 아래 내용은 스크롤이 필요하며 끝 도달 근거는 자동 테스트다.
+  Noether도 두 PNG의 보이는 배치를 기존 증거로 검토해 PASS로 판정했다.
+- 검증 PID 32516 종료, 세션 루트 `gpui-claude-visual-aaf6677faeb8492c884376e181d496ea`
+  삭제(`sessionRootExists=false`), 사용자 PID 10208 유지. 전역 키/마우스 입력 없이 소유 창
+  캡처/리사이즈만 수행했고 사용자 포커스 변경(`skipped-focus-changed`)은 덮지 않았다.
+- 측정은 E-001 추적/신규 소스 103개·32,174줄·최대 907줄·800줄 이상 4개로 대조했다.
+  미통합 E-003/E-004 미추적 파일은 제외했으므로 전체 작업 트리 구조 assertion의 통과로
+  표현하지 않는다. 전체 대조는 남은 E 통합 후 수행한다.
+- 실제 사용자 클립보드 읽기/쓰기·macOS 실행·장시간 I/O 지연 측정은 미실행이다.
+  개인정보 검증 범위를 확장하지 않고 내부/경계 계약과 격리 실제 화면의 증거를 구분한다.
+- 부모의 최종 전체 회귀 재실행도 269 passed / 8 ignored / 0 failed, strict clippy 통과.
+  문서 형식 검사 38개 Markdown 오류 0, 열린 ID 대응 10/10, diff 검사 통과.
+
 <a id="e002-evidence"></a>
 
 ## 2026-10-21 — E-002 프로세스 모니터 통합 검증
@@ -36,7 +78,10 @@
   추적 파일과 E-002 신규 파일만 89개/29,012줄로 대조했고 다른 E 미추적 파일은 제외했다.
 - 실제 사용자 프로세스 종료·자동 승격·macOS 실행은 검증 범위 밖이다.
   최종 clippy `-D warnings`, 문서 형식 검사(38개 Markdown·오류 0), 열린 ID 대응
-  **13/13**, diff 검사 통과. 기능 검증을 닫고 Git 반영·푸시 확인은 다음 작업의 후속 기록에 남긴다.
+  **13/13**, diff 검사 통과. Noether도 최종 PNG의 보이는 도움말·표 열 배치를 확인했다.
+  스크롤 끝 도달은 정지 PNG가 아닌 자동 테스트의 근거다.
+- Git 후속: `d80b1e1` 커밋·원격 푸시 후 fetch, ahead/behind **0/0** 확인.
+  이후 E-001 작업에서 구조 지도·기능 소스가 다시 바뀔 수 있으므로 위 해시별 검증과 구분한다.
 
 ## 2026-10-21 — 작업 목록 전역 규칙 재확인·충돌 해소
 

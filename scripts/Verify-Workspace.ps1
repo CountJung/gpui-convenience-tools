@@ -9,6 +9,18 @@ Set-StrictMode -Version 2.0
 $repoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 $packageName = "gpui-convenience-tools"
 $visualTests = @(
+    "clipboard_ui_opt_in_poll_throttle_and_type_policy",
+    "clipboard_ui_search_select_copy_pin_delete_and_clear",
+    "clipboard_ui_png_recopy_and_missing_file_failure",
+    "clipboard_ui_policy_validation_retention_and_restart_store",
+    "clipboard_ui_corruption_blocks_capture_and_requires_clear_confirmation",
+    "clipboard_ui_widths_and_scrolling_preserve_controls",
+    "clipboard_ui_sensitive_marker_and_unavailable_probe_fail_closed",
+    "clipboard_ui_settings_autosave_preserve_other_fields_and_rehydrate",
+    "clipboard_ui_background_single_flight_keeps_ui_available",
+    "clipboard_ui_expired_recopy_persists_prune_and_removes_owned_png",
+    "clipboard_ui_recopy_then_clear_baselines_current_sequence",
+    "clipboard_ui_first_history_row_visible_at_default_window",
     "process_monitor_selection_confirmation_cancel_and_guarded_failure",
     "process_monitor_sort_interval_search_and_transient_state",
     "process_monitor_preferences_save_and_reopen_without_search_or_snapshot",

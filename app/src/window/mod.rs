@@ -1,4 +1,5 @@
 pub mod ad_block;
+pub mod clipboard;
 pub mod dashboard;
 pub mod file_sync;
 pub mod interval;

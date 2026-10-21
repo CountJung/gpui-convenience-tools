@@ -7,6 +7,7 @@
 )]
 
 mod app;
+mod clipboard_history;
 mod config;
 mod config_layout;
 mod logging;

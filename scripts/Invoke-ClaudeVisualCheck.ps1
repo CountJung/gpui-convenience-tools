@@ -44,6 +44,9 @@ param(
     # 최근 동기화 이력이 표시되는 화면을 재현할 때 쓴다.
     [string]$SeedHistory,
 
+    # Start 전용. 합성 텍스트 이력 index만 격리 루트에 넣는다. 사용자 클립보드는 읽지 않는다.
+    [string]$SeedClipboardHistory,
+
     # Start 전용. 검증 전용 격리 VDI 복사본을 만들 원본 경로.
     [string]$SeedVdi,
 
@@ -73,7 +76,7 @@ param(
     [int]$VdiPartitionNumber,
 
     # Start 전용. 검증 전용 환경 변수로 패널 전환 입력 없이 특정 화면을 연다.
-    [ValidateSet("Dashboard", "FileSync", "VirtualDisk", "OpenSsl", "Timestamp", "ProcessMonitor", "AutoStart", "Settings")]
+    [ValidateSet("Dashboard", "FileSync", "VirtualDisk", "OpenSsl", "Timestamp", "ProcessMonitor", "ClipboardHistory", "AutoStart", "Settings")]
     [string]$InitialPanel = "Dashboard",
 
     [string]$Name = "capture",
@@ -501,6 +504,20 @@ switch ($Action) {
             Copy-Item -LiteralPath $historyPath -Destination (Join-Path $appData "sync-history.json") -Force
         }
 
+        if (-not [string]::IsNullOrWhiteSpace($SeedClipboardHistory)) {
+            $clipboardSeedPath = [System.IO.Path]::GetFullPath($SeedClipboardHistory)
+            if (-not (Test-Path -LiteralPath $clipboardSeedPath -PathType Leaf)) {
+                throw "시드 클립보드 이력을 찾을 수 없다: $clipboardSeedPath"
+            }
+            $clipboardSeed = Get-Content -LiteralPath $clipboardSeedPath -Raw | ConvertFrom-Json
+            if ($clipboardSeed.version -ne 1 -or @($clipboardSeed.history.entries | Where-Object { $_.content.kind -ne "text" }).Count -gt 0) {
+                throw "시각 검증 시드는 version 1 합성 텍스트 이력만 지원한다."
+            }
+            $clipboardSeedRoot = Join-Path $appData "clipboard-history"
+            New-Item -ItemType Directory -Path $clipboardSeedRoot | Out-Null
+            Copy-Item -LiteralPath $clipboardSeedPath -Destination (Join-Path $clipboardSeedRoot "index.json")
+        }
+
         # 앱은 `dirs::config_dir()`(= `SHGetKnownFolderPath`)로 데이터 루트를 찾으므로
         # `APPDATA`만 바꿔서는 격리되지 않는다. 전용 변수를 프로세스 범위로 지정해야
         # 사용자의 실제 config.json·로그를 건드리지 않는다.
@@ -533,6 +550,9 @@ switch ($Action) {
             }
             elseif ($InitialPanel -eq "ProcessMonitor") {
                 $env:GPUI_CONVENIENCE_TOOLS_INITIAL_PANEL = "process_monitor"
+            }
+            elseif ($InitialPanel -eq "ClipboardHistory") {
+                $env:GPUI_CONVENIENCE_TOOLS_INITIAL_PANEL = "clipboard_history"
             }
             elseif ($InitialPanel -eq "AutoStart") {
                 $env:GPUI_CONVENIENCE_TOOLS_INITIAL_PANEL = "auto_start"

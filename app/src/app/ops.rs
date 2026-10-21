@@ -43,6 +43,7 @@ impl AppRoot {
         let openssl = self.openssl.config.clone();
         let timestamp = self.timestamp.config.clone();
         let process_monitor = self.process_monitor.config.clone();
+        let clipboard = self.clipboard.config.clone();
         let virtual_disk = VirtualDiskConfig {
             last_vdi_path: non_empty_string(&self.virtual_disk.path_text),
             last_partition_number: self
@@ -71,10 +72,12 @@ impl AppRoot {
             config.openssl = openssl;
             config.timestamp = timestamp;
             config.process_monitor = process_monitor;
+            config.clipboard = clipboard;
         });
         self.openssl.save_error = result.is_err();
         self.timestamp.save_error = result.is_err();
         self.process_monitor.save_error = result.is_err();
+        self.clipboard.save_error = result.is_err();
         result?;
 
         Ok(())
