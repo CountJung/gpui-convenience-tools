@@ -419,8 +419,8 @@ fn sidebar_wheel_scroll_reaches_last_navigation_item(cx: &mut TestAppContext) {
     let max_scroll_height =
         cx.update(|_, app| view.read(app).sidebar_scroll_handle.max_offset().height);
 
-    // Windows는 Win32 전용 패널까지 7개 항목이라 이 크기에서 반드시 넘친다.
-    // 비Windows는 파일 동기화·로그·설정만 남아 넘치지 않을 수 있으므로, 이 단언은
+    // Windows는 Win32 전용 패널까지 포함해 이 크기에서 반드시 넘친다.
+    // 비Windows는 전용 메뉴가 빠져 넘치지 않을 수 있으므로, 이 단언은
     // 항목이 줄었다는 이유로 스크롤 회귀를 놓치지 않도록 Windows에서만 강제한다.
     #[cfg(target_os = "windows")]
     assert!(
@@ -436,7 +436,8 @@ fn sidebar_wheel_scroll_reaches_last_navigation_item(cx: &mut TestAppContext) {
         );
         cx.simulate_event(ScrollWheelEvent {
             position: wheel_position,
-            delta: ScrollDelta::Pixels(point(px(0.0), px(-1000.0))),
+            // 메뉴가 늘어도 임의의 고정 거리 대신 실제 overflow 끝까지 이동한다.
+            delta: ScrollDelta::Pixels(point(px(0.0), -max_scroll_height - viewport.size.height)),
             modifiers: Modifiers::none(),
             ..Default::default()
         });
@@ -495,5 +496,25 @@ fn settings_page_keeps_user_config_actions_inside_the_card(cx: &mut TestAppConte
             && open.origin.x >= card.origin.x
             && open_right <= card_right,
         "settings actions should stay inside the card: card={card:?}, save={save:?}, open={open:?}"
+    );
+}
+
+#[gpui::test]
+fn mock_settings_actions_do_not_write_without_side_effects(cx: &mut TestAppContext) {
+    let _isolated = crate::config::tests::IsolatedDataDir::new("mock-settings-guard");
+    initialize_components(cx);
+    let (view, cx) = cx.add_window_view(|_, _| test_app_root(ActivePanel::Settings));
+    view.update(cx, |root, cx| {
+        assert!(!root.sync.external_side_effects_enabled);
+        root.persist_config();
+        root.toggle_favorite_service("synthetic-service");
+        root.update_log_config(cx, |config| config.max_files = 17);
+        assert!(root.is_favorite_service("synthetic-service"));
+        assert_eq!(root.log_config.max_files, 17);
+    });
+    refresh(cx);
+    assert!(
+        !crate::config::effective_config_path().exists(),
+        "mock-only settings actions must not create a settings file"
     );
 }

@@ -4,11 +4,13 @@ use serde::{Deserialize, Serialize};
 use std::{fs, path::PathBuf};
 
 mod clipboard;
+pub(crate) mod launcher;
 mod openssl;
 mod persistence;
 pub(crate) mod process;
 mod timestamp;
 pub use clipboard::ClipboardConfig;
+pub use launcher::LauncherConfig;
 pub use openssl::OpenSslConfig;
 #[cfg(test)]
 use persistence::{config_path, fallback_config_path, save_config};
@@ -90,6 +92,8 @@ pub struct AppConfig {
     pub process_monitor: ProcessMonitorConfig,
     #[serde(default)]
     pub clipboard: ClipboardConfig,
+    #[serde(default)]
+    pub launcher: LauncherConfig,
 }
 
 fn default_scan_interval_secs() -> u32 {
@@ -390,6 +394,7 @@ impl Default for AppConfig {
             timestamp: TimestampConfig::default(),
             process_monitor: ProcessMonitorConfig::default(),
             clipboard: ClipboardConfig::default(),
+            launcher: LauncherConfig::default(),
         }
     }
 }

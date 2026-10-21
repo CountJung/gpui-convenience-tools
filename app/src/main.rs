@@ -14,6 +14,7 @@ mod logging;
 mod openssl_codec;
 mod platform;
 mod process_monitor;
+mod quick_launcher;
 mod sync;
 mod sync_history;
 mod theme;

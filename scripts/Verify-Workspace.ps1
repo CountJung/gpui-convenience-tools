@@ -9,6 +9,22 @@ Set-StrictMode -Version 2.0
 $repoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 $packageName = "gpui-convenience-tools"
 $visualTests = @(
+    "mock_settings_actions_do_not_write_without_side_effects",
+    "launcher_gpui_register_search_select_script_cancel_edit_delete",
+    "launcher_gpui_hotkey_event_only_navigates_and_restores_without_panel_entry",
+    "launcher_gpui_settings_persist_and_transient_inputs_do_not",
+    "launcher_gpui_page_bounds_scroll_and_trust_invalidation",
+    "launcher_gpui_registered_rows_keep_names_and_paths_separate",
+    "launcher_gpui_native_path_results_select_cancel_and_fail_without_side_effects",
+    "launcher_gpui_sidebar_navigation_and_background_tick_without_panel_entry",
+    "launcher_drive_roots_allow_folder_registration_and_execution_plan",
+    "launcher_script_requires_explicit_confirmation_and_fixed_file_interpreter",
+    "launcher_script_fixture_runs_only_after_confirmation_or_reports_policy_block",
+    "launcher_runs_only_its_harmless_fixture_with_literal_arguments",
+    "launcher_os_hotkey_default_register_or_conflict",
+    "launcher_os_hotkey_alternative_register_or_conflict",
+    "launcher_os_hotkey_register_conflict_release",
+    "launcher_os_hotkey_owned_queue_message_emits_activated",
     "clipboard_ui_opt_in_poll_throttle_and_type_policy",
     "clipboard_ui_search_select_copy_pin_delete_and_clear",
     "clipboard_ui_png_recopy_and_missing_file_failure",

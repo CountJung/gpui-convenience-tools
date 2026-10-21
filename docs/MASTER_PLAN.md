@@ -23,7 +23,10 @@ GPUI 기반 다용도 데스크탑 보조 도구 모음의 단계 범위와 현�
   클립보드 히스토리 `E-001`: 로컬 정책·보관·UI·설정 복원과 Windows 합성 화면 검증 완료.
   [구현 이력](IMPLEMENTATION_HISTORY.md#e001-implementation-stage)과
   [검증 기록](VERIFICATION_RECORDS.md#e001-evidence)을 따른다.
-  빠른 실행기 `E-003`·스크린샷 `E-004`는 미통합이며 완료로 처리하지 않는다.
+  빠른 실행기 `E-003`: 신뢰 등록한 로컬 대상의 명시 실행·단축키 패널 열기·설정 저장/복원 구현 완료.
+  [구현 이력](IMPLEMENTATION_HISTORY.md#e003-implementation-stage)과
+  [검증 기록](VERIFICATION_RECORDS.md#e003-evidence)을 따른다. Windows 격리 화면·전체 회귀 검증 완료.
+  스크린샷 `E-004`는 미통합이다.
   [사용 안내 초안](README.md#phase-e-사용-안내-초안)과
   [안전 기본값](DEVELOPMENT_GUIDE.md#phase-e-승인-범위와-안전-기본값)을 따른다.
 - macOS 네이티브 확장: 범위 결정과 환경 확보 후 진행한다.
@@ -52,6 +55,8 @@ TIME·E 작업의 Git 반영·후속 결과는 [검증 기록](VERIFICATION_RECO
 
 - [E-001 — 클립보드 히스토리](IMPLEMENTATION_HISTORY.md#e001-implementation-stage):
   로컬 정책·보관·UI·설정 복원과 Windows 합성 화면 검증 완료.
+- [E-003 — 빠른 실행기](IMPLEMENTATION_HISTORY.md#e003-implementation-stage):
+  신뢰 대상 등록·명시 실행·단축키 패널 열기·설정 저장/복원 구현 완료. 최종 검증은 진행 중이다.
 
 ## 2026-10-19 — 문서 체계 간소화
 

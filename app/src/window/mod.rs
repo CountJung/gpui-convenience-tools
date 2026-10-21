@@ -3,6 +3,7 @@ pub mod clipboard;
 pub mod dashboard;
 pub mod file_sync;
 pub mod interval;
+pub mod launcher;
 pub mod log_view;
 pub mod openssl;
 pub mod process;

@@ -19,6 +19,7 @@ mod clipboard_ops;
 mod events;
 mod inputs;
 mod interval;
+mod launcher_ops;
 mod openssl_ops;
 mod ops;
 mod process_ops;
@@ -109,6 +110,7 @@ pub struct AppRoot {
     pub(crate) timestamp: timestamp_ops::TimestampState,
     pub(crate) process_monitor: process_ops::ProcessMonitorState,
     pub(crate) clipboard: clipboard_ops::ClipboardState,
+    pub(crate) launcher: launcher_ops::LauncherState,
 
     // ── VirtualBox 오프라인 디스크 탐색 ──
     pub(crate) virtual_disk: VirtualDiskSession,
@@ -391,6 +393,7 @@ impl Render for AppRoot {
             ActivePanel::Timestamp => crate::window::timestamp::render(self, window, cx),
             ActivePanel::ProcessMonitor => crate::window::process::render(self, window, cx),
             ActivePanel::ClipboardHistory => crate::window::clipboard::render(self, window, cx),
+            ActivePanel::QuickLauncher => crate::window::launcher::render(self, window, cx),
             ActivePanel::Services => service_mgr::render(self, window, cx),
             ActivePanel::AutoStart => service_view::render(self, window, cx),
             ActivePanel::Logs => log_view::render(self, cx),
@@ -427,6 +430,7 @@ impl Render for AppRoot {
                 | ActivePanel::Timestamp
                 | ActivePanel::ProcessMonitor
                 | ActivePanel::ClipboardHistory
+                | ActivePanel::QuickLauncher
         );
         let sidebar_scroll = self.sidebar_scroll_handle.clone();
         let content_scroll = self.content_scroll_handle.clone();

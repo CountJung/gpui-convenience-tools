@@ -19,6 +19,7 @@ pub(super) fn initial_panel_from_validation_env() -> ActivePanel {
         Some("timestamp") => ActivePanel::Timestamp,
         Some("process_monitor") => ActivePanel::ProcessMonitor,
         Some("clipboard_history") => ActivePanel::ClipboardHistory,
+        Some("quick_launcher") => ActivePanel::QuickLauncher,
         Some("auto_start") => ActivePanel::AutoStart,
         Some("settings") => ActivePanel::Settings,
         _ => ActivePanel::Dashboard,

@@ -19,6 +19,7 @@ impl AppRoot {
         let mut timestamp_config = crate::config::TimestampConfig::default();
         let mut process_monitor_config = crate::config::ProcessMonitorConfig::default();
         let mut clipboard_config = crate::config::ClipboardConfig::default();
+        let mut launcher_config = crate::config::LauncherConfig::default();
         let initial_sync_history = crate::sync_history::load_recent(20).unwrap_or_else(|err| {
             log::warn!("동기화 이력 불러오기 실패: {err:#}");
             Vec::new()
@@ -37,6 +38,7 @@ impl AppRoot {
             timestamp_config = cfg.timestamp.clone();
             process_monitor_config = cfg.process_monitor.clone();
             clipboard_config = cfg.clipboard.clone();
+            launcher_config = cfg.launcher.clone();
             virtual_disk_config = cfg.virtual_disk.clone();
             sync_enabled = cfg.sync_enabled;
             sidebar_width = normalize_sidebar_width(cfg.sidebar_width);
@@ -187,6 +189,7 @@ impl AppRoot {
             timestamp: timestamp_ops::TimestampState::from_config(timestamp_config),
             process_monitor: process_ops::ProcessMonitorState::from_config(process_monitor_config),
             clipboard: clipboard_ops::ClipboardState::from_config(clipboard_config),
+            launcher: launcher_ops::LauncherState::from_config(launcher_config),
 
             virtual_disk: VirtualDiskSession {
                 path_text: virtual_disk_config
@@ -218,6 +221,7 @@ impl AppRoot {
         };
 
         seed_validation_virtual_disk(&mut root, cx);
+        root.tick_launcher(cx);
         Self::start_event_refresh_loop(cx);
 
         root
@@ -234,6 +238,7 @@ impl AppRoot {
                 .update(cx, |this, cx| {
                     this.tick_process_monitor(cx);
                     this.tick_clipboard(cx);
+                    this.tick_launcher(cx);
                     if !this.event_rx.is_empty() {
                         cx.notify();
                     }

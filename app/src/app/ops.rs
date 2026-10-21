@@ -44,6 +44,7 @@ impl AppRoot {
         let timestamp = self.timestamp.config.clone();
         let process_monitor = self.process_monitor.config.clone();
         let clipboard = self.clipboard.config.clone();
+        let launcher = self.launcher.config.clone();
         let virtual_disk = VirtualDiskConfig {
             last_vdi_path: non_empty_string(&self.virtual_disk.path_text),
             last_partition_number: self
@@ -73,11 +74,13 @@ impl AppRoot {
             config.timestamp = timestamp;
             config.process_monitor = process_monitor;
             config.clipboard = clipboard;
+            config.launcher = launcher;
         });
         self.openssl.save_error = result.is_err();
         self.timestamp.save_error = result.is_err();
         self.process_monitor.save_error = result.is_err();
         self.clipboard.save_error = result.is_err();
+        self.launcher.save_error = result.is_err();
         result?;
 
         Ok(())
@@ -153,6 +156,10 @@ impl AppRoot {
     }
 
     pub(super) fn persist_config(&mut self) {
+        #[cfg(test)]
+        if !self.sync.external_side_effects_enabled {
+            return;
+        }
         let is_active = self.app_state.is_active;
         let kakao_reclaim_ad_space = self.kakao_reclaim_ad_space;
         let targets = self.app_state.targets.clone();
@@ -303,6 +310,10 @@ impl AppRoot {
             self.services.favorites.push(name.to_string());
         }
 
+        #[cfg(test)]
+        if !self.sync.external_side_effects_enabled {
+            return;
+        }
         let favorites = self.services.favorites.clone();
         if let Err(err) = update_config(move |cfg| cfg.favorite_services = favorites) {
             log::error!("즐겨찾기 저장 실패: {err}");
@@ -333,6 +344,11 @@ impl AppRoot {
         edit: impl FnOnce(&mut LogConfig),
     ) {
         edit(&mut self.log_config);
+        #[cfg(test)]
+        if !self.sync.external_side_effects_enabled {
+            cx.notify();
+            return;
+        }
         crate::logging::update_config(self.log_config.clone());
 
         let log_config = self.log_config.clone();

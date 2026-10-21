@@ -126,6 +126,7 @@ pub(crate) fn test_app_root(active_panel: ActivePanel) -> AppRoot {
         timestamp: super::timestamp_ops::TimestampState::default(),
         process_monitor: super::process_ops::ProcessMonitorState::default(),
         clipboard: super::clipboard_ops::ClipboardState::default(),
+        launcher: super::launcher_ops::LauncherState::default(),
         virtual_disk: super::virtual_disk_ops::VirtualDiskSession::default(),
         virtual_disk_page_scroll: ScrollHandle::default(),
         log_config: LogConfig::default(),

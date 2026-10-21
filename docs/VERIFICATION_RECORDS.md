@@ -4,6 +4,46 @@
 현재 코드의 재검증 결과로 보지 않는다. 현재 절차와 열린 게이트는 [VERIFICATION.md](VERIFICATION.md),
 남은 일은 [TODO.md](TODO.md)를 따른다. 2026-10-19 문서 정리에서 원문 근거를 이관했다.
 
+<a id="e003-evidence"></a>
+
+## 2026-10-21 — E-003 빠른 실행기 통합 검증
+
+- 대상·환경: `bcef8ec` 이후 Windows E-003 통합 작업 트리. 사용자 등록 대상은 실행하지
+  않고 격리 설정·자체 무해 EXE/PowerShell fixture·소유 메시지 큐로 검증했다.
+- 자동: `cargo test --workspace --all-targets --all-features --offline` **290 passed /
+  8 ignored / 0 failed**. all-targets/all-features check·clippy `-D warnings`와 변경
+  Rust 파일 fmt 통과. GPUI는 신뢰 등록·검색·
+  선택·편집·삭제, 스크립트 확인/취소, 파일 대화상자 결과/취소/실패 전달, 설정 자동 저장·
+  재시작 복원, 패널 미진입 시 단축키 이벤트 처리와 920/1000/1500px 배치를 단언했다.
+- 실제 Windows 경계: 자체 EXE에 전달한 인수와 확인 후 고정 PowerShell `-File`로 실행한
+  fixture의 marker·literal 인수가 일치했다. Ctrl+Alt+F9 등록/해제 성공, Ctrl+Alt+Space는
+  기존 바인딩의 OS 1409 충돌을 보존했다. 소유 WM_HOTKEY 큐는 다른 ID를 무시하고
+  등록 ID만 Activated로 전달했다. 물리 키 입력은 보내지 않았다.
+- 전체 회귀에서 신규 메뉴 때문에 고정 휠 거리로 끝까지 닿지 않던 기존 테스트를 실제
+  scroll 높이 기반으로 고쳤으며 마지막 설정 카드의 완전 가시성 단언은 유지했다.
+  병렬 테스트 중 모의 설정 조작이 공용 격리 파일을 생성해 16개가 연쇄 실패한 것도
+  재현했다. 설정 일괄 저장·즐겨찾기·로그 설정의 테스트 부작용 가드를 일치시키고,
+  로컬 상태 변경은 유지하면서 파일을 만들지 않는 회귀를 추가했다. 제품 저장 경로는 유지했다.
+- 실제 첫 화면에서 등록 이름 줄바꿈/경로 겹침을 확인해 이름 최소 180px·행 축소 방지로
+  수정했다. 후속 화면의 경로가 말줄임표만 남는 현상도 확인해 한 줄 클리핑으로 교체했다.
+  긴 이름/300자 경로의 bounds 회귀와 최종 PNG에서 읽을 수 있는 이름·경로를 함께 확인했다.
+- 별도 release: `cargo rustc -p gpui-convenience-tools --release --offline -- -o
+  .../target/launcher-validation.exe` 성공(출력 경로 경고 2개).
+  SHA-256 `14d3ca098e0ca3a99746401b3fc1e19810c7d9b22d9af895cff4beb2ca5c1f16`.
+  `-SeedConfig .../e003-config.json -InitialPanel QuickLauncher`로 단축키 OFF·합성 폴더 2건을
+  표시했다. `target/visual-validation/captures/e003-readable-default-134519.png`(1000×700),
+  `e003-readable-minimum-134520.png`(920×480)를 직접 관찰했다. 아래 등록 편집 내용은
+  스크롤 영역이며 끝 도달은 자동 테스트로 검증했다.
+- 검증 PID 39580과 세션 루트 `gpui-claude-visual-44f6606898aa4c75913272083a0163a1`
+  정리(`sessionRootExists=false`). 사용자 PID 10208 유지, 전역 키/마우스 입력 없이
+  소유 창 캡처/리사이즈만 했다. 시작 포커스는 복원했고 이후 사용자 포커스 변경은 보존했다.
+- Code Reviewer Sagan 정적 PASS, Error Reviewer Noether의 단축키 큐·테스트 부작용·배치
+  검토 지적을 수정했다. Noether도 최종 PNG 두 장의 경로 가독성·비겹침을 직접 확인해
+  기존 증거 시각 PASS로 판정했다. 실제 OS 파일 선택 대화상자의 수동 조작, 물리 단축키→패널 열기,
+  macOS 실행은 미실행이며 내부 결과 전달·Windows 메시지/프로세스 검증과 구분한다.
+- 구조 측정은 E-003 포함 111개·34,523줄·최대 907줄·경고 4개, 위반 0개다.
+  미통합 E-004는 제외했으므로 전체 작업 트리 구조 assertion의 통과로 표현하지 않는다.
+
 <a id="e001-evidence"></a>
 
 ## 2026-10-21 — E-001 클립보드 히스토리 통합 검증
@@ -45,6 +85,8 @@
   개인정보 검증 범위를 확장하지 않고 내부/경계 계약과 격리 실제 화면의 증거를 구분한다.
 - 부모의 최종 전체 회귀 재실행도 269 passed / 8 ignored / 0 failed, strict clippy 통과.
   문서 형식 검사 38개 Markdown 오류 0, 열린 ID 대응 10/10, diff 검사 통과.
+- Git 후속: `bcef8ec` 커밋·원격 푸시 후 fetch, ahead/behind **0/0** 확인.
+  다른 E의 미통합 신규 파일은 이 커밋에 포함하지 않았다.
 
 <a id="e002-evidence"></a>
 

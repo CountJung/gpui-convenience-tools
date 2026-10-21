@@ -4,6 +4,26 @@
 당시 문맥이며 현재 규칙이나 열린 작업이 아니다. 현재 단계는 [MASTER_PLAN.md](MASTER_PLAN.md),
 규칙은 [DEVELOPMENT_GUIDE.md](DEVELOPMENT_GUIDE.md), 현재 구조는 [PROJECT_MAP.md](PROJECT_MAP.md)를 따른다.
 
+<a id="e003-implementation-stage"></a>
+<a id="e003-implementation-draft"></a>
+
+## 2026-10-21 — E-003 빠른 실행기
+
+신뢰 대상 등록·명시 실행·단축키 패널 열기·설정 저장/복원 구현을 완료했다.
+Windows 격리 화면·전체 회귀 검증을 완료했다. 상세 근거·미검증 경계·Git 후속은
+[검증 기록](VERIFICATION_RECORDS.md#e003-evidence)을 따른다.
+
+- `quick_launcher.rs`는 신뢰 등록한 로컬 절대 경로·종류·개별 인수를 저장/실행 시 검사한다.
+  앱은 직접 실행하고 폴더는 시스템 Explorer, `.ps1`은 시스템 PowerShell의 `-File`로 연다.
+  명령 문자열·실행 정책 우회는 제공하지 않으며 스크립트는 실행마다 확인한다.
+- `app/launcher_ops.rs`와 `window/launcher.rs`가 검색·등록·편집·신뢰 재확인·선택 실행·
+  등록 삭제와 상태 표시를 맡는다. 실행 요청은 백그라운드에서 처리하며 시작 결과와 종료 결과를 구분한다.
+- `quick_launcher/hotkey.rs`는 기본 OFF인 Windows 전역 단축키 등록·충돌·해제를 맡고,
+  활성화 이벤트는 대상 실행 없이 패널을 연다. `platform.rs`는 시스템 실행 경로와 자기 창 복원을 맡는다.
+- `LauncherConfig`를 시작 시 복원·개별 자동 저장·전체 저장에 연결하고 Windows 메뉴에 노출한다.
+  등록 정보·단축키 설정만 보존하며 경로·인수는 평문이다. 사용법·지원 범위·주의사항은
+  [README.md](README.md#빠른-실행기--e-003)에 둔다.
+
 <a id="e001-implementation-stage"></a>
 <a id="e001-implementation-draft"></a>
 
