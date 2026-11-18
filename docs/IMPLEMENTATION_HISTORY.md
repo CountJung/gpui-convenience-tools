@@ -4,6 +4,12 @@
 당시 문맥이며 현재 규칙이나 열린 작업이 아니다. 현재 단계는 [MASTER_PLAN.md](MASTER_PLAN.md),
 규칙은 [DEVELOPMENT_GUIDE.md](DEVELOPMENT_GUIDE.md), 현재 구조는 [PROJECT_MAP.md](PROJECT_MAP.md)를 따른다.
 
+<a id="ux003-implementation-stage"></a>
+
+## UX-003 — Windows 서비스 목록 우선 배치 (2026-11-18 완료)
+
+좁은 창은 목록과 설정을 전환하고 넓은 창은 저장된 분할 폭을 복원한다. 긴 서비스명은 목록 안에서만 가로 스크롤한다. [최소·기본 릴리즈 화면 및 자동 검증](VERIFICATION_RECORDS.md#ux003-evidence)으로 수용 종료했다.
+
 <a id="e004-implementation-stage"></a>
 <a id="e004-implementation-draft"></a>
 

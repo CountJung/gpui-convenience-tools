@@ -30,6 +30,7 @@ impl AppRoot {
         let targets = self.app_state.targets.clone();
         let scan_interval_secs = self.scan_interval_secs;
         let favorite_services = self.services.favorites.clone();
+        let service_list_width = self.services.wide_list_width;
         let sync_enabled = self.sync.enabled;
         let mut sync_jobs = self.sync.jobs.clone();
         let sidebar_width = self.sidebar_width;
@@ -68,6 +69,7 @@ impl AppRoot {
             config.sync_enabled = sync_enabled;
             config.sync_jobs = sync_jobs;
             config.sidebar_width = sidebar_width;
+            config.service_list_width = service_list_width;
             config.virtual_disk_suppressed_issue_keys = suppressed_issue_keys;
             config.log = log_config;
             config.virtual_disk = virtual_disk;
@@ -301,7 +303,10 @@ impl AppRoot {
 
     pub(crate) fn refresh_sys_services(&mut self) {
         match self.platform.list_sys_services() {
-            Ok(services) => self.services.items = services,
+            Ok(services) => {
+                self.services.items = services;
+                self.services.measured_names = None;
+            }
             Err(err) => log::error!("서비스 목록 조회 실패: {err}"),
         }
     }

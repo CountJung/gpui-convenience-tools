@@ -338,6 +338,237 @@ fn service_rows_keep_names_readable_at_supported_window_widths(cx: &mut TestAppC
 }
 
 #[gpui::test]
+fn service_viewport_keeps_scroll_local_at_supported_sizes(cx: &mut TestAppContext) {
+    initialize_components(cx);
+    for sidebar in [200., 240., 360.] {
+        let (view, cx) = cx.add_window_view(move |_, _| {
+            let mut root = test_app_root(ActivePanel::Services);
+            root.sidebar_width = sidebar;
+            root.services.items = (0..40)
+                .map(|i| SysServiceInfo {
+                    name: format!("{}-{i}", "LongServiceIdentifier".repeat(8)),
+                    display_name: "긴 Windows 서비스 표시 이름 ".repeat(12),
+                    status: SysServiceStatus::Running,
+                    start_type: SysServiceStartType::Automatic,
+                })
+                .collect();
+            root.services.items[1].name = "short-only".into();
+            root.services.items[1].display_name = "짧은 이름".into();
+            root
+        });
+        for (w, h) in [(920., 480.), (1000., 700.), (1280., 700.)] {
+            cx.simulate_resize(size(px(w), px(h)));
+            refresh(cx);
+            let side = cx.debug_bounds("sidebar-pane").unwrap();
+            let divider = point(side.right() - px(2.), side.center().y);
+            if (side.size.width - px(sidebar)).abs() > px(1.) {
+                drag_divider(cx, divider, point(px(sidebar) - px(2.), divider.y));
+            }
+            refresh(cx);
+            let side = cx.debug_bounds("sidebar-pane").unwrap();
+            assert!(
+                (side.size.width - px(sidebar)).abs() <= px(3.),
+                "{w} {sidebar}: {side:?}"
+            );
+            let viewport = cx.debug_bounds("svc-list-viewport").unwrap();
+            let shell = cx.debug_bounds("content-area").unwrap();
+            assert!(viewport.right() <= shell.right() && viewport.bottom() <= px(h));
+            let compact = viewport.size.width + px(40.) >= shell.size.width;
+            assert_eq!(
+                compact,
+                w - sidebar - 32. < 701.,
+                "{w} / {sidebar}: shell={shell:?} viewport={viewport:?}"
+            );
+            let (horizontal, vertical) = view.read_with(cx, |root, _| {
+                (
+                    root.services.horizontal.clone(),
+                    root.services.scroll.clone(),
+                )
+            });
+            horizontal.set_offset(point(px(0.), px(0.)));
+            vertical.scroll_to_item(0, gpui::ScrollStrategy::Top);
+            refresh(cx);
+            let left = cx.debug_bounds("service-row-0-identity").unwrap();
+            assert!(left.origin.x >= viewport.origin.x && left.origin.x < viewport.right());
+            let glyphs = cx.update(|window, _| {
+                [
+                    "LongServiceIdentifier".repeat(8) + "-0",
+                    "긴 Windows 서비스 표시 이름 ".repeat(12),
+                ]
+                .into_iter()
+                .map(|s| {
+                    let run = gpui::TextRun {
+                        len: s.len(),
+                        font: window.text_style().font(),
+                        color: window.text_style().color,
+                        background_color: None,
+                        underline: None,
+                        strikethrough: None,
+                    };
+                    window
+                        .text_system()
+                        .shape_line(s.into(), window.rem_size(), &[run], None)
+                        .width
+                })
+                .max()
+                .unwrap()
+            });
+            assert!(left.size.width >= glyphs, "{left:?} < {glyphs:?}");
+            let actions = cx.debug_bounds("service-row-0-actions").unwrap();
+            assert!(actions.origin.x >= viewport.origin.x && actions.right() <= viewport.right());
+            let limit = horizontal.max_offset().width;
+            assert!(limit > px(0.));
+            cx.simulate_event(ScrollWheelEvent {
+                position: viewport.center(),
+                delta: ScrollDelta::Pixels(point(-limit - px(20.), px(0.))),
+                modifiers: Modifiers::none(),
+                ..Default::default()
+            });
+            refresh(cx);
+            assert_eq!(cx.debug_bounds("svc-list-viewport").unwrap(), viewport);
+            let right = cx.debug_bounds("service-row-0-identity").unwrap();
+            assert!(right.origin.x < left.origin.x && right.right() <= viewport.right());
+            if compact {
+                click_debug_element(cx, "svc-settings-toggle");
+                let pane = cx.debug_bounds("service-mgr-right").expect("설정 열기");
+                let filter = cx.debug_bounds("svc-filter-Running").unwrap();
+                wheel_to_end(
+                    cx,
+                    "service-mgr-right",
+                    (pane.center().y - filter.center().y).into(),
+                );
+                assert_inside_viewport(cx, "service-mgr-right", "svc-filter-Running");
+                click_debug_element(cx, "svc-filter-Running");
+                click_debug_element(cx, "svc-settings-toggle");
+                assert_eq!(
+                    view.read_with(cx, |root, _| root.services.filter),
+                    ServiceFilter::Running
+                );
+                assert_eq!(horizontal.offset().x, -limit);
+            }
+            cx.simulate_event(ScrollWheelEvent {
+                position: viewport.center(),
+                delta: ScrollDelta::Pixels(point(limit + px(20.), px(0.))),
+                modifiers: Modifiers::none(),
+                ..Default::default()
+            });
+            refresh(cx);
+            wheel_to_end(cx, "svc-list-viewport", -8000.);
+            let last = cx.debug_bounds("svc-delete-39").unwrap();
+            let offset = horizontal.offset();
+            let v = vertical.base_handle().offset();
+            assert!(
+                last.origin.x >= viewport.origin.x
+                    && last.right() <= viewport.right()
+                    && last.origin.y >= viewport.origin.y
+                    && last.bottom() <= viewport.bottom(),
+                "{w}/{sidebar}: last={last:?}, viewport={viewport:?} x={offset:?} y={v:?}"
+            );
+            click_debug_element(cx, "svc-delete-39");
+            assert!(
+                view.read_with(cx, |root, _| root.services.pending_delete.is_some()),
+                "{w}/{sidebar}: last={last:?}, viewport={viewport:?} x={offset:?} y={v:?}"
+            );
+            click_debug_element(cx, "svc-cancel");
+            assert!(view.read_with(cx, |root, _| root.services.pending_delete.is_none()));
+            click_debug_element(cx, "svc-delete-39");
+            let before = view.read_with(cx, |root, _| root.app_state.log_entries.len());
+            click_debug_element(cx, "svc-confirm");
+            view.read_with(cx, |root, _| {
+                assert!(root.services.pending_delete.is_none());
+                assert_eq!(root.app_state.log_entries.len(), before + 1);
+                let message = &root.app_state.log_entries[before].message;
+                assert!(message.contains("삭제 실패") && message.contains("-39"));
+            });
+        }
+        view.update(cx, |root, cx| {
+            root.services
+                .horizontal
+                .set_offset(point(px(-2000.), px(0.)));
+            root.services.search_query = "short-only".into();
+            cx.notify();
+        });
+        refresh(cx);
+        assert_eq!(
+            view.read_with(cx, |root, _| root.services.horizontal.offset().x),
+            px(0.)
+        );
+    }
+}
+
+#[gpui::test]
+fn service_split_drag_survives_full_save_and_reopen(cx: &mut TestAppContext) {
+    let _dir = crate::config::tests::IsolatedDataDir::new("service-split");
+    initialize_components(cx);
+    fn make_window(
+        cx: &mut TestAppContext,
+    ) -> (gpui::Entity<AppRoot>, &mut gpui::VisualTestContext) {
+        let (view, cx) = cx.add_window_view(|_, _| {
+            let mut root = test_app_root(ActivePanel::Dashboard);
+            root.services.wide_list_width = crate::config::load_config()
+                .unwrap()
+                .and_then(|c| c.service_list_width);
+            root.sync.external_side_effects_enabled = true;
+            root
+        });
+        cx.simulate_resize(size(px(1400.), px(700.)));
+        view.update(cx, |root, cx| {
+            root.active_panel = ActivePanel::Services;
+            cx.notify();
+        });
+        refresh(cx);
+        refresh(cx);
+        (view, cx)
+    }
+    let (view, first) = make_window(cx);
+    let before = first.debug_bounds("service-mgr-split-right-pane").unwrap();
+    let initial = first
+        .debug_bounds("service-mgr-split-left-pane")
+        .unwrap()
+        .size
+        .width;
+    let divider = point(before.origin.x - px(2.), before.center().y);
+    drag_divider(first, divider, point(divider.x + px(70.), divider.y));
+    let after = first
+        .debug_bounds("service-mgr-split-left-pane")
+        .unwrap()
+        .size
+        .width;
+    let saved = crate::config::load_config()
+        .unwrap()
+        .unwrap()
+        .service_list_width
+        .unwrap();
+    assert!((after - px(saved)).abs() <= px(2.));
+    assert!(after > initial + px(40.));
+    first.simulate_resize(size(px(920.), px(480.)));
+    refresh(first);
+    first.simulate_resize(size(px(1400.), px(700.)));
+    refresh(first);
+    refresh(first);
+    let returned = first
+        .debug_bounds("service-mgr-split-left-pane")
+        .unwrap()
+        .size
+        .width;
+    assert!(
+        (returned - after).abs() <= px(2.),
+        "{returned:?} != {after:?}"
+    );
+    view.update(first, |root, _| root.save_current_config().unwrap());
+    let (_, reopened) = make_window(cx);
+    let restored = reopened
+        .debug_bounds("service-mgr-split-left-pane")
+        .unwrap()
+        .size
+        .width;
+    assert!(
+        (restored - after).abs() <= px(2.),
+        "{restored:?} != {after:?}"
+    );
+}
+
+#[gpui::test]
 fn sidebar_divider_drag_resizes_navigation_and_content(cx: &mut TestAppContext) {
     initialize_components(cx);
     let (_view, cx) = cx.add_window_view(|_, _| test_app_root(ActivePanel::Dashboard));

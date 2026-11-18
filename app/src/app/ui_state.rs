@@ -17,6 +17,11 @@ use std::sync::{Arc, Mutex};
 
 /// Windows 서비스 패널이 소유하는 상태.
 pub struct ServiceState {
+    pub(crate) horizontal: ScrollHandle,
+    pub(crate) available_width: gpui::Pixels,
+    pub(crate) settings_open: bool,
+    pub(crate) wide_list_width: Option<f32>,
+    pub(crate) measured_names: Option<(gpui::Font, gpui::Pixels, Vec<usize>, gpui::Pixels)>,
     pub(crate) items: Vec<SysServiceInfo>,
     pub(crate) search_query: String,
     pub(crate) search_input: Option<Entity<InputState>>,
@@ -30,6 +35,11 @@ pub struct ServiceState {
 impl Default for ServiceState {
     fn default() -> Self {
         Self {
+            horizontal: ScrollHandle::default(),
+            available_width: gpui::px(0.),
+            settings_open: false,
+            wide_list_width: None,
+            measured_names: None,
             items: Vec::new(),
             search_query: String::new(),
             search_input: None,

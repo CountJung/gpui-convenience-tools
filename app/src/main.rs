@@ -113,7 +113,7 @@ fn main() {
             WindowOptions {
                 window_bounds: Some(WindowBounds::Windowed(Bounds::centered(
                     None,
-                    size(px(1000.0), px(700.0)),
+                    app::service_preview_size().unwrap_or_else(|| size(px(1000.0), px(700.0))),
                     cx,
                 ))),
                 titlebar: None,

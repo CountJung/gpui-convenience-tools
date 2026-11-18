@@ -9,6 +9,7 @@ impl AppRoot {
         let mut kakao_reclaim_ad_space = false;
         let mut sync_jobs = Vec::new();
         let mut favorite_services = Vec::new();
+        let mut wide_list_width = None;
         let mut log_config = LogConfig::default();
         let mut initial_interval_presets = default_interval_presets();
         let mut sync_enabled = true;
@@ -61,6 +62,9 @@ impl AppRoot {
                 job.ensure_id();
             }
             favorite_services = cfg.favorite_services;
+            wide_list_width = cfg
+                .service_list_width
+                .filter(|w| w.is_finite() && *w >= 400.0);
             // 구버전 config에는 프리셋이 없어 기본값이 들어온다. 손상된 값은 여기서 거른다.
             initial_interval_presets = cfg.interval_presets;
             normalize_interval_presets(&mut initial_interval_presets);
@@ -159,6 +163,7 @@ impl AppRoot {
 
             services: ServiceState {
                 favorites: favorite_services,
+                wide_list_width,
                 ..ServiceState::default()
             },
             sync: SyncState {
@@ -223,6 +228,9 @@ impl AppRoot {
             content_scroll_handle: ScrollHandle::default(),
         };
 
+        if root.active_panel == ActivePanel::Services {
+            root.refresh_sys_services();
+        }
         seed_validation_virtual_disk(&mut root, cx);
         root.tick_launcher(cx);
         Self::start_event_refresh_loop(cx);

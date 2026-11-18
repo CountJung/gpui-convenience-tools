@@ -78,6 +78,8 @@ $visualTests = @(
     "ad_block_cards_contain_long_content_at_supported_widths",
     "split_panels_keep_settings_pane_usable_at_default_width",
     "service_rows_keep_names_readable_at_supported_window_widths",
+    "service_viewport_keeps_scroll_local_at_supported_sizes",
+    "service_split_drag_survives_full_save_and_reopen",
     "sidebar_divider_drag_resizes_navigation_and_content",
     "sidebar_wheel_scroll_reaches_last_navigation_item",
     "rendered_switch_toggles_in_light_dark_and_missing_switch_token_theme",

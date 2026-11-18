@@ -4,6 +4,24 @@
 현재 코드의 재검증 결과로 보지 않는다. 현재 절차와 열린 게이트는 [VERIFICATION.md](VERIFICATION.md),
 남은 일은 [TODO.md](TODO.md)를 따른다. 2026-10-19 문서 정리에서 원문 근거를 이관했다.
 
+<a id="ux003-evidence"></a>
+
+## 2026-11-18 — UX-003 서비스 관리의 목록 우선 배치
+
+최종 판정: **PASS**. 독립 화면 리뷰도 최소 크기의 완전한 2행과 기본 크기의 완전한 5행에서 이름 두 줄과 세 조작 버튼을 확인했다.
+
+- 테스트 대상: 현재 작업 트리의 Windows 서비스 뷰, 격리 설정, 모의 플랫폼과 서비스 40개. 920×480·1000×700·1280×700 각각에서 실제 사이드바를 200/240/360px로 맞추고, 설정 전환·필터 클릭·가로 휠·행 좌표를 검사한다. 삭제 확인은 실제 Windows 서비스에 전달하지 않는다.
+- 분할 폭: 넓은 화면에서 스플리터를 드래그하고 전체 설정을 저장한 뒤, 디스크에서 값을 읽어 새 GPUI 창을 구성해 폭을 비교한다. 이는 실제 릴리즈 프로세스의 종료·재기동 시험이 아니다.
+- 실행 결과: `cargo check --locked --offline` 통과. 격리된 `cargo test --locked --offline -- --test-threads=1` **320 passed, 0 failed, 9 ignored**. 최소 창에서도 앞쪽 조작 버튼이 뷰포트 안에 있고, 실제 글리프 폭 이상의 이름 영역 양 끝까지 도달했다. 세로 휠이 가로 위치까지 바꾸던 결함을 재현·수정하고 마지막 행 삭제 확인(모의 실패 로그)·취소를 클릭했다. 짧은 검색 결과로 좁히면 가로 위치도 초기화됐다.
+- 로컬 산출물: `D:\ArielNetworks\Predevelop\Tools\gpui-convenience-tools\target\debug`는 기존 자료 포함 약 32 GiB의 재사용 빌드 캐시다. 이번 테스트 실행 파일 58 MiB, 디버그 심볼 538 MiB를 포함한다. 후속 UI 회귀에 재사용하고 캐시 정리 승인 시에만 제거한다.
+- 회귀 이름: `service_viewport_keeps_scroll_local_at_supported_sizes`, `service_split_drag_survives_full_save_and_reopen`. 이 시점에는 GPUI에서만 검증했다.
+
+- 독립 정적 리뷰 후 삭제 확인을 누를 때마다 해당 행의 새 모의 실패 로그가 정확히 1건 생기고 확인 창이 닫히는지 단언을 보강했다. 보강 후 서비스 회귀 **3 passed**.
+- 최종 릴리즈: 기준 `70b5dc6`에서 UX-003 변경만 선별하여 `cargo build --release --locked --offline`. 검증 EXE SHA-256 `657665047b69d96b1ce9bde6eceb05b3dced6ff47e3b5d542c9520936b572ebe`. 같은 후보에서 서비스 테스트 **3 passed**, 전체 **319 passed, 0 failed, 9 ignored**.
+- Windows 실제 화면 **PASS**: 별도 입력 비활성 데스크톱과 격리 설정(광고/동기화 해제, 사이드바 240px)에서 동일 바이너리를 두 번 실행해 실제 서비스 309개를 조회했다. 920×480은 보기 설정이 접힌 목록, 1000×700은 설정을 펼친 분할 화면이었다. 두 크기 모두 완전히 표시된 행에서 표시명·내부명과 시작/중지/삭제 세 버튼이 잘리지 않았다. 끝에 일부만 보이는 행은 세로 스크롤 경계다. 긴 이름의 양 끝과 마지막 행 조작은 위 GPUI 테스트가 검증한다.
+- 로컬 캡처: `target/visual-validation/captures/ux003-minimum-41964-1.png`, `ux003-default-37328-1.png`(같은 폴더). 크기별 두 프레임의 SHA-256이 같았다. 사용자 데스크톱으로 전환하거나 전역 입력을 보내지 않았고 서비스 상태도 변경하지 않았다. 검증 프로세스만 종료했다.
+- 빌드 캐시 `D:\ArielNetworks\Predevelop\Tools\gpui-convenience-tools\target\release-validation` 약 4.15 GiB(기존 캐시 포함), 내부 검증 EXE 약 24.5 MiB. 후속 릴리즈 검증에서 재사용하며 캐시 정리 시 제거 가능하다.
+
 <a id="e004-evidence"></a>
 
 ## 2026-10-21 — E-004 스크린샷 도구 통합 검증

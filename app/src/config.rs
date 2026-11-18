@@ -57,6 +57,9 @@ pub struct AppConfig {
     pub scan_interval_secs: u32,
     #[serde(default)]
     pub favorite_services: Vec<String>,
+    /// 넓은 서비스 화면에서 사용자가 조정한 목록 폭.
+    #[serde(default)]
+    pub service_list_width: Option<f32>,
     /// 주기 드롭다운에 나열할 초 단위 프리셋.
     ///
     /// 광고 차단 스캔 주기와 파일 동기화 감시 주기가 **같은 목록을 공유**한다.
@@ -387,6 +390,7 @@ impl Default for AppConfig {
             theme_mode: None,
             scan_interval_secs: default_scan_interval_secs(),
             favorite_services: Vec::new(),
+            service_list_width: None,
             interval_presets: default_interval_presets(),
             sync_enabled: true,
             sync_jobs: Vec::new(),

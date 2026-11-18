@@ -20,28 +20,18 @@ use std::{ops::Range, rc::Rc};
 use crate::app::{AppRoot, ServiceFilter};
 use crate::platform::SysServiceStatus;
 use crate::window::ui::{self, ButtonStyle, Tone};
-use crate::window::{balanced_split, scroll_pane, SETTINGS_PANE_MIN_WIDTH};
+use crate::window::{resizable_split, scroll_pane, SETTINGS_PANE_MIN_WIDTH};
 
-const FEATURE_PANE_MIN_WIDTH: gpui::Pixels = px(400.0);
+mod layout;
+pub use layout::render;
+use layout::row_min_width;
 
-pub fn render(this: &mut AppRoot, window: &mut Window, cx: &mut Context<AppRoot>) -> AnyElement {
-    // ensure_service_search_input은 cx를 mut으로 빌리므로 theme() 이전에 호출
-    this.ensure_service_search_input(window, cx);
-
-    let right_scroll = this.services.right_scroll.clone();
-    let list = render_service_list(this, cx);
-    let settings = render_view_settings(this, cx);
-
-    balanced_split(
-        "service-mgr-split",
-        FEATURE_PANE_MIN_WIDTH,
-        SETTINGS_PANE_MIN_WIDTH,
-        list,
-        scroll_pane("service-mgr-right", &right_scroll, settings),
-    )
-}
-
-fn render_service_list(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElement {
+fn render_service_list(
+    this: &mut AppRoot,
+    window: &Window,
+    cx: &mut Context<AppRoot>,
+) -> AnyElement {
+    let em = window.rem_size();
     let pending_delete = this.services.pending_delete.clone();
     let svc_scroll = this.services.scroll.clone();
 
@@ -55,7 +45,8 @@ fn render_service_list(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElem
     let filter = this.services.filter;
     let favorites = this.services.favorites.clone();
     let filtered_indices: Rc<Vec<usize>> = Rc::new(
-        this.services.items
+        this.services
+            .items
             .iter()
             .enumerate()
             .filter(|(_, svc)| {
@@ -77,6 +68,7 @@ fn render_service_list(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElem
     );
     let total_count = this.services.items.len();
     let filtered_count = filtered_indices.len();
+    let min_width = row_min_width(this, window, &filtered_indices);
 
     // ── 서비스 목록 본문 ──
     let list_body: AnyElement = if this.services.items.is_empty() {
@@ -183,6 +175,7 @@ fn render_service_list(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElem
                                                         format!("service-row-{svc_ix}-identity")
                                                     })
                                                     .flex_1()
+                                                    .text_size(em)
                                                     .min_w_0()
                                                     .overflow_hidden()
                                                     .child(
@@ -208,7 +201,6 @@ fn render_service_list(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElem
                                             .w_full()
                                             .gap_2()
                                             .items_center()
-                                            .justify_between()
                                             .child(
                                                 ui::badge(
                                                     status_label,
@@ -337,6 +329,7 @@ fn render_service_list(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElem
                                                                 },
                                                             ),
                                                         )
+                                                        .debug_selector(move || format!("svc-delete-{svc_ix}"))
                                                         .w(px(52.0)),
                                                     ),
                                             ),
@@ -364,25 +357,27 @@ fn render_service_list(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElem
                     .child("Windows 서비스 관리"),
             )
             .child(
-                h_flex().gap_2().child(
-                    div()
-                        .text_color(theme.muted_foreground)
-                        .child(if total_count > 0 {
-                            format!("{filtered_count} / {total_count}")
-                        } else {
-                            String::new()
+                h_flex()
+                    .gap_2()
+                    .child(
+                        div()
+                            .text_color(theme.muted_foreground)
+                            .child(if total_count > 0 {
+                                format!("{filtered_count} / {total_count}")
+                            } else {
+                                String::new()
+                            }),
+                    )
+                    .child(ui::action_button(
+                        "svc-refresh-btn",
+                        "새로고침",
+                        ui::Size::Md,
+                        ButtonStyle::neutral(cx),
+                        cx.listener(|this, _ev, _window, cx| {
+                            this.refresh_sys_services();
+                            cx.notify();
                         }),
-                )
-                .child(ui::action_button(
-                    "svc-refresh-btn",
-                    "새로고침",
-                    ui::Size::Md,
-                    ButtonStyle::neutral(cx),
-                    cx.listener(|this, _ev, _window, cx| {
-                        this.refresh_sys_services();
-                        cx.notify();
-                    }),
-                )),
+                    )),
             ),
     );
 
@@ -416,14 +411,10 @@ fn render_service_list(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElem
                 .child(
                     v_flex()
                         .gap_2()
-                        .child(
-                            div()
-                                .text_color(theme.danger_foreground)
-                                .child(format!(
-                                    "⚠ '{}' 서비스를 삭제하면 되돌릴 수 없습니다. 계속하시겠습니까?",
-                                    del_cancel
-                                )),
-                        )
+                        .child(div().text_color(theme.danger_foreground).child(format!(
+                            "⚠ '{}' 서비스를 삭제하면 되돌릴 수 없습니다. 계속하시겠습니까?",
+                            del_cancel
+                        )))
                         .child(
                             h_flex()
                                 .gap_2()
@@ -454,26 +445,36 @@ fn render_service_list(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElem
                                             this.services.pending_delete = None;
                                             cx.notify();
                                         }),
-                                    ),
+                                    )
+                                    .debug_selector(|| "svc-confirm".into()),
                                 )
-                                .child(ui::action_button(
-                                    "svc-cancel-delete-btn",
-                                    "취소",
-                                    ui::Size::Md,
-                                    ButtonStyle::secondary(cx),
-                                    cx.listener(|this, _ev, _window, cx| {
-                                        this.services.pending_delete = None;
-                                        cx.notify();
-                                    }),
-                                )),
+                                .child(
+                                    ui::action_button(
+                                        "svc-cancel-delete-btn",
+                                        "취소",
+                                        ui::Size::Md,
+                                        ButtonStyle::secondary(cx),
+                                        cx.listener(|this, _ev, _window, cx| {
+                                            this.services.pending_delete = None;
+                                            cx.notify();
+                                        }),
+                                    )
+                                    .debug_selector(|| "svc-cancel".into()),
+                                ),
                         ),
                 ),
         );
     }
 
     // 테이블 카드
+    let mut horizontal = div().id("svc-list-x").overflow_x_scroll();
+    // 세로 휠을 바깥 가로 스크롤의 대체 입력으로 해석하지 않는다.
+    horizontal.style().restrict_scroll_to_axis = Some(true);
     root = root.child(
         div()
+            .relative()
+            .min_w_0()
+            .overflow_hidden()
             .flex_1()
             .min_h_0()
             .rounded_lg()
@@ -481,38 +482,52 @@ fn render_service_list(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElem
             .border_1()
             .border_color(theme.border)
             .child(
-                v_flex()
+                horizontal
+                    .debug_selector(|| "svc-list-viewport".into())
                     .size_full()
-                    // 컬럼 헤더
+                    .track_scroll(&this.services.horizontal)
                     .child(
-                        h_flex()
-                            .px_3()
-                            .pr(px(20.0))
-                            .py_2()
-                            .border_b_1()
-                            .border_color(theme.border)
-                            .justify_between()
-                            .child(div().text_color(theme.muted_foreground).child("서비스"))
+                        v_flex()
+                            .size_full()
+                            .min_w(min_width)
+                            .pb(px(12.))
+                            // 컬럼 헤더
                             .child(
-                                div()
-                                    .text_color(theme.muted_foreground)
-                                    .child("상태 · 작업"),
-                            ),
-                    )
-                    // 목록 본문
+                                h_flex()
+                                    .px_3()
+                                    .pr(px(20.0))
+                                    .py_2()
+                                    .border_b_1()
+                                    .border_color(theme.border)
+                                    .child(
+                                        div()
+                                            .text_color(theme.muted_foreground)
+                                            .child("서비스 · 상태 · 작업"),
+                                    ),
+                            )
+                            // 목록 본문
+                            .child(div().relative().flex_1().min_h_0().child(list_body)),
+                    ),
+            )
+            .child(
+                div()
+                    .absolute()
+                    .top(px(40.))
+                    .right_0()
+                    .bottom(px(12.))
+                    .w(px(12.))
+                    .child(Scrollbar::vertical(&svc_scroll).scrollbar_show(ScrollbarShow::Always)),
+            )
+            .child(
+                div()
+                    .absolute()
+                    .bottom_0()
+                    .left_0()
+                    .right_0()
+                    .h(px(12.))
                     .child(
-                        div().relative().flex_1().min_h_0().child(list_body).child(
-                            div()
-                                .absolute()
-                                .top_0()
-                                .left_0()
-                                .right_0()
-                                .bottom_0()
-                                .child(
-                                    Scrollbar::vertical(&svc_scroll)
-                                        .scrollbar_show(ScrollbarShow::Always),
-                                ),
-                        ),
+                        Scrollbar::horizontal(&this.services.horizontal)
+                            .scrollbar_show(ScrollbarShow::Always),
                     ),
             ),
     );
@@ -549,13 +564,22 @@ fn render_view_settings(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyEle
         filter_rows = filter_rows.child(
             div()
                 .id(("svc-filter", label.as_ptr() as usize))
+                .debug_selector(move || format!("svc-filter-{filter:?}"))
                 .rounded_md()
                 .px_3()
                 .py_2()
                 .cursor_pointer()
-                .bg(if is_selected { theme.primary } else { theme.list })
+                .bg(if is_selected {
+                    theme.primary
+                } else {
+                    theme.list
+                })
                 .border_1()
-                .border_color(if is_selected { theme.primary_hover } else { border })
+                .border_color(if is_selected {
+                    theme.primary_hover
+                } else {
+                    border
+                })
                 .hover(|s| s.bg(theme.secondary_hover))
                 .on_click(cx.listener(move |this, _ev, _window, cx| {
                     this.services.filter = filter;
