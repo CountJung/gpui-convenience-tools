@@ -5,12 +5,6 @@
 [VERIFICATION.md](VERIFICATION.md)를 따른다. 진행률은 확인된 작업 범위의 추정치이며
 남은 필수 조건을 대신하지 않는다. 표기 기준은 [공통 지침](DEVELOPMENT_GUIDE.md#작업-목록-표기)을 따른다.
 
-## 사용자 설정 — Phase C
-
-- [ ] C-002 | 95% | 광고 자리 회수 설정의 재시작 유지 확인
-  - 남은 일: 기존 사용자 프로필에서 옵션 켜기 → 앱 재시작 → 켜짐 유지 여부 1회 확인.
-  - 확인 주체: 사용자. 격리 설정의 자동 복원은 [이미 검증](VERIFICATION_RECORDS.md#c002-settings-evidence)했으며 독립 화면 반복 검토는 불필요.
-
 ## VirtualBox 오프라인 탐색 — Phase O
 
 종료된 VM의 VDI만 읽기 전용으로 탐색한다. 숨김·시스템 파일도 노출한다.

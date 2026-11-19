@@ -4,6 +4,10 @@
 당시 문맥이며 현재 규칙이나 열린 작업이 아니다. 현재 단계는 [MASTER_PLAN.md](MASTER_PLAN.md),
 규칙은 [DEVELOPMENT_GUIDE.md](DEVELOPMENT_GUIDE.md), 현재 구조는 [PROJECT_MAP.md](PROJECT_MAP.md)를 따른다.
 
+## C-002 — 기존 사용자 설정의 카카오톡 광고 자리 회수 옵션 복원 (2026-11-19 완료)
+
+기존 설정을 편집하지 않고 최신 릴리즈를 재시작해 켜짐 유지와 다른 설정값 보존을 확인했다. [검증 기록](VERIFICATION_RECORDS.md#c002-settings-evidence)
+
 <a id="g003-implementation-stage"></a>
 
 ## G-003 — 전체 저장 후에도 사이드바 폭 유지 (2026-11-19 완료)
