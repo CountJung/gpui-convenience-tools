@@ -8,8 +8,7 @@ GPUI 기반 다용도 데스크탑 보조 도구 모음의 단계 범위와 현�
 
 - 광고 창 축소·카카오톡 자리 회수: 사용자 실제 확인으로 수용 종료.
 - 사용자 설정 복원: 격리 검증 완료, 기존 사용자 프로필 재시작 확인이 남아 있다.
-- VirtualBox 오프라인 탐색: NTFS 탐색·복사와 화면 수용 완료.
-  네이티브 VDI 파일 선택·취소 확인이 남아 있다.
+- VirtualBox 오프라인 탐색: NTFS 탐색·복사와 화면 수용에 이어 [VDI 파일 선택·취소](VERIFICATION_RECORDS.md#vde023-picker)까지 확인해 Phase O 필수 검증을 마쳤다.
 - 파일 동기화: 제외 패턴·진행률·실시간 감시·링크/정션·이력까지 구현·검증 이력으로 이동.
 - OpenSSL 암복호화 `SSL-001`: 2026-10-21 사용자 확인으로 수용 종료.
   구현과 반영 상태는 [구현 이력](IMPLEMENTATION_HISTORY.md#ssl001-implementation-stage),
