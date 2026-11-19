@@ -4,6 +4,13 @@
 당시 문맥이며 현재 규칙이나 열린 작업이 아니다. 현재 단계는 [MASTER_PLAN.md](MASTER_PLAN.md),
 규칙은 [DEVELOPMENT_GUIDE.md](DEVELOPMENT_GUIDE.md), 현재 구조는 [PROJECT_MAP.md](PROJECT_MAP.md)를 따른다.
 
+<a id="ux006-implementation-stage"></a>
+
+## UX-006 — 프로세스 경로와 로그 원문 확인 (2026-11-19 완료)
+
+동명 프로세스는 선택 상세의 PID와 전체 경로로 구별하고 종료 없이 복사·취소할 수 있다. 로그 목록은 한 줄로 유지하고 상세에서 원문 끝까지 읽거나 메시지와 파일 경로를 따로 복사한다. 경로 복사는 무손실 텍스트 변환이 가능할 때만 제공한다.
+[후보 전체 회귀·양쪽 트리 컴파일 검사·Windows 릴리즈 화면·코드 재리뷰와 기존 Clippy 실패 범위](VERIFICATION_RECORDS.md#ux006-evidence)를 확인하고 수용 종료했다.
+
 <a id="ux004-implementation-stage"></a>
 
 ## UX-004 — 좁은 창의 광고 차단 목록과 설정 (2026-11-19 완료)

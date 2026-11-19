@@ -31,6 +31,8 @@ pub struct AppState {
     pub targets: Vec<TargetApp>,
     pub blocked_count: u32,
     pub log_entries: Vec<LogEntry>,
+    /// Owned detail survives eviction or replacement of the displayed row.
+    pub(crate) selected_log_entry: Option<LogEntry>,
 }
 
 impl Default for AppState {
@@ -45,6 +47,7 @@ impl Default for AppState {
                 ad_window_class: "Chrome_WidgetWin_1".to_string(),
             }],
             blocked_count: 0,
+            selected_log_entry: None,
             log_entries: vec![LogEntry {
                 level: "INFO".to_string(),
                 message: "앱을 시작했습니다.".to_string(),

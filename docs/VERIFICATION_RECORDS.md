@@ -4,6 +4,21 @@
 현재 코드의 재검증 결과로 보지 않는다. 현재 절차와 열린 게이트는 [VERIFICATION.md](VERIFICATION.md),
 남은 일은 [TODO.md](TODO.md)를 따른다. 2026-10-19 문서 정리에서 원문 근거를 이관했다.
 
+<a id="ux006-evidence"></a>
+
+## 2026-11-19 — UX-006 프로세스·로그 원문 확인
+
+검증 대상은 `2edab83` 위에 UX-006만 반영한 Windows 후보이며 다른 작업 트리의 미커밋 편집은 포함하지 않았다.
+프로세스 종료 확인에는 같은 이름·다른 경로의 합성 행을, 메시지에는 긴 무공백 문자열·줄바꿈·끝 표식을 사용한다.
+외부 입력 없이 별도 데스크톱에서 릴리즈를 캡처하고, 클릭·스크롤과 복사 결과는 GPUI 이벤트 및 테스트 클립보드로 검사한다. 사용자 프로세스 종료나 시스템 클립보드 교체는 수용 조건이 아니다.
+
+- **프로세스:** 최소 창에서 두 `worker.exe`를 차례로 선택해 PID와 긴 경로 원문을 구별하고 각각 복사·취소했다. 취소 후 선택과 페이지 스크롤 범위가 원복되고 종료 작업자는 시작되지 않았다. GPUI의 사라진 요소 좌표 캐시는 닫힘 근거에서 제외했다.
+- **로그:** 30px 행의 본문과 다음 행이 겹치지 않고 행 오른쪽도 클릭된다. 상세에서 끝까지 스크롤하고 줄바꿈까지 동일한 메시지와 현재 로그 파일 경로를 각각 복사했다. 보존 한도 2,000개를 넘어 원래 행이 밀려나도 열린 메시지가 바뀌지 않는다. 텍스트로 손실 없이 옮길 수 없는 경로는 복사를 제공하지 않는다.
+- **실제 Windows 릴리즈:** 920×480·1000×700에서 전체 경로의 `Beta\worker.exe`, 로그의 마지막 문자 `끝`, 최소 폭의 목록/통계 간격을 확인했다. `target/visual-validation/captures/`의 최종 화면: `ux006-process-minimum-33520-1.png`, `ux006-process-default-10084-1.png`, `ux006-log-list-minimum-35880-1.png`, `ux006-log-minimum-40976-1.png`, `ux006-log-default-4320-1.png`. 각 검증 PID 종료 확인. EXE: `target/release-validation/release/gpui-convenience-tools.exe`, 25,750,528 B, SHA-256 `E46AFBD3C43B381E71361352E1C0C60239E94FFA970E2441BFB6295F6B55313B`.
+
+- **자동 회귀:** `cargo check --locked --offline` 후보·통합 작업 트리 모두 성공. 후보의 `cargo test --locked --offline --all-targets --all-features -- --test-threads=1` 결과 335 passed, 0 failed, 9 ignored (144.84초). 재리뷰에서 이번 변경의 코드 오류 없음. 엄격 Clippy(`-D warnings`)는 기존 청크 순회 4곳·로그 정렬 1곳 때문에 실패했으며 통과로 세지 않았다.
+- **산출물:** 새 Cargo 캐시를 만들지 않았다. 기존 공유 캐시 `D:\ArielNetworks\Predevelop\Tools\gpui-convenience-tools\target\debug` 33.54 GiB와 같은 루트의 `target\release-validation` 4.15 GiB는 후속 테스트에 재사용하며, 이번 변경량이 아니다. 보존할 검증 증거는 위 최종 캡처와 이 기록이다.
+
 <a id="ux004-evidence"></a>
 
 ## 2026-11-19 — UX-004 광고 차단 화면: 격리 실측 및 자동 검증

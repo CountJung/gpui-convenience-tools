@@ -69,6 +69,117 @@ fn process_monitor_selection_confirmation_cancel_and_guarded_failure(cx: &mut Te
 }
 
 #[gpui::test]
+fn process_monitor_same_name_rows_wrap_copy_and_cancel_at_minimum(cx: &mut TestAppContext) {
+    initialize_components(cx);
+    let mut root = test_app_root(ActivePanel::ProcessMonitor);
+    let make_row = |pid, suffix| {
+        let mut row = fixture_row(pid);
+        row.name = "worker.exe".into();
+        row.identity.path =
+            PathBuf::from(format!(r"D:\합성\{}\{suffix}\worker.exe", "W".repeat(220)));
+        row
+    };
+    let first = make_row(88, "alpha");
+    let second = make_row(89, "beta");
+    root.process_monitor.rows = vec![first.clone(), second.clone()];
+    let (view, cx) = add_window(cx, root);
+    cx.simulate_resize(size(px(920.0), px(480.0)));
+    refresh(cx);
+    let collapsed_scroll = view.read_with(cx, |root, _| root.process_monitor.scroll.max_offset());
+    for (row, selector) in [(first, "process-row-88"), (second, "process-row-89")] {
+        let page = cx.debug_bounds("process-page").unwrap();
+        cx.simulate_event(ScrollWheelEvent {
+            position: page.center(),
+            delta: ScrollDelta::Pixels(point(px(0.0), px(-2000.0))),
+            modifiers: Modifiers::none(),
+            ..Default::default()
+        });
+        refresh(cx);
+        click_debug_element(cx, selector);
+        view.read_with(cx, |root, _| {
+            let selected = root.process_monitor.selected.as_ref().unwrap();
+            assert_eq!(selected.name, "worker.exe");
+            assert_eq!(selected.identity, row.identity);
+            assert!(root.process_monitor.scroll.max_offset().height > collapsed_scroll.height);
+        });
+        let path = cx.debug_bounds("process-selected-path").unwrap();
+        let pid = cx.debug_bounds("process-selected-pid").unwrap();
+        assert!(path.left() >= page.left() && path.right() <= page.right());
+        assert!(
+            path.size.height > pid.size.height * 2.0,
+            "unbroken component must wrap"
+        );
+        for selector in [
+            "process-selected-pid",
+            "process-copy-path",
+            "process-cancel-kill",
+            "process-confirm-kill",
+        ] {
+            let bounds = cx.debug_bounds(selector).unwrap();
+            assert!(
+                bounds.left() >= page.left() && bounds.right() <= page.right(),
+                "{selector}"
+            );
+            assert!(
+                bounds.top() >= page.top() && bounds.bottom() <= page.bottom(),
+                "{selector}"
+            );
+        }
+        click_debug_element(cx, "process-copy-path");
+        assert_eq!(
+            cx.read_from_clipboard().unwrap().text().as_deref(),
+            row.identity.path.to_str()
+        );
+        click_debug_element(cx, "process-cancel-kill");
+        view.read_with(cx, |root, _| {
+            assert!(root.process_monitor.selected.is_none());
+            // GPUI 0.2.2 retains debug bounds for removed elements. Check that the
+            // live layout lost the entire card as well as clearing the selected identity.
+            assert_eq!(root.process_monitor.scroll.max_offset(), collapsed_scroll);
+            assert!(!root.process_monitor.terminating);
+            assert!(root.process_monitor.worker.is_none());
+        });
+    }
+}
+
+#[gpui::test]
+fn process_monitor_preview_keeps_static_blocked_rows_and_user_interval(cx: &mut TestAppContext) {
+    initialize_components(cx);
+    let mut root = test_app_root(ActivePanel::ProcessMonitor);
+    root.process_monitor.config.refresh_interval_secs = 7;
+    let mut missing = fixture_row(89);
+    missing.identity.path = PathBuf::new();
+    missing.blocked_reason = Some("fixture: path unavailable");
+    root.process_monitor
+        .seed_preview_rows(vec![fixture_row(88), missing]);
+    let (view, cx) = add_window(cx, root);
+    refresh(cx);
+    assert!(cx.debug_bounds("process-copy-path").is_none());
+    assert!(cx.debug_bounds("process-confirm-kill").is_none());
+    view.update(cx, |root, cx| {
+        // A queued synthetic reply makes it observable whether the timer polled.
+        // The mock worker has no OS thread; manual refresh cannot scan the host.
+        root.process_monitor.worker = Some(MonitorWorker::with_test_reply(WorkerReply::Snapshot(
+            Vec::new(),
+        )));
+        root.tick_process_monitor(cx);
+        root.sync.external_side_effects_enabled = true;
+        root.refresh_process_monitor(cx);
+        root.sync.external_side_effects_enabled = false;
+        let state = &root.process_monitor;
+        assert_eq!(state.config.refresh_interval_secs, 7);
+        assert_eq!(state.selected.as_ref().unwrap().identity.pid, 89);
+        assert_eq!(
+            state.rows[1].blocked_reason,
+            Some("fixture: path unavailable")
+        );
+        assert!(state.rows.iter().all(|row| row.blocked_reason.is_some()));
+        assert!(state.last_scan.is_none());
+        assert!(!state.failed);
+    });
+}
+
+#[gpui::test]
 fn process_monitor_sort_interval_search_and_transient_state(cx: &mut TestAppContext) {
     initialize_components(cx);
     let (view, cx) = add_window(cx, test_app_root(ActivePanel::ProcessMonitor));

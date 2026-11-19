@@ -9,6 +9,7 @@ mod file_sync_browse;
 mod file_sync_history;
 mod interval;
 mod layout;
+mod log_detail;
 mod openssl;
 mod theme;
 mod timestamp;

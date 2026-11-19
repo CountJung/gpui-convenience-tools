@@ -13,8 +13,11 @@ pub(crate) fn panel_preview_size() -> Option<gpui::Size<gpui::Pixels>> {
         .ok()?
         .as_str()
     {
-        "services-minimum" | "ad-block-minimum" => (920., 480.),
-        "services-default" | "ad-block-default" => (1000., 700.),
+        "services-minimum" | "ad-block-minimum" | "log-minimum" | "log-list-minimum"
+        | "process-minimum" => (920., 480.),
+        "services-default" | "ad-block-default" | "log-default" | "process-default" => {
+            (1000., 700.)
+        }
         _ => return None,
     };
     Some(gpui::size(gpui::px(width), gpui::px(height)))
@@ -38,12 +41,70 @@ pub(super) fn initial_panel_from_validation_env() -> ActivePanel {
         Some("openssl") => ActivePanel::OpenSsl,
         Some("timestamp") => ActivePanel::Timestamp,
         Some("process_monitor") => ActivePanel::ProcessMonitor,
+        Some("process-minimum" | "process-default") if panel_preview_size().is_some() => {
+            ActivePanel::ProcessMonitor
+        }
+        Some("log-minimum" | "log-default" | "log-list-minimum")
+            if panel_preview_size().is_some() =>
+        {
+            ActivePanel::Logs
+        }
         Some("clipboard_history") => ActivePanel::ClipboardHistory,
         Some("quick_launcher") => ActivePanel::QuickLauncher,
         Some("screenshot") => ActivePanel::Screenshot,
         Some("auto_start") => ActivePanel::AutoStart,
         Some("settings") => ActivePanel::Settings,
         _ => ActivePanel::Dashboard,
+    }
+}
+
+/// 단절된 검증 창을 위한 고정 표본. 실제 프로세스 경로나 사용자 로그를 수집하지 않는다.
+pub(super) fn seed_detail_preview(root: &mut AppRoot) {
+    use crate::process_monitor::{ProcessIdentity, ProcessRow};
+    if panel_preview_size().is_none() {
+        return;
+    }
+    match root.active_panel {
+        ActivePanel::ProcessMonitor => {
+            let rows = ["Alpha", "Beta"].into_iter().enumerate().map(|(index, variant)| ProcessRow {
+                name: "worker.exe".into(),
+                identity: ProcessIdentity {
+                    pid: u32::MAX - index as u32,
+                    start_time: 1,
+                    creation_stamp: None,
+                    path: format!(r"C:\Example\SyntheticApplication\LongDirectoryWithoutSpacesForLayoutVerification\NestedDirectory\{variant}\worker.exe").into(),
+                },
+                cpu_percent: 1.,
+                memory_bytes: 4_194_304,
+                blocked_reason: Some("화면 검증용 합성 프로세스 · 종료 불가"),
+            }).collect();
+            root.process_monitor.seed_preview_rows(rows);
+        }
+        ActivePanel::Logs => {
+            root.app_state.log_entries = [
+                ("INFO", "작업을 시작했습니다.".to_owned()),
+                (
+                    "WARN",
+                    format!(
+                        "여러 줄 메시지입니다.\n{}\n마지막 문자: 끝",
+                        "LongUnbrokenSample0123456789".repeat(6)
+                    ),
+                ),
+                ("INFO", "다음 행 · 앞 행과 겹치지 않아야 합니다.".to_owned()),
+            ]
+            .into_iter()
+            .map(|(level, message)| super::LogEntry {
+                level: level.into(),
+                message,
+            })
+            .collect();
+            if std::env::var("GPUI_CONVENIENCE_TOOLS_INITIAL_PANEL").as_deref()
+                != Ok("log-list-minimum")
+            {
+                root.app_state.selected_log_entry = Some(root.app_state.log_entries[1].clone());
+            }
+        }
+        _ => {}
     }
 }
 

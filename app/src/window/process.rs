@@ -1,4 +1,4 @@
-//! Full-width process monitor; long identity text is clipped within a measured name column.
+//! Compact process rows with a full-width identity detail for the selected row.
 use super::ui::{self, ButtonStyle, Size};
 use crate::app::AppRoot;
 use crate::config::ProcessSort;
@@ -27,8 +27,14 @@ pub fn render(this: &mut AppRoot, window: &mut Window, cx: &mut Context<AppRoot>
         state.config.sort,
         state.config.top_count,
     );
-    let mut content = v_flex().w_full().min_w_0().pr_4().gap_3().text_color(foreground)
-        .child(div().text_lg().child("프로세스 모니터"))
+    let mut content = v_flex()
+        .w_full()
+        .min_w_0()
+        .pr_4()
+        .gap_3()
+        .text_color(foreground)
+        .child(div().text_lg().child("프로세스 모니터"));
+    let controls = v_flex().w_full().min_w_0().gap_3()
         .child(div().text_sm().text_color(muted)
             .child("CPU/메모리 내림차순 · 검색 후 상위 목록 표시 · 자동 갱신은 이 패널이 열려 있을 때만 실행"))
         .child(div().debug_selector(|| "process-search".into()).w_full().min_w_0().child(Input::new(search)))
@@ -53,7 +59,7 @@ pub fn render(this: &mut AppRoot, window: &mut Window, cx: &mut Context<AppRoot>
         .child(div().debug_selector(|| "process-save-status".into()).w_full().min_w_0().flex_shrink_0().text_sm()
             .text_color(if state.save_error { danger } else { muted })
             .child(if state.save_error { "설정 저장 실패 · 쓰기 권한을 확인하고 설정 저장을 재시도하세요." }
-                else { "검색어·프로세스 목록·실행 경로는 저장하거나 로그에 기록하지 않습니다." }))
+                else { "검색어·목록·경로는 조회만으로 저장하지 않습니다. 복사한 경로는 클립보드 이력 설정을 따릅니다." }))
         .child(div().debug_selector(|| "process-status".into()).w_full().min_w_0().text_sm()
             .text_color(if state.failed { danger } else { muted })
             .child(if state.status.is_empty() { "프로세스 정보를 기다리는 중입니다.".into() } else { state.status.clone() }));
@@ -100,20 +106,22 @@ pub fn render(this: &mut AppRoot, window: &mut Window, cx: &mut Context<AppRoot>
                 div()
                     .text_sm()
                     .child(format!("시작 시각 (Unix 초): {}", identity.start_time)),
-            )
-            .child(
-                div()
-                    .w_full()
-                    .min_w_0()
-                    .overflow_hidden()
-                    .whitespace_nowrap()
-                    .text_sm()
-                    .child(identity.path.to_string_lossy().into_owned()),
             );
         if let Some(reason) = selected.blocked_reason {
             confirmation = confirmation.child(div().text_sm().text_color(danger).child(reason));
         }
-        let mut actions = h_flex().w_full().min_w_0().gap_2();
+        let mut actions = h_flex().w_full().min_w_0().gap_2().flex_wrap();
+        if state.selected_path_text().is_some() {
+            actions = actions.child(div().debug_selector(|| "process-copy-path".into()).child(
+                ui::action_button(
+                    "process-copy-path-button",
+                    "전체 경로 복사",
+                    Size::Md,
+                    ButtonStyle::secondary(cx),
+                    cx.listener(|this, _, _, cx| this.copy_selected_process_path(cx)),
+                ),
+            ));
+        }
         if selected.blocked_reason.is_none() {
             actions = actions.child(
                 div()
@@ -136,10 +144,27 @@ pub fn render(this: &mut AppRoot, window: &mut Window, cx: &mut Context<AppRoot>
                 cx.listener(|this, _, _, cx| this.cancel_process_termination(cx)),
             ),
         ));
-        content = content.child(confirmation.child(actions));
+        // Keep actions above the variable-height path, including at minimum window size.
+        content = content.child(
+            confirmation.child(actions).child(
+                div()
+                    .debug_selector(|| "process-selected-path".into())
+                    .w_full()
+                    .min_w_0()
+                    .flex_shrink_0()
+                    .whitespace_normal()
+                    .text_sm()
+                    .child(if identity.path.as_os_str().is_empty() {
+                        "경로 조회 불가".to_owned()
+                    } else {
+                        identity.path.to_string_lossy().into_owned()
+                    }),
+            ),
+        );
     }
 
     content = content
+        .child(controls)
         .child(div().text_sm().text_color(muted).child(format!(
             "표시 {}개 / 전체 {}개 · 행을 클릭해 대상 확인",
             rows.len(),

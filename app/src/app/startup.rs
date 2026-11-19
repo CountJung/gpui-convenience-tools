@@ -232,6 +232,7 @@ impl AppRoot {
             root.refresh_sys_services();
         }
         seed_validation_virtual_disk(&mut root, cx);
+        validation::seed_detail_preview(&mut root);
         root.tick_launcher(cx);
         Self::start_event_refresh_loop(cx);
 

@@ -2,7 +2,7 @@
 use super::{ActivePanel, AppRoot};
 use crate::config::{update_config, ProcessMonitorConfig, ProcessSort};
 use crate::process_monitor::{MonitorWorker, ProcessError, ProcessRow, WorkerReply};
-use gpui::{AppContext, Context, Entity, ScrollHandle, Subscription, Window};
+use gpui::{AppContext, ClipboardItem, Context, Entity, ScrollHandle, Subscription, Window};
 use gpui_component::input::{InputEvent, InputState};
 use std::time::{Duration, Instant};
 
@@ -24,9 +24,31 @@ pub(crate) struct ProcessMonitorState {
     subscriptions: Vec<Subscription>,
     worker: Option<MonitorWorker>,
     last_scan: Option<Instant>,
+    preview_only: bool,
 }
 
 impl ProcessMonitorState {
+    /// Install a static startup fixture without changing any saved preferences.
+    pub(super) fn seed_preview_rows(&mut self, mut rows: Vec<ProcessRow>) {
+        for row in &mut rows {
+            row.blocked_reason
+                .get_or_insert("합성 미리보기 · 종료할 수 없습니다.");
+        }
+        self.selected = rows.last().cloned();
+        self.rows = rows;
+        self.preview_only = true;
+    }
+
+    /// Clipboard text must be the actual selected path, never a display fallback.
+    pub(crate) fn selected_path_text(&self) -> Option<&str> {
+        self.selected
+            .as_ref()?
+            .identity
+            .path
+            .to_str()
+            .filter(|path| !path.is_empty())
+    }
+
     pub fn from_config(mut config: ProcessMonitorConfig) -> Self {
         config.normalize();
         Self {
@@ -127,6 +149,9 @@ impl AppRoot {
 
     /// The main UI timer calls this method. Only the active panel schedules scans.
     pub(crate) fn tick_process_monitor(&mut self, cx: &mut Context<Self>) {
+        if self.process_monitor.preview_only {
+            return;
+        }
         if let Some(worker) = &self.process_monitor.worker {
             match worker.poll() {
                 Ok(Some(reply)) => self.apply_process_reply(reply, cx),
@@ -153,7 +178,7 @@ impl AppRoot {
     }
 
     pub(crate) fn refresh_process_monitor(&mut self, cx: &mut Context<Self>) {
-        if self.process_monitor.busy {
+        if self.process_monitor.preview_only || self.process_monitor.busy {
             return;
         }
         #[cfg(test)]
@@ -249,6 +274,12 @@ impl AppRoot {
         }
         self.process_monitor.selected = None;
         cx.notify();
+    }
+
+    pub(crate) fn copy_selected_process_path(&mut self, cx: &mut Context<Self>) {
+        if let Some(path) = self.process_monitor.selected_path_text() {
+            cx.write_to_clipboard(ClipboardItem::new_string(path.to_owned()));
+        }
     }
 
     pub(crate) fn confirm_process_termination(&mut self, cx: &mut Context<Self>) {
