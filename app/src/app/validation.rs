@@ -6,15 +6,15 @@ use crate::virtual_disk::GuestPath;
 
 use super::{ActivePanel, AppRoot};
 
-/// 격리된 서비스 화면 검증은 창 이동이나 사용자 입력 없이 지원 크기에서 시작한다.
-pub(crate) fn service_preview_size() -> Option<gpui::Size<gpui::Pixels>> {
+/// 격리된 패널 화면을 실제 창 이동이나 사용자 입력 없이 지원 크기로 연다.
+pub(crate) fn panel_preview_size() -> Option<gpui::Size<gpui::Pixels>> {
     std::env::var_os("GPUI_CONVENIENCE_TOOLS_DATA_DIR").filter(|dir| !dir.is_empty())?;
     let (width, height) = match std::env::var("GPUI_CONVENIENCE_TOOLS_INITIAL_PANEL")
         .ok()?
         .as_str()
     {
-        "services-minimum" => (920., 480.),
-        "services-default" => (1000., 700.),
+        "services-minimum" | "ad-block-minimum" => (920., 480.),
+        "services-default" | "ad-block-default" => (1000., 700.),
         _ => return None,
     };
     Some(gpui::size(gpui::px(width), gpui::px(height)))
@@ -23,13 +23,16 @@ pub(crate) fn service_preview_size() -> Option<gpui::Size<gpui::Pixels>> {
 /// 검증 하네스가 패널 전환 입력 없이 특정 화면을 열 수 있도록 하는 실행 전용 선택값이다.
 /// 일반 사용자 설정에는 저장하지 않으며, 값이 없거나 알 수 없으면 대시보드로 시작한다.
 pub(super) fn initial_panel_from_validation_env() -> ActivePanel {
-    if service_preview_size().is_some() {
-        return ActivePanel::Services;
-    }
     match std::env::var("GPUI_CONVENIENCE_TOOLS_INITIAL_PANEL")
         .ok()
         .as_deref()
     {
+        Some("services-minimum" | "services-default") if panel_preview_size().is_some() => {
+            ActivePanel::Services
+        }
+        Some("ad-block-minimum" | "ad-block-default") if panel_preview_size().is_some() => {
+            ActivePanel::AdBlock
+        }
         Some("file_sync") => ActivePanel::FileSync,
         Some("virtual_disk") => ActivePanel::VirtualDisk,
         Some("openssl") => ActivePanel::OpenSsl,

@@ -4,6 +4,13 @@
 당시 문맥이며 현재 규칙이나 열린 작업이 아니다. 현재 단계는 [MASTER_PLAN.md](MASTER_PLAN.md),
 규칙은 [DEVELOPMENT_GUIDE.md](DEVELOPMENT_GUIDE.md), 현재 구조는 [PROJECT_MAP.md](PROJECT_MAP.md)를 따른다.
 
+<a id="ux004-implementation-stage"></a>
+
+## UX-004 — 좁은 창의 광고 차단 목록과 설정 (2026-11-19 완료)
+
+좁은 본문은 대상 목록과 설정을 전환하고 넓은 본문은 두 영역을 나란히 표시한다. 긴 이름·창 클래스에는 원문 툴팁을 제공하고 직접 주기 입력은 줄을 바꿀 수 있다.
+[전체 회귀·GPUI·격리 화면·오류 재리뷰 결과](VERIFICATION_RECORDS.md#ux004-evidence)를 확인하고 수용 종료했다.
+
 <a id="ux007-implementation-stage"></a>
 
 ## UX-007 — 서비스·자동 시작 버튼을 상태와 권한에 맞춤 (2026-11-19)

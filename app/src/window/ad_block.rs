@@ -2,7 +2,7 @@
 //!
 //! 좌측(기능 영역)은 차단 상태와 등록된 타겟 앱 목록을,
 //! 우측(설정 영역)은 스캔 주기와 실행 중인 프로세스 추가 UI를 담당한다.
-//! 두 영역은 스플리터([`h_resizable`])로 나뉜다.
+//! 두 영역이 들어가지 않으면 대상 목록을 우선하고 설정은 같은 자리에서 연다.
 //!
 //! ## 동작 원리
 //! 타겟 프로세스 트리의 보이는 광고 후보를 `EnumWindows`로 찾은 뒤, 후보 창을
@@ -13,7 +13,7 @@ use gpui::{
     div, px, AnyElement, Context, InteractiveElement, IntoElement, ParentElement,
     StatefulInteractiveElement, Styled, Window,
 };
-use gpui_component::{h_flex, theme::ActiveTheme, v_flex};
+use gpui_component::{h_flex, theme::ActiveTheme, tooltip::Tooltip, v_flex};
 
 use crate::app::{AppRoot, IntervalTarget};
 use crate::window::ui::{self, Tone};
@@ -25,16 +25,85 @@ pub fn render(this: &mut AppRoot, window: &mut Window, cx: &mut Context<AppRoot>
     let left_scroll = this.ad_block.left_scroll.clone();
     let right_scroll = this.ad_block.right_scroll.clone();
 
-    let feature = render_status_and_targets(this, cx);
-    let settings = render_settings(this, window, cx);
-
-    balanced_split(
-        "ad-block-split",
-        FEATURE_PANE_MIN_WIDTH,
-        SETTINGS_PANE_MIN_WIDTH,
-        scroll_pane("ad-block-left", &left_scroll, feature),
-        scroll_pane("ad-block-right", &right_scroll, settings),
-    )
+    let compact = this.ad_block.compact;
+    let mut body = v_flex().relative().size_full().min_w_0().min_h_0();
+    let content = if compact {
+        let open = this.ad_block.settings_open;
+        body = body.child(
+            h_flex().justify_end().flex_shrink_0().child(
+                ui::action_button(
+                    "ad-settings-toggle",
+                    if open {
+                        "대상 목록으로"
+                    } else {
+                        "광고 차단 설정"
+                    },
+                    ui::Size::Sm,
+                    ui::ButtonStyle::neutral(cx),
+                    cx.listener(|this, _, _, cx| {
+                        this.ad_block.settings_open = !this.ad_block.settings_open;
+                        cx.notify();
+                    }),
+                )
+                .debug_selector(|| "ad-settings-toggle".into()),
+            ),
+        );
+        if open {
+            scroll_pane(
+                "ad-block-right",
+                &right_scroll,
+                render_settings(this, window, cx),
+            )
+        } else {
+            scroll_pane(
+                "ad-block-left",
+                &left_scroll,
+                render_status_and_targets(this, cx),
+            )
+        }
+    } else {
+        balanced_split(
+            "ad-block-split",
+            FEATURE_PANE_MIN_WIDTH,
+            SETTINGS_PANE_MIN_WIDTH,
+            scroll_pane(
+                "ad-block-left",
+                &left_scroll,
+                render_status_and_targets(this, cx),
+            ),
+            scroll_pane(
+                "ad-block-right",
+                &right_scroll,
+                render_settings(this, window, cx),
+            ),
+        )
+    };
+    let owner = cx.entity();
+    body.child(div().flex_1().min_h_0().min_w_0().child(content))
+        .child(
+            gpui::canvas(
+                move |bounds, _, cx| {
+                    let narrow = bounds.size.width
+                        < FEATURE_PANE_MIN_WIDTH + SETTINGS_PANE_MIN_WIDTH + px(1.);
+                    if narrow != compact {
+                        let owner = owner.clone();
+                        cx.defer(move |cx| {
+                            owner.update(cx, |this, cx| {
+                                if this.ad_block.compact != narrow {
+                                    this.ad_block.compact = narrow;
+                                    this.ad_block.settings_open = false;
+                                    cx.notify();
+                                }
+                            })
+                        });
+                    }
+                },
+                |_, _, _, _| {},
+            )
+            .absolute()
+            .size_full(),
+        )
+        .into_any_element()
 }
 
 // ─────────────────────────────────────────────
@@ -69,13 +138,10 @@ fn render_status_and_targets(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> A
     // ── 타겟 목록 ──
     let mut target_rows = v_flex();
     if state.targets.is_empty() {
-        target_rows = target_rows.child(
-            div()
-                .px_3()
-                .py_4()
-                .text_color(muted_fg)
-                .child("등록된 타겟이 없습니다. 우측에서 실행 중인 프로세스를 추가하세요."),
-        );
+        target_rows =
+            target_rows.child(div().px_3().py_4().text_color(muted_fg).child(
+                "등록된 타겟이 없습니다. 광고 차단 설정에서 실행 중인 프로세스를 추가하세요.",
+            ));
     } else {
         for (ix, target) in state.targets.iter().enumerate() {
             let enabled = target.enabled;
@@ -107,24 +173,19 @@ fn render_status_and_targets(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> A
                                     .flex_1()
                                     .min_w_0()
                                     .overflow_hidden()
+                                    .child(full_text(("target-name", ix), display).text_color(fg))
                                     .child(
-                                        div()
-                                            .text_color(fg)
-                                            .whitespace_nowrap()
-                                            .overflow_hidden()
-                                            .child(display),
-                                    )
-                                    .child(
-                                        div()
-                                            .text_color(muted_fg)
-                                            .whitespace_nowrap()
-                                            .overflow_hidden()
-                                            .child(process),
+                                        full_text(("target-process", ix), process)
+                                            .debug_selector(move || {
+                                                format!("ad-block-target-process-{ix}")
+                                            })
+                                            .text_color(muted_fg),
                                     ),
                             )
                             .child(
                                 div()
                                     .w(px(56.0))
+                                    .debug_selector(move || format!("ad-target-toggle-{ix}"))
                                     .flex_shrink_0()
                                     .flex()
                                     .items_center()
@@ -173,14 +234,11 @@ fn render_status_and_targets(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> A
                                     .child("창 클래스"),
                             )
                             .child(
-                                div()
+                                full_text(("target-class", ix), class)
                                     .flex_1()
                                     .min_w_0()
                                     .debug_selector(move || format!("ad-block-target-class-{ix}"))
-                                    .whitespace_nowrap()
-                                    .overflow_hidden()
-                                    .text_color(muted_fg)
-                                    .child(class),
+                                    .text_color(muted_fg),
                             ),
                     ),
             );
@@ -379,13 +437,10 @@ fn render_settings(
                 .border_color(border)
                 .hover(|s| s.bg(theme.secondary_hover))
                 .child(
-                    div()
+                    full_text(("running-process-name", ix), process_name.clone())
                         .flex_1()
                         .min_w_0()
-                        .overflow_hidden()
-                        .whitespace_nowrap()
-                        .text_color(if exists { muted_fg } else { fg })
-                        .child(process_name.clone()),
+                        .text_color(if exists { muted_fg } else { fg }),
                 )
                 .child(action),
         );
@@ -512,3 +567,22 @@ fn render_settings(
 // ─────────────────────────────────────────────
 // 공통 조각
 // ─────────────────────────────────────────────
+
+fn full_text(id: (&'static str, usize), value: String) -> gpui::Stateful<gpui::Div> {
+    let full: gpui::SharedString = value.into();
+    div()
+        .id(id)
+        .truncate()
+        .child(full.clone())
+        .tooltip(move |w, cx| {
+            let text = full.clone();
+            Tooltip::element(move |_, _| {
+                let value = text.clone();
+                div()
+                    .max_w(px(400.))
+                    .child(value.clone())
+                    .debug_selector(move || value.to_string())
+            })
+            .build(w, cx)
+        })
+}

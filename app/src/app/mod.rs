@@ -46,7 +46,7 @@ use state::{PlatformEvent, ScannerState, SyncSharedState, NAV_SYSTEM, NAV_TOOLS}
 pub use ui_state::ServiceFilter;
 use ui_state::{AdBlockState, ServiceState, SyncState};
 use validation::{initial_panel_from_validation_env, seed_validation_virtual_disk};
-pub(crate) use validation::service_preview_size;
+pub(crate) use validation::panel_preview_size;
 use virtual_disk_ops::VirtualDiskSession;
 
 use gpui::{

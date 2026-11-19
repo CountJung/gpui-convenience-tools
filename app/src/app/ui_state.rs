@@ -94,6 +94,8 @@ pub struct SyncState {
 /// 웹뷰 광고 차단 패널의 스크롤 상태.
 #[derive(Default)]
 pub struct AdBlockState {
+    pub(crate) compact: bool,
+    pub(crate) settings_open: bool,
     pub(crate) left_scroll: ScrollHandle,
     pub(crate) right_scroll: ScrollHandle,
 }

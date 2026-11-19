@@ -45,9 +45,11 @@ pub fn render(
             div()
                 .debug_selector(|| "interval-select".to_string())
                 .w_full()
-                .children(select.as_ref().map(|state| {
-                    Select::new(state).placeholder(format_interval(current))
-                })),
+                .children(
+                    select
+                        .as_ref()
+                        .map(|state| Select::new(state).placeholder(format_interval(current))),
+                ),
         )
         // ── 직접 추가 ──
         .child(
@@ -56,7 +58,7 @@ pub fn render(
                 .min_w_0()
                 .gap_2()
                 .items_center()
-                .overflow_x_hidden()
+                .flex_wrap()
                 .child(
                     div()
                         .flex_shrink_0()
@@ -67,7 +69,8 @@ pub fn render(
                 .child(
                     div()
                         .flex_1()
-                        .min_w_0()
+                        .min_w(px(96.0))
+                        .debug_selector(|| "interval-amount".into())
                         .children(amount_input.as_ref().map(Input::new)),
                 )
                 .child(
@@ -90,7 +93,32 @@ pub fn render(
                                 this.add_interval_preset(target, window, cx);
                             }),
                         )),
-                ),
+                )
+                .children((target == IntervalTarget::Scan).then(|| {
+                    ui::action_button(
+                        "interval-cancel",
+                        "취소",
+                        ui::Size::Md,
+                        ButtonStyle::secondary(cx),
+                        cx.listener(|this, _, window, cx| {
+                            if let Some(input) = &this.interval_picker.amount_input {
+                                input.update(cx, |input, cx| input.set_value("", window, cx));
+                            }
+                            if let Some(unit) = &this.interval_picker.unit_select {
+                                unit.update(cx, |unit, cx| {
+                                    unit.set_selected_index(
+                                        Some(gpui_component::IndexPath::new(0)),
+                                        window,
+                                        cx,
+                                    )
+                                });
+                            }
+                            this.interval_picker.error = None;
+                            cx.notify();
+                        }),
+                    )
+                    .debug_selector(|| "interval-cancel".into())
+                })),
         )
         .children(error.map(|reason| {
             div()

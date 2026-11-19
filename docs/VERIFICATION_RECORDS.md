@@ -4,6 +4,22 @@
 현재 코드의 재검증 결과로 보지 않는다. 현재 절차와 열린 게이트는 [VERIFICATION.md](VERIFICATION.md),
 남은 일은 [TODO.md](TODO.md)를 따른다. 2026-10-19 문서 정리에서 원문 근거를 이관했다.
 
+<a id="ux004-evidence"></a>
+
+## 2026-11-19 — UX-004 광고 차단 화면: 격리 실측 및 자동 검증
+
+대상은 `dd78749` 위에 UX-004만 선택 반영한 최종 후보다. 검증 담당자가 실행한 결과이며 원본의 다른 미커밋 변경은 포함하지 않는다.
+
+- **빌드·전체 회귀:** `cargo check --locked --offline`과 격리 릴리즈 빌드 성공. `cargo test --locked --offline -- --test-threads=1`: **329 passed, 0 failed, 9 ignored** (133.10초).
+- **GPUI:** `ad_block_compact_switches_panels_and_keeps_controls_reachable` 단독 통과. 920×480에서 긴 프로세스명·창 클래스 각각의 전체 원문 툴팁 경계를 실측했다. 취소 후 기존 주기·프리셋은 그대로였고, 추가 후에는 현재 값과 목록에 92초가 반영됐다.
+- **Windows 격리 화면 2종:** 920×480의 대상 목록·설정 전환, 1000×700의 양쪽 패널·주기 버튼 줄바꿈을 확인했다. 원본의 `target/visual-validation/captures/`에 `ux004-minimum-42588-1.png`, `ux004-default-41752-1.png`를 보존한다. 툴팁 호버·입력 동작은 무입력 화면 관찰이 아닌 GPUI 근거다.
+- **최종 EXE:** `target/release-validation/release/gpui-convenience-tools.exe`, 25,694,720 B, SHA-256 `FA1561C16719C93B3E4276068CFA000E2FB41F53881012AE3B57974318078635`. 문서 담당자가 파일 해시·크기와 PNG 해상도를 대조했다.
+- **오류 재리뷰 PASS:** 이전 지적 2건 해소, 추가 수정 없음. 엄격 Clippy는 기존과 동일한 5건이 남아 통과로 세지 않는다. 이번 판정 근거는 자동 테스트와 격리 릴리즈 화면이며 사용자 수동 확인은 수행하지 않았다.
+
+산출물 메모(착수 시점): `D:\ArielNetworks\Predevelop\Tools\gpui-convenience-tools\target\debug` 33.52 GiB,
+`D:\ArielNetworks\Predevelop\Tools\gpui-convenience-tools\target\release-validation` 4.15 GiB는 기존 공유 캐시이며 이번 작업의 증가량이 아니다.
+후속 검증에 재사용한다. 검증 후 작은 로그·필요 캡처만 선별하고, 사용 중인 작업자가 없는지 확인한 뒤 승인된 범위에서만 정리한다.
+
 <a id="ux007-evidence"></a>
 
 ## 2026-11-19 — UX-007 서비스와 자동 시작의 비활성 버튼

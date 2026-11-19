@@ -1,5 +1,6 @@
 //! 사이드바·스플리터·스크롤 레이아웃 회귀 테스트.
 
+mod ad_compact;
 mod service_actions;
 
 use super::*;
