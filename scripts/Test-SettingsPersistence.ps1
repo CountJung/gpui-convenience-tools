@@ -82,6 +82,7 @@ try {
         kakao_reclaim_ad_space = $true
         theme_mode = 'dark'
         scan_interval_secs = 37
+        sidebar_width = 313
         favorite_services = @('fixture-service')
         sync_enabled = $false
     } | ConvertTo-Json -Depth 5
@@ -95,7 +96,7 @@ try {
     $first = Get-Content -LiteralPath $settingsPath -Raw | ConvertFrom-Json
     if (-not $first.kakao_reclaim_ad_space -or $first.scan_interval_secs -ne 37 -or
         $first.service_enabled -or $first.sync_enabled -or $first.theme_mode -ne 'dark' -or
-        $first.favorite_services[0] -ne 'fixture-service') {
+        $first.favorite_services[0] -ne 'fixture-service' -or $first.sidebar_width -ne 313) {
         throw 'First app exit did not preserve all seeded settings'
     }
     if ([IO.File]::ReadAllText($legacyPath) -cne $malformedLegacy) {
@@ -106,7 +107,7 @@ try {
     $second = Get-Content -LiteralPath $settingsPath -Raw | ConvertFrom-Json
     if (-not $second.kakao_reclaim_ad_space -or $second.scan_interval_secs -ne 37 -or
         $second.service_enabled -or $second.sync_enabled -or $second.theme_mode -ne 'dark' -or
-        $second.favorite_services[0] -ne 'fixture-service') {
+        $second.favorite_services[0] -ne 'fixture-service' -or $second.sidebar_width -ne 313) {
         throw 'Restart did not restore the saved settings'
     }
     if ([IO.File]::ReadAllText($legacyPath) -cne $malformedLegacy) {
@@ -120,6 +121,7 @@ try {
         LegacyPreserved = $true
         ReclaimEnabledAfterRestart = [bool]$second.kakao_reclaim_ad_space
         ScanIntervalAfterRestart = [int]$second.scan_interval_secs
+        SidebarWidthAfterRestart = [double]$second.sidebar_width
         BinarySha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $binary).Hash
     }
 }

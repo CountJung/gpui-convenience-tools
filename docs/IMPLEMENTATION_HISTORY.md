@@ -4,6 +4,14 @@
 당시 문맥이며 현재 규칙이나 열린 작업이 아니다. 현재 단계는 [MASTER_PLAN.md](MASTER_PLAN.md),
 규칙은 [DEVELOPMENT_GUIDE.md](DEVELOPMENT_GUIDE.md), 현재 구조는 [PROJECT_MAP.md](PROJECT_MAP.md)를 따른다.
 
+<a id="g003-implementation-stage"></a>
+
+## G-003 — 전체 저장 후에도 사이드바 폭 유지 (2026-11-19 완료)
+
+분할선을 313px로 옮긴 뒤 전체 저장을 누르면 이전 폭 240px가 다시 저장됐다. 분할선 드래그가 끝날 때 보정한 폭을 앱 상태와 설정 파일에 함께 반영하도록 수정했다.
+
+격리 GPUI 회귀 1건에서 드래그 → 전체 저장 → 창 다시 열기 후 313px를 확인했다. 별도 Windows 재시작 검사에서는 미리 지정한 313px가 두 프로세스 종료 후 모두 유지됐고, 독립 검토한 1000×700 화면 두 장에서도 분할선은 x=312~313이었다. [스플리터 검증 기록](VERIFICATION_RECORDS.md#g003-splitter-evidence)
+
 <a id="ux008-implementation-stage"></a>
 
 ## UX-008 — 최소 창에서 주요 조작과 결과 도달 (2026-11-19 에이전트 검증 완료)

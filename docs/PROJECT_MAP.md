@@ -150,7 +150,9 @@ flowchart LR
 
 ## 현재 소스 실측
 
-**최종 측정**: 2026-11-19 · 전체 `app/src` 총 139개 파일 · 40,637줄
+**최종 측정**: 2026-11-19 · 전체 `app/src` 총 140개 파일 · 40,696줄
+
+G-003: 사이드바 폭 회귀 테스트를 포함한 후보 작업 트리 실측이다. 실행 결과는 [스플리터 검증 기록](VERIFICATION_RECORDS.md#g003-splitter-evidence)을 참조한다.
 
 UX-008 후보 작업 트리에서 [최소 창·최대 사이드바 테스트 픽스처](../app/src/app/tests/compact.rs)와 [스크린샷 대상 선택 영역](../app/src/window/screenshot.rs)을 포함해 실측했다. [기능 검증 범위와 근거](VERIFICATION_RECORDS.md#ux008-evidence)는 구조 실측과 구분한다.
 
@@ -309,13 +311,13 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `browse.rs` | 82 | 숨김·시스템 항목 포함 원본 직계 탐색·링크 내부 진입 차단 |
 | `link_tests.rs` | 250 | Windows 링크·정션 Follow/Recreate·탈출·순환·대상 충돌 안전 회귀 |
 
-### 앱 루트 (`app/src/app/`) — 11,110줄 / 31파일
+### 앱 루트 (`app/src/app/`) — 11,111줄 / 31파일
 
 `app.rs`(1,798줄)를 책임별로 분할한 결과다.
 
 | 파일 | 줄 | 책임 |
 | --- | ---: | --- |
-| `mod.rs` | 597 | `AppRoot`·스크린샷 포함 패널/사이드바·최상위 레이아웃·종료 복원/저장·서비스·광고 차단 미리보기 크기 함수 재노출; 시작 책임은 startup 모듈 소유 |
+| `mod.rs` | 598 | `AppRoot`·스크린샷 포함 패널/사이드바·최상위 레이아웃·분할 폭 변경 시 앱 상태와 설정 파일 갱신·종료 복원/저장·서비스·광고 차단 미리보기 크기 함수 재노출; 시작 책임은 startup 모듈 소유 |
 | `sync_ops.rs` | 592 | 동기화 작업 조작·원본 직계 탐색/제외 선택·링크 모드 저장·실행 큐·커서 무효화 |
 | `interval.rs` | 313 | 주기 선택 상태(`IntervalPicker`)와 조작 — 프리셋 추가·삭제·드롭다운 동기화 |
 | `events.rs` | 329 | `PlatformEvent` 채널 소비, 진행 상태·동기화 이력·감시 실패 강등 반영, 로그·토스트 유틸 |
@@ -347,7 +349,7 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `screenshot_ops/integration_tests.rs` | 123 | GPUI 기본 창/다중 모니터 미리보기 가시성·실제 그리기/fit 좌표 일치와 미리보기 내 포함·전역 저장/메뉴 연결·일시 이미지 미복원 회귀 |
 | `screenshot_ops/validation/tests.rs` | 271 | 합성 시드의 명시 경로·탈출/형식/크기 차단·이미지 불변·자동 저장 없는 GPUI 미리보기 회귀 |
 
-### GPUI 회귀 테스트 (`app/src/app/tests/`) — 4,374줄 / 17파일
+### GPUI 회귀 테스트 (`app/src/app/tests/`) — 4,432줄 / 18파일
 
 테스트는 시나리오별 모듈과 공용 픽스처로 나뉘며, 공용 픽스처는 `mod.rs`가 소유하고 하위 모듈은
 `use super::*`로 가져다 쓴다.
@@ -360,7 +362,8 @@ VDI 연결 픽스처 `loaded_virtual_disk_root`는 `virtual_disk.rs`에서 탐�
 | `file_sync.rs` | 831 | 동기화 조작·진행·중지·섹션 너비·전역 스위치·감시 방식 UI 경계 |
 | `file_sync_browse.rs` | 150 | 숨김·시스템 원본 항목 선택·링크 모드·원본 변경 시 stale 클릭 차단 |
 | `file_sync_history.rs` | 59 | 이력 3행의 상태·건수·소요 시간 카드 경계, 최소 높이 마지막 행 스크롤 진입 |
-| `layout.rs` | 755 | 사이드바·스플리터·카드 경계·divider drag·실제 overflow 기반 끝 이동·사용자 설정 저장 카드·카카오톡 회수 옵션 클릭·컴팩트 높이 설정 목록 끝 도달·모의 설정 조작의 파일 미생성·서비스 목록 내부 스크롤과 분할 폭 저장/복원 |
+| `layout.rs` | 756 | 사이드바·스플리터·카드 경계·divider drag·실제 overflow 기반 끝 이동·사용자 설정 저장 카드·카카오톡 회수 옵션 클릭·컴팩트 높이 설정 목록 끝 도달·모의 설정 조작의 파일 미생성·서비스 목록 내부 스크롤과 분할 폭 저장/복원 |
+| `layout/sidebar.rs` | 57 | 격리 GPUI 창에서 분할선 드래그 후 전체 저장 버튼을 누르고, 설정을 다시 읽어 새 창의 사이드바 폭을 비교 |
 | `layout/ad_compact.rs` | 103 | 좁은 창에서 긴 프로세스명·창 클래스의 원문 툴팁 경계, 활성 토글·설정 전환, 주기 취소 시 값·프리셋 보존, 추가 및 넓은 창 복귀를 검사하는 GPUI 회귀 |
 | `interval.rs` | 230 | 주기 드롭다운·프리셋 추가/삭제·패널 간 공유 |
 | `mod.rs` | 221 | 공용 픽스처 (`test_app_root`·`TestPlatform`·`refresh`·`click_debug_element` 등)·스크린샷 포함 모의 상태 초기화와 시나리오 모듈 등록 |
@@ -441,7 +444,8 @@ VDI 연결 픽스처 `loaded_virtual_disk_root`는 `virtual_disk.rs`에서 탐�
 | `.claude/agents/docs-sync.md` | 11 | Claude용 Documentation Sync 얇은 어댑터 |
 | `.codex/agents/code-reviewer.toml` | 9 | Codex용 Code Reviewer 얇은 어댑터 |
 | `.codex/agents/docs-sync.toml` | 9 | Codex용 Documentation Sync 얇은 어댑터 |
-| `scripts/Verify-Workspace.ps1` | 303 | E-004·소유 메모리 GDI 포함 Rust/GPUI 필수 수용 테스트 등록(UX-008 최소 창의 대시보드·설정·스크린샷 포함, UX-006 프로세스 선택·로그 상세 포함, UX-004 광고 차단 폭 전환·UX-005 VDI 열 배치·UX-003 목록 내부 스크롤·분할 폭 저장/복원 포함)·모의 설정 파일 미생성·하네스 구문 검사·해시 고정 handoff 생성 |
+| `scripts/Verify-Workspace.ps1` | 304 | E-004·소유 메모리 GDI 포함 Rust/GPUI 필수 수용 테스트 등록(G-003 사이드바 드래그·전체 저장·창 다시 열기 포함, UX-008 최소 창의 대시보드·설정·스크린샷 포함, UX-006 프로세스 선택·로그 상세 포함, UX-004 광고 차단 폭 전환·UX-005 VDI 열 배치·UX-003 목록 내부 스크롤·분할 폭 저장/복원 포함)·모의 설정 파일 미생성·하네스 구문 검사·해시 고정 handoff 생성 |
+| `scripts/Test-SettingsPersistence.ps1` | 132 | 격리 실행파일을 두 번 시작·종료해 미리 지정한 사이드바 폭 등 설정 보존을 검사한다. 드래그 입력은 이 스크립트의 범위가 아니다. |
 | `scripts/Invoke-ClaudeVisualCheck.ps1` | 933 | 격리 실행·합성 클립보드/PNG 시드·Screenshot 포함 초기 패널·소유 창 캡처/입력·조건부 복원·세션 정리 |
 | `scripts/visual-validation/ScreenshotSeed.ps1` | 41 | 명시적 합성 PNG의 서명/크기 확인·격리 세션 신규 파일 복사·실패 시 자체 출력 정리 |
 | `scripts/visual-validation/Test-ScreenshotSeed.ps1` | 44 | 합성 PNG 복사·바이트 일치·기존 파일/과대 크기/잘못된 헤더 거부의 파일 전용 회귀 |

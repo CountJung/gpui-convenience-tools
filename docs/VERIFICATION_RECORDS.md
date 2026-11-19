@@ -892,6 +892,10 @@ E2E/시각 증거: <PNG 경로 또는 N/A 사유>
 
 <a id="g003-splitter-evidence"></a>
 
-### G-003 — 기존 검증과 미검증 경계
+### G-003 — 사이드바 폭 저장·재시작 복원
+
+2026-11-19 완료: GPUI 드래그(240→313px) 후 설정 저장 시 240px로 돌아가던 실패를 재현하고 수정했다. 회귀 테스트에서 저장·창 재생성 후 313px 유지, 격리 Windows 릴리즈에서 313px 시드로 정상 종료·재시작 후 설정값 313과 두 1000×700 창의 구분선 위치(x=312~313) 일치를 확인했다. 전체 Rust 테스트: 339 통과, 0 실패, 9 제외.
+
+이전 검증 이력(당시의 미검증 항목 포함):
 
 `sidebar_width` 설정 필드와 200~360px 보정·기본 240px 복원; `sidebar_width_is_normalized_to_supported_range`, `update_config_preserves_unedited_fields`, GPUI `sidebar_divider_drag_resizes_navigation_and_content`; 전체 최신 테스트는 상단 품질 게이트 기준 161 passed·4 ignored; 격리 release 기본 캡처 `target/visual-validation/captures/g003-default-003709.png`, `sidebar_width=320` 시드 복원 캡처 `target/visual-validation/captures/g003-restored-width-003742.png`; 최신 release 시작 캡처 `target/visual-validation/captures/next-g003-before-065645.png`에서 divider 위치를 재확인했으나 `-Action Drag -X 0.25 -Y 0.50 -ToX 0.32 -ToY 0.50`은 포그라운드 안전 검사(`현재 포그라운드=66246`)에서 차단되어 입력을 보내지 않음; 2026-09-30 표시 검증은 기존 증거로 충족. 남은 일: 저장을 활성화한 GPUI drag/mouse-up→설정 재로드→새 화면 폭 복원 단언. 외부 입력 반복·독립 재조작은 선택

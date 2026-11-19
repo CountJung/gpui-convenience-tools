@@ -2,6 +2,7 @@
 
 mod ad_compact;
 mod service_actions;
+mod sidebar;
 
 use super::*;
 use crate::platform::{SysServiceInfo, SysServiceStartType, SysServiceStatus};

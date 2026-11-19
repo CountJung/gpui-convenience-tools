@@ -58,7 +58,7 @@ use gpui_component::{
     h_flex,
     input::InputState,
     notification::NotificationType,
-    resizable::{h_resizable, resizable_panel},
+    resizable::{h_resizable, resizable_panel, ResizableState},
     scroll::{Scrollbar, ScrollbarShow},
     theme::ActiveTheme,
     v_flex, PixelsExt, VirtualListScrollHandle, TITLE_BAR_HEIGHT,
@@ -440,7 +440,6 @@ impl Render for AppRoot {
         let sidebar_scroll = self.sidebar_scroll_handle.clone();
         let content_scroll = self.content_scroll_handle.clone();
         let initial_sidebar_width = px(normalize_sidebar_width(self.sidebar_width));
-        let persist_sidebar_width = !cfg!(test);
 
         v_flex()
             .size_full()
@@ -470,20 +469,22 @@ impl Render for AppRoot {
             .child(
                 div().flex_1().min_h_0().child(
                     h_resizable("app-shell-split")
-                        .on_resize(move |state, _window, cx| {
-                            if !persist_sidebar_width {
-                                return;
-                            }
+                        .on_resize(cx.listener(|this, state: &Entity<ResizableState>, _, cx| {
                             let Some(width) =
                                 state.read(cx).sizes().first().map(|size| size.as_f32())
                             else {
                                 return;
                             };
                             let width = normalize_sidebar_width(width);
+                            this.sidebar_width = width;
+                            #[cfg(test)]
+                            if !this.sync.external_side_effects_enabled {
+                                return;
+                            }
                             if let Err(err) = update_config(|config| config.sidebar_width = width) {
                                 log::warn!("사이드바 폭 저장 실패: {err}");
                             }
-                        })
+                        }))
                         .child(
                             resizable_panel()
                                 .size(initial_sidebar_width)

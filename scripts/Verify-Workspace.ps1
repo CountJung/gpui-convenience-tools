@@ -96,6 +96,7 @@ $visualTests = @(
     "auto_start_disabled_delete_requires_confirmation_and_cancel_calls_nothing",
     "auto_start_standard_user_cannot_register_or_delete",
     "sidebar_divider_drag_resizes_navigation_and_content",
+    "sidebar_drag_survives_settings_save_and_reopen",
     "sidebar_wheel_scroll_reaches_last_navigation_item",
     "rendered_switch_toggles_in_light_dark_and_missing_switch_token_theme",
     "file_sync_unified_page_uses_full_width_and_scrolls_to_last_record",
