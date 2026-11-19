@@ -42,8 +42,23 @@ impl std::fmt::Display for TaskState {
 
 /// 작업 스케줄러에서 작업 상태를 조회한다.
 pub fn query_task_state() -> TaskState {
-    let output = std::process::Command::new("schtasks")
-        .args(["/Query", "/TN", TASK_NAME, "/FO", "CSV", "/NH"])
+    // 지역화된 schtasks 메시지·CSV를 추측하지 않는다. GetTask 자체의
+    // ERROR_FILE_NOT_FOUND만 미등록이고 연결·권한·그 밖의 오류는 조회 실패다.
+    const QUERY: &str = r#"
+$ErrorActionPreference = 'Stop'
+$scheduler = New-Object -ComObject Schedule.Service
+$scheduler.Connect()
+$folder = $scheduler.GetFolder('\')
+try { $task = $folder.GetTask($env:GPUI_QUERY_TASK_NAME) }
+catch {
+    if ($_.Exception.GetBaseException().HResult -eq -2147024894) { 'missing'; exit 0 }
+    exit 1
+}
+[int]$task.State
+"#;
+    let output = std::process::Command::new("powershell.exe")
+        .args(["-NoProfile", "-NonInteractive", "-Command", QUERY])
+        .env("GPUI_QUERY_TASK_NAME", TASK_NAME)
         .creation_flags(CREATE_NO_WINDOW)
         .output();
 
@@ -51,19 +66,16 @@ pub fn query_task_state() -> TaskState {
         return TaskState::Unknown;
     };
 
-    if !output.status.success() {
-        // 비정상 종료 = 작업 미등록 or 조회 실패
-        return TaskState::NotInstalled;
-    }
+    decode_query(output.status.success(), &output.stdout)
+}
 
-    // CSV 출력: "<name>","<next_run>","<status>"
-    let stdout = String::from_utf8_lossy(&output.stdout).to_ascii_lowercase();
-    if stdout.contains("running") || stdout.contains("실행 중") {
-        TaskState::Running
-    } else if stdout.contains("disabled") || stdout.contains("사용 안 함") {
-        TaskState::Disabled
-    } else {
-        TaskState::Ready
+fn decode_query(success: bool, stdout: &[u8]) -> TaskState {
+    match (success, stdout.trim_ascii()) {
+        (true, b"missing") => TaskState::NotInstalled,
+        (true, b"1") => TaskState::Disabled,
+        (true, b"3") => TaskState::Ready,
+        (true, b"4") => TaskState::Running,
+        _ => TaskState::Unknown, // 대기열(2)도 실행 가능 상태로 간주하지 않는다.
     }
 }
 
@@ -83,7 +95,6 @@ pub fn install_task() -> Result<()> {
             "/TR", &tr,
             "/SC", "ONLOGON",
             "/IT",
-            "/F",
         ])
         .creation_flags(CREATE_NO_WINDOW)
         .output()
@@ -145,4 +156,21 @@ pub fn run_task_now() -> Result<()> {
 
     log::info!("Task Scheduler 작업 즉시 실행: {TASK_NAME}");
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn auto_start_query_only_explicit_missing_means_not_installed() {
+        assert_eq!(decode_query(true, b"missing\r\n"), TaskState::NotInstalled);
+        for bytes in [b"".as_slice(), b"0", b"2", b"unknown"] {
+            assert_eq!(decode_query(true, bytes), TaskState::Unknown);
+        }
+        assert_eq!(decode_query(false, b"missing"), TaskState::Unknown);
+        assert_eq!(decode_query(true, b"1"), TaskState::Disabled);
+        assert_eq!(decode_query(true, b"3"), TaskState::Ready);
+        assert_eq!(decode_query(true, b"4"), TaskState::Running);
+    }
 }

@@ -1,5 +1,7 @@
 //! 사이드바·스플리터·스크롤 레이아웃 회귀 테스트.
 
+mod service_actions;
+
 use super::*;
 use crate::platform::{SysServiceInfo, SysServiceStartType, SysServiceStatus};
 
@@ -348,12 +350,13 @@ fn service_viewport_keeps_scroll_local_at_supported_sizes(cx: &mut TestAppContex
                 .map(|i| SysServiceInfo {
                     name: format!("{}-{i}", "LongServiceIdentifier".repeat(8)),
                     display_name: "긴 Windows 서비스 표시 이름 ".repeat(12),
-                    status: SysServiceStatus::Running,
+                    status: SysServiceStatus::Stopped,
                     start_type: SysServiceStartType::Automatic,
                 })
                 .collect();
             root.services.items[1].name = "short-only".into();
             root.services.items[1].display_name = "짧은 이름".into();
+            root.platform = service_actions::platform_with_delete_failure(&root.services.items);
             root
         });
         for (w, h) in [(920., 480.), (1000., 700.), (1280., 700.)] {
@@ -431,18 +434,18 @@ fn service_viewport_keeps_scroll_local_at_supported_sizes(cx: &mut TestAppContex
             if compact {
                 click_debug_element(cx, "svc-settings-toggle");
                 let pane = cx.debug_bounds("service-mgr-right").expect("설정 열기");
-                let filter = cx.debug_bounds("svc-filter-Running").unwrap();
+                let filter = cx.debug_bounds("svc-filter-Stopped").unwrap();
                 wheel_to_end(
                     cx,
                     "service-mgr-right",
                     (pane.center().y - filter.center().y).into(),
                 );
-                assert_inside_viewport(cx, "service-mgr-right", "svc-filter-Running");
-                click_debug_element(cx, "svc-filter-Running");
+                assert_inside_viewport(cx, "service-mgr-right", "svc-filter-Stopped");
+                click_debug_element(cx, "svc-filter-Stopped");
                 click_debug_element(cx, "svc-settings-toggle");
                 assert_eq!(
                     view.read_with(cx, |root, _| root.services.filter),
-                    ServiceFilter::Running
+                    ServiceFilter::Stopped
                 );
                 assert_eq!(horizontal.offset().x, -limit);
             }

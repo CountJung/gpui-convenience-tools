@@ -223,6 +223,24 @@ pub trait Platform: Send + Sync {
     fn is_elevated(&self) -> bool {
         false
     }
+
+    #[cfg(windows)]
+    fn auto_start_state(&self) -> TaskState {
+        TaskState::Unknown
+    }
+
+    #[cfg(windows)]
+    fn apply_auto_start(&self, _action: AutoStartAction) -> Result<()> {
+        Err(anyhow::anyhow!("자동 시작을 지원하지 않습니다."))
+    }
+}
+
+#[cfg(windows)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AutoStartAction {
+    Install,
+    Run,
+    Delete,
 }
 
 #[cfg(target_os = "windows")]

@@ -4,6 +4,12 @@
 당시 문맥이며 현재 규칙이나 열린 작업이 아니다. 현재 단계는 [MASTER_PLAN.md](MASTER_PLAN.md),
 규칙은 [DEVELOPMENT_GUIDE.md](DEVELOPMENT_GUIDE.md), 현재 구조는 [PROJECT_MAP.md](PROJECT_MAP.md)를 따른다.
 
+<a id="ux007-implementation-stage"></a>
+
+## UX-007 — 서비스·자동 시작 버튼을 상태와 권한에 맞춤 (2026-11-19)
+
+불가능한 버튼은 실제 호출을 막고 이유를 툴팁으로 표시한다. 상태 조회 실패는 미등록과 구분해 재조회할 수 있다. 서비스 삭제는 확인 시 같은 이름의 서비스 상태와 권한을 다시 검사한다. [검증 범위와 결과](VERIFICATION_RECORDS.md#ux007-evidence).
+
 <a id="ux005-implementation-stage"></a>
 
 ## UX-005 — VDI 탐색기의 파일 목록 스크롤 (2026-11-19 완료)

@@ -302,12 +302,18 @@ impl AppRoot {
     // ─────────────────────────────────────────────
 
     pub(crate) fn refresh_sys_services(&mut self) {
+        self.services.pending_delete = None;
+        self.services.measured_names = None;
         match self.platform.list_sys_services() {
             Ok(services) => {
                 self.services.items = services;
-                self.services.measured_names = None;
+                self.services.list_failed = false;
             }
-            Err(err) => log::error!("서비스 목록 조회 실패: {err}"),
+            Err(err) => {
+                self.services.items.clear();
+                self.services.list_failed = true;
+                log::error!("서비스 목록 조회 실패: {err}");
+            }
         }
     }
 

@@ -17,9 +17,9 @@ use crate::app::AppRoot;
 use crate::window::ui::{self, ButtonStyle, Tone};
 
 #[cfg(target_os = "windows")]
-use crate::platform::{
-    TaskState, install_task, uninstall_task, run_task_now, query_task_state,
-};
+use crate::platform::TaskState;
+#[cfg(windows)]
+mod controls;
 
 // ─────────────────────────────────────────────
 // 공통 색상 스냅샷
@@ -67,51 +67,35 @@ fn state_badge(state: &TaskState, cx: &Context<AppRoot>) -> AnyElement {
     ui::badge(label, tone, ui::Size::Md, cx).into_any_element()
 }
 
-// ─────────────────────────────────────────────
-// 액션 버튼 스타일
-// ─────────────────────────────────────────────
-
-/// 작업 제어 버튼의 색.
-///
-/// 지금 의미 없는 조작(미등록 상태의 '삭제' 등)은 비활성처럼 보이게만 하고
-/// 클릭 자체는 막지 않는다 — 실패 사유를 로그로 남기는 편이 원인 파악에 낫기 때문이다.
+/// 자동 시작 패널이 열려 있는 동안에만 조회 결과와 삭제 확인 상태를 보관한다.
 #[cfg(target_os = "windows")]
-fn task_button_style(enabled: bool, danger: bool, cx: &Context<AppRoot>) -> ButtonStyle {
-    if !enabled {
-        ButtonStyle::muted(cx)
-    } else if danger {
-        ButtonStyle::danger(cx)
-    } else {
-        ButtonStyle::primary(cx)
-    }
-}
-
-// ─────────────────────────────────────────────
-// 메인 렌더 함수 (Windows)
-// ─────────────────────────────────────────────
-
-#[cfg(target_os = "windows")]
-pub fn render(_this: &mut AppRoot, _window: &mut Window, cx: &mut Context<AppRoot>) -> AnyElement {
-    let state = query_task_state();
-
-    let is_installed = !matches!(state, TaskState::NotInstalled);
-    let is_not_installed = !is_installed;
-
-    let state_desc = match &state {
-        TaskState::NotInstalled =>
+pub fn render(this: &mut AppRoot, window: &mut Window, cx: &mut Context<AppRoot>) -> AnyElement {
+    let panel = window.use_keyed_state("auto-start-panel", cx, |_, cx| {
+        controls::Panel::load(this.platform.clone(), cx)
+    });
+    let admin = this.platform.is_elevated();
+    let state = panel.read(cx).state.as_ref();
+    let state_desc = match state {
+        None => "자동 시작 상태를 조회하고 있습니다.",
+        Some(TaskState::NotInstalled) if !admin =>
+            "자동 시작이 등록되지 않았습니다. 등록하려면 관리자 권한으로 앱을 다시 실행하세요.",
+        Some(TaskState::NotInstalled) =>
             "자동 시작이 등록되지 않았습니다. '등록' 버튼으로 로그온 자동 시작을 설정하세요.",
-        TaskState::Ready =>
+        Some(TaskState::Ready) =>
             "로그온 시 자동 시작이 등록되어 있습니다. 다음 로그온 시 트레이 모드로 자동 시작됩니다.",
-        TaskState::Running =>
+        Some(TaskState::Running) =>
             "작업이 현재 실행 중입니다.",
-        TaskState::Disabled =>
-            "작업이 비활성화되어 있습니다. 삭제 후 다시 등록하세요.",
-        TaskState::Unknown =>
-            "작업 상태를 조회할 수 없습니다.",
+        Some(TaskState::Disabled) =>
+            "작업이 비활성화되어 있습니다. 관리자 권한으로 삭제 후 다시 등록하세요.",
+        Some(TaskState::Unknown) =>
+            "작업 상태를 확인할 수 없습니다. 재조회 버튼을 눌러 주세요.",
     };
 
     let t = ThemeSnap::from_cx(cx);
-    let badge = state_badge(&state, cx);
+    let badge = match state {
+        Some(state) => state_badge(state, cx),
+        None => ui::badge("조회 중", Tone::Muted, ui::Size::Md, cx).into_any_element(),
+    };
 
     v_flex()
         .w_full()
@@ -128,15 +112,7 @@ pub fn render(_this: &mut AppRoot, _window: &mut Window, cx: &mut Context<AppRoo
                         .text_color(t.foreground)
                         .child("자동 시작 (Task Scheduler)"),
                 )
-                .child(ui::action_button(
-                    "task-refresh",
-                    "↺ 새로고침",
-                    ui::Size::Md,
-                    ButtonStyle::secondary(cx),
-                    cx.listener(|_this, _ev, _window, cx| {
-                        cx.notify();
-                    }),
-                )),
+                .child(controls::refresh_button(panel.clone(), cx)),
         )
         // ── 상태 카드 ──
         .child(
@@ -211,65 +187,7 @@ pub fn render(_this: &mut AppRoot, _window: &mut Window, cx: &mut Context<AppRoo
                         .w_full()
                         .gap_3()
                         .child(div().text_color(t.foreground).child("작업 제어"))
-                        .child(
-                            h_flex()
-                                .gap_3()
-                                .flex_wrap()
-                                .child(ui::action_button(
-                                    "task-install",
-                                    "등록",
-                                    ui::Size::Lg,
-                                    task_button_style(is_not_installed, false, cx),
-                                    cx.listener(|this, _ev, window, cx| {
-                                        match install_task() {
-                                            Ok(()) => this.push_service_log(
-                                                "자동 시작 작업을 등록했습니다. 다음 로그온 시 자동으로 시작됩니다.",
-                                                window, cx,
-                                            ),
-                                            Err(e) => this.push_service_log(
-                                                &format!("등록 실패: {e}"), window, cx,
-                                            ),
-                                        }
-                                        cx.notify();
-                                    }),
-                                ))
-                                .child(ui::action_button(
-                                    "task-run-now",
-                                    "지금 실행",
-                                    ui::Size::Lg,
-                                    task_button_style(is_installed, false, cx),
-                                    cx.listener(|this, _ev, window, cx| {
-                                        match run_task_now() {
-                                            Ok(()) => this.push_service_log(
-                                                "앱을 트레이 모드로 즉시 실행했습니다.",
-                                                window, cx,
-                                            ),
-                                            Err(e) => this.push_service_log(
-                                                &format!("실행 실패: {e}"), window, cx,
-                                            ),
-                                        }
-                                        cx.notify();
-                                    }),
-                                ))
-                                .child(ui::action_button(
-                                    "task-uninstall",
-                                    "삭제",
-                                    ui::Size::Lg,
-                                    task_button_style(is_installed, true, cx),
-                                    cx.listener(|this, _ev, window, cx| {
-                                        match uninstall_task() {
-                                            Ok(()) => this.push_service_log(
-                                                "자동 시작 작업을 삭제했습니다.",
-                                                window, cx,
-                                            ),
-                                            Err(e) => this.push_service_log(
-                                                &format!("삭제 실패: {e}"), window, cx,
-                                            ),
-                                        }
-                                        cx.notify();
-                                    }),
-                                )),
-                        ),
+                        .child(controls::buttons(panel, admin, cx)),
                 ),
         )
         // ── Session 0 해결 안내 ──

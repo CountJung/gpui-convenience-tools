@@ -172,6 +172,19 @@ impl Platform for WindowsPlatform {
     fn is_elevated(&self) -> bool {
         is_elevated()
     }
+
+    fn auto_start_state(&self) -> TaskState {
+        query_task_state()
+    }
+
+    fn apply_auto_start(&self, action: super::AutoStartAction) -> Result<()> {
+        use super::AutoStartAction::*;
+        match action {
+            Install => install_task(),
+            Run => run_task_now(),
+            Delete => uninstall_task(),
+        }
+    }
 }
 
 #[cfg(test)]

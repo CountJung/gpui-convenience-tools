@@ -22,7 +22,9 @@ use crate::platform::SysServiceStatus;
 use crate::window::ui::{self, ButtonStyle, Tone};
 use crate::window::{resizable_split, scroll_pane, SETTINGS_PANE_MIN_WIDTH};
 
+mod actions;
 mod layout;
+use actions::Action;
 pub use layout::render;
 use layout::row_min_width;
 
@@ -76,7 +78,11 @@ fn render_service_list(
             .px_3()
             .py_4()
             .text_color(theme.muted_foreground)
-            .child("서비스 목록을 불러오려면 새로고침 버튼을 누르세요.")
+            .child(if this.services.list_failed {
+                "서비스 목록 조회에 실패했습니다. 새로고침하여 다시 조회하세요."
+            } else {
+                "서비스 목록을 불러오려면 새로고침 버튼을 누르세요."
+            })
             .into_any_element()
     } else if filtered_count == 0 {
         div()
@@ -113,17 +119,14 @@ fn render_service_list(
                         let badge_tone = match svc.status {
                             SysServiceStatus::Running => Tone::Success,
                             SysServiceStatus::Stopped => Tone::Muted,
-                            SysServiceStatus::StartPending
-                            | SysServiceStatus::StopPending => Tone::Warning,
+                            SysServiceStatus::StartPending | SysServiceStatus::StopPending => {
+                                Tone::Warning
+                            }
                             _ => Tone::Muted,
                         };
-                        let is_running = svc.status == SysServiceStatus::Running;
                         let status_label = svc.status.to_string();
                         let display = svc.display_name.clone();
                         let name_label = svc.name.clone();
-                        let name_start = svc.name.clone();
-                        let name_stop = svc.name.clone();
-                        let name_delete = svc.name.clone();
                         let name_fav = svc.name.clone();
                         let is_favorite = this.is_favorite_service(&svc.name);
 
@@ -220,118 +223,24 @@ fn render_service_list(
                                                     .w(px(172.0))
                                                     .flex_shrink_0()
                                                     .gap_2()
-                                                    .child(
-                                                        ui::action_button(
-                                                            ("svc-start", svc_ix),
-                                                            "시작",
-                                                            ui::Size::Sm,
-                                                            if is_running {
-                                                                ButtonStyle::muted(cx)
-                                                            } else {
-                                                                ButtonStyle::neutral(cx)
-                                                            },
-                                                            cx.listener(
-                                                                move |this,
-                                                                      _ev,
-                                                                      window,
-                                                                      cx| {
-                                                                    match this
-                                                                        .platform
-                                                                        .start_sys_service(
-                                                                            &name_start,
-                                                                        ) {
-                                                                        Ok(()) => {
-                                                                            this.push_service_log(
-                                                                                &format!(
-                                                                                    "서비스 시작: {name_start}"
-                                                                                ),
-                                                                                window,
-                                                                                cx,
-                                                                            );
-                                                                            this.refresh_sys_services();
-                                                                        }
-                                                                        Err(e) => {
-                                                                            this.push_service_log(
-                                                                                &format!(
-                                                                                    "시작 실패 ({name_start}): {e}"
-                                                                                ),
-                                                                                window,
-                                                                                cx,
-                                                                            );
-                                                                        }
-                                                                    }
-                                                                    cx.notify();
-                                                                },
-                                                            ),
-                                                        )
-                                                        .w(px(52.0)),
-                                                    )
-                                                    .child(
-                                                        ui::action_button(
-                                                            ("svc-stop", svc_ix),
-                                                            "중지",
-                                                            ui::Size::Sm,
-                                                            if is_running {
-                                                                ButtonStyle::danger(cx)
-                                                            } else {
-                                                                ButtonStyle::muted(cx)
-                                                            },
-                                                            cx.listener(
-                                                                move |this,
-                                                                      _ev,
-                                                                      window,
-                                                                      cx| {
-                                                                    match this
-                                                                        .platform
-                                                                        .stop_sys_service(
-                                                                            &name_stop,
-                                                                        ) {
-                                                                        Ok(()) => {
-                                                                            this.push_service_log(
-                                                                                &format!(
-                                                                                    "서비스 중지: {name_stop}"
-                                                                                ),
-                                                                                window,
-                                                                                cx,
-                                                                            );
-                                                                            this.refresh_sys_services();
-                                                                        }
-                                                                        Err(e) => {
-                                                                            this.push_service_log(
-                                                                                &format!(
-                                                                                    "중지 실패 ({name_stop}): {e}"
-                                                                                ),
-                                                                                window,
-                                                                                cx,
-                                                                            );
-                                                                        }
-                                                                    }
-                                                                    cx.notify();
-                                                                },
-                                                            ),
-                                                        )
-                                                        .w(px(52.0)),
-                                                    )
-                                                    .child(
-                                                        ui::action_button(
-                                                            ("svc-delete", svc_ix),
-                                                            "삭제",
-                                                            ui::Size::Sm,
-                                                            ButtonStyle::danger(cx),
-                                                            cx.listener(
-                                                                move |this,
-                                                                      _ev,
-                                                                      _window,
-                                                                      cx| {
-                                                                    this.services.pending_delete =
-                                                                        Some(name_delete.clone());
-                                                                    cx.notify();
-                                                                },
-                                                            ),
-                                                        )
-                                                        .debug_selector(move || format!("svc-delete-{svc_ix}"))
-                                                        .w(px(52.0)),
-                                                    ),
+                                                    .child(Action::Start.button(
+                                                        svc,
+                                                        svc_ix,
+                                                        is_elevated,
+                                                        cx,
+                                                    ))
+                                                    .child(Action::Stop.button(
+                                                        svc,
+                                                        svc_ix,
+                                                        is_elevated,
+                                                        cx,
+                                                    ))
+                                                    .child(Action::Delete.button(
+                                                        svc,
+                                                        svc_ix,
+                                                        is_elevated,
+                                                        cx,
+                                                    )),
                                             ),
                                     ),
                             )
@@ -368,16 +277,19 @@ fn render_service_list(
                                 String::new()
                             }),
                     )
-                    .child(ui::action_button(
-                        "svc-refresh-btn",
-                        "새로고침",
-                        ui::Size::Md,
-                        ButtonStyle::neutral(cx),
-                        cx.listener(|this, _ev, _window, cx| {
-                            this.refresh_sys_services();
-                            cx.notify();
-                        }),
-                    )),
+                    .child(
+                        ui::action_button(
+                            "svc-refresh-btn",
+                            "새로고침",
+                            ui::Size::Md,
+                            ButtonStyle::neutral(cx),
+                            cx.listener(|this, _ev, _window, cx| {
+                                this.refresh_sys_services();
+                                cx.notify();
+                            }),
+                        )
+                        .debug_selector(|| "svc-refresh".into()),
+                    ),
             ),
     );
 
@@ -391,7 +303,7 @@ fn render_service_list(
                 .bg(theme.warning)
                 .text_color(theme.warning_foreground)
                 .child(
-                    "⚠ 서비스 시작/중지는 관리자 권한이 필요합니다. 관리자 권한으로 재실행하세요.",
+                    "⚠ 서비스 시작/중지/삭제는 관리자 권한이 필요합니다. 관리자 권한으로 재실행하세요.",
                 ),
         );
     }
@@ -399,7 +311,7 @@ fn render_service_list(
     // ── 서비스 삭제 확인 배너 ──
     if let Some(ref pending_name) = pending_delete {
         let del_confirm = pending_name.clone();
-        let del_cancel = pending_name.clone();
+        let reason = Action::Delete.cached_reason(this, pending_name);
         root = root.child(
             div()
                 .rounded_md()
@@ -413,37 +325,24 @@ fn render_service_list(
                         .gap_2()
                         .child(div().text_color(theme.danger_foreground).child(format!(
                             "⚠ '{}' 서비스를 삭제하면 되돌릴 수 없습니다. 계속하시겠습니까?",
-                            del_cancel
+                            pending_name
                         )))
                         .child(
                             h_flex()
                                 .gap_2()
                                 .child(
-                                    ui::action_button(
+                                    ui::gated_action_button(
                                         "svc-confirm-delete-btn",
                                         "삭제 확인",
                                         ui::Size::Md,
-                                        ButtonStyle::danger_outline(cx),
-                                        cx.listener(move |this, _ev, window, cx| {
-                                            match this.platform.delete_sys_service(&del_confirm) {
-                                                Ok(()) => {
-                                                    this.push_service_log(
-                                                        &format!("서비스 삭제: {del_confirm}"),
-                                                        window,
-                                                        cx,
-                                                    );
-                                                    this.refresh_sys_services();
-                                                }
-                                                Err(e) => {
-                                                    this.push_service_log(
-                                                        &format!("삭제 실패 ({del_confirm}): {e}"),
-                                                        window,
-                                                        cx,
-                                                    );
-                                                }
-                                            }
-                                            this.services.pending_delete = None;
-                                            cx.notify();
+                                        if reason.is_some() {
+                                            ButtonStyle::muted(cx)
+                                        } else {
+                                            ButtonStyle::danger_outline(cx)
+                                        },
+                                        reason,
+                                        cx.listener(move |this, _, window, cx| {
+                                            actions::confirm_delete(this, &del_confirm, window, cx);
                                         }),
                                     )
                                     .debug_selector(|| "svc-confirm".into()),

@@ -185,20 +185,39 @@ pub fn action_button(
     style: ButtonStyle,
     on_click: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
 ) -> Stateful<Div> {
+    gated_action_button(id, label, size, style, None, on_click)
+}
+
+/// 차단 사유가 있으면 클릭 핸들러를 등록하지 않고 이유를 툴팁으로 표시한다.
+pub fn gated_action_button(
+    id: impl Into<ElementId>,
+    label: impl Into<SharedString>,
+    size: Size,
+    style: ButtonStyle,
+    blocked: Option<&'static str>,
+    on_click: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
+) -> Stateful<Div> {
     let mut el = size
         .apply(div().rounded_md())
-        .cursor_pointer()
         .bg(style.bg)
         .text_color(style.fg);
 
     if let Some(border) = style.border {
         el = el.border_1().border_color(border);
     }
+    let label = label.into();
+    if let Some(reason) = blocked {
+        return el.id(id).cursor(gpui::CursorStyle::OperationNotAllowed)
+            .tooltip(move |window, cx| {
+                gpui_component::tooltip::Tooltip::new(reason).build(window, cx)
+            })
+            .child(label);
+    }
     if let Some(hover) = style.hover {
         el = el.hover(move |s| s.bg(hover));
     }
 
-    el.id(id).on_click(on_click).child(label.into())
+    el.cursor_pointer().id(id).on_click(on_click).child(label)
 }
 
 /// 숫자 하나를 강조해 보여주는 통계 타일.

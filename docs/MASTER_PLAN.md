@@ -55,6 +55,8 @@ TIME·E 작업의 Git 반영·후속 결과는 [검증 기록](VERIFICATION_RECO
 [구현 이력](IMPLEMENTATION_HISTORY.md)의 각 단계에서 당시 구현·커밋·검증 경계를 찾는다.
 이력의 '진행 예정'·'착수' 표기는 당시 상태이며 현재 대기열이 아니다.
 
+- [UX-007 — 서비스·자동 시작 버튼의 상태와 권한](IMPLEMENTATION_HISTORY.md#ux007-implementation-stage)
+- [UX-005 — 좁은 VDI 파일 목록에서 모든 열에 접근](IMPLEMENTATION_HISTORY.md#ux005-implementation-stage)
 - [UX-003 — Windows 서비스 목록 우선 배치](IMPLEMENTATION_HISTORY.md#ux003-implementation-stage)
 
 - [E-001 — 클립보드 히스토리](IMPLEMENTATION_HISTORY.md#e001-implementation-stage):

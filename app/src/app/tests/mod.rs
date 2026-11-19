@@ -2,6 +2,8 @@
 //!
 //! 시나리오별 테스트는 하위 모듈이 소유한다.
 
+#[cfg(windows)]
+mod auto_start;
 mod file_sync;
 mod file_sync_browse;
 mod file_sync_history;

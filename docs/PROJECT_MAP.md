@@ -150,7 +150,7 @@ flowchart LR
 
 ## 현재 소스 실측
 
-**최종 측정**: 2026-11-19 · 전체 `app/src` 총 131개 파일 · 38,755줄
+**최종 측정**: 2026-11-19 · 전체 `app/src` 총 135개 파일 · 39,377줄
 
 추적 여부와 무관하게 전체 `app/src/**/*.rs`를 열거하고 `Get-Content`로 실측했다.
 E-004 신규 Rust 소스 19개와 중앙 연결 변경을 총계·소계·파일 표에 모두 포함한다.
@@ -307,7 +307,7 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `browse.rs` | 82 | 숨김·시스템 항목 포함 원본 직계 탐색·링크 내부 진입 차단 |
 | `link_tests.rs` | 250 | Windows 링크·정션 Follow/Recreate·탈출·순환·대상 충돌 안전 회귀 |
 
-### 앱 루트 (`app/src/app/`) — 10,655줄 / 31파일
+### 앱 루트 (`app/src/app/`) — 10,663줄 / 31파일
 
 `app.rs`(1,798줄)를 책임별로 분할한 결과다.
 
@@ -319,10 +319,10 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `events.rs` | 329 | `PlatformEvent` 채널 소비, 진행 상태·동기화 이력·감시 실패 강등 반영, 로그·토스트 유틸 |
 | `background.rs` | 624 | 스캔 스레드와 동기화 스레드 (다중 광고 창 추적·복원·카카오톡 레이아웃 적용/복원·진행 이벤트 빈도 제한·중지·실행 위치·동기화 이력 영속화·실시간 watcher 연동) |
 | `state.rs` | 352 | 순수 데이터 타입 (`AppState`, `PlatformEvent`, `SyncRunning`, `ActivePanel`, 카카오톡 옵션, 감시 실패 이벤트, 스크린샷 포함 공통/타깃별 `NAV_*`) |
-| `ops.rs` | 375 | 광고 차단·카카오톡 옵션·서비스·로그 조작·서비스 이름 폭 캐시 무효화·목록 분할 폭 저장·스크린샷 포함 사용자 설정 일괄 저장과 저장 오류 상태 갱신·모의 테스트의 설정/로그 부작용 차단 |
+| `ops.rs` | 381 | 광고 차단·카카오톡 옵션·서비스·로그 조작·서비스 이름 폭 캐시 무효화·목록 분할 폭 저장·스크린샷 포함 사용자 설정 일괄 저장과 저장 오류 상태 갱신·모의 테스트의 설정/로그 부작용 차단 |
 | `openssl_ops.rs` | 165 | 일시적 입력/결과·마스킹 암호 위젯·입력 구독 수명·undo 이력 제거·변환·개별 설정 자동 저장과 오류 상태 |
 | `inputs.rs` | 142 | 입력 위젯 지연 생성·제외 패턴 편집기·원본 탐색 초기화 |
-| `ui_state.rs` | 97 | 서비스 본문 폭·설정 열림·가로 스크롤·분할 폭·이름 폭 캐시 등 기능별 UI 상태와 동기화 이력·원본 탐색 상태 |
+| `ui_state.rs` | 99 | 서비스 본문 폭·설정 열림·가로 스크롤·분할 폭·이름 폭 캐시 등 기능별 UI 상태와 동기화 이력·원본 탐색 상태 |
 | `virtual_disk_ops.rs` | 907 | VDI 경로 입력·read-only 열기·파티션 연결·지연 트리/게스트 목록/다중 선택·안전 오류·설정/열 너비/결과 상세의 일시적 표시 상태·오류 스크롤·기존 설정 저장 |
 | `virtual_disk_copy.rs` | 564 | VDI 대상 폴더 입력·선택, 백그라운드 read-only 복사, 청크 단위 중지 요청, 진행·중지·완료 요약·항목별 오류 로그·미억제 토스트 게이트·탐색기 keymap·검증 자동 복사·검증 자동 중지·검증 전용 읽기 지연 |
 | `watch.rs` | 303 | `notify` 재귀 watcher 소유·작업별 변경 이벤트 전달·2초 quiet debounce·감시 실패 중복 억제·작업 변경 시 정리 |
@@ -345,9 +345,9 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `screenshot_ops/integration_tests.rs` | 123 | GPUI 기본 창/다중 모니터 미리보기 가시성·실제 그리기/fit 좌표 일치와 미리보기 내 포함·전역 저장/메뉴 연결·일시 이미지 미복원 회귀 |
 | `screenshot_ops/validation/tests.rs` | 271 | 합성 시드의 명시 경로·탈출/형식/크기 차단·이미지 불변·자동 저장 없는 GPUI 미리보기 회귀 |
 
-### GPUI 회귀 테스트 (`app/src/app/tests/`) — 3,511줄 / 11파일
+### GPUI 회귀 테스트 (`app/src/app/tests/`) — 3,915줄 / 13파일
 
-테스트는 시나리오별 모듈과 공용 픽스처의 11개 파일로 나뉘며, 공용 픽스처는 `mod.rs`가 소유하고 하위 모듈은
+테스트는 시나리오별 모듈과 공용 픽스처로 나뉘며, 공용 픽스처는 `mod.rs`가 소유하고 하위 모듈은
 `use super::*`로 가져다 쓴다.
 VDI 연결 픽스처 `loaded_virtual_disk_root`는 `virtual_disk.rs`에서 탐색 작업 화면 테스트에 공유한다.
 
@@ -356,28 +356,30 @@ VDI 연결 픽스처 `loaded_virtual_disk_root`는 `virtual_disk.rs`에서 탐�
 | `file_sync.rs` | 786 | 동기화 조작·진행·중지·섹션 너비·전역 스위치·감시 방식 UI 경계 |
 | `file_sync_browse.rs` | 150 | 숨김·시스템 원본 항목 선택·링크 모드·원본 변경 시 stale 클릭 차단 |
 | `file_sync_history.rs` | 59 | 이력 3행의 상태·건수·소요 시간 카드 경계, 최소 높이 마지막 행 스크롤 진입 |
-| `layout.rs` | 751 | 사이드바·스플리터·카드 경계·divider drag·실제 overflow 기반 끝 이동·사용자 설정 저장 카드·카카오톡 회수 옵션 클릭·컴팩트 높이 설정 목록 끝 도달·모의 설정 조작의 파일 미생성·서비스 목록 내부 스크롤과 분할 폭 저장/복원 |
+| `layout.rs` | 754 | 사이드바·스플리터·카드 경계·divider drag·실제 overflow 기반 끝 이동·사용자 설정 저장 카드·카카오톡 회수 옵션 클릭·컴팩트 높이 설정 목록 끝 도달·모의 설정 조작의 파일 미생성·서비스 목록 내부 스크롤과 분할 폭 저장/복원 |
 | `interval.rs` | 230 | 주기 드롭다운·프리셋 추가/삭제·패널 간 공유 |
-| `mod.rs` | 215 | 공용 픽스처 (`test_app_root`·`TestPlatform`·`refresh`·`click_debug_element` 등)·스크린샷 포함 모의 상태 초기화와 시나리오 모듈 등록 |
+| `mod.rs` | 217 | 공용 픽스처 (`test_app_root`·`TestPlatform`·`refresh`·`click_debug_element` 등)·스크린샷 포함 모의 상태 초기화와 시나리오 모듈 등록 |
 | `openssl.rs` | 265 | 공통 메뉴·키 입력/복사/붙여넣기·변환/지우기/undo·설정 재로드·저장 실패/재시도·지원 화면 크기/스크롤 회귀 |
 | `theme.rs` | 110 | 테마 전환·설정 화면 Light/Dark 버튼 조작과 스위치 가시성 |
 | `virtual_disk.rs` | 614 | VirtualBox 미연결 셸·게스트 탐색/선택·작업 화면 트리/목록 경계·접이식 열 폭/결과 상세·오류 억제·단축키·stale 목록·안전 안내 회귀와 연결 픽스처 |
 | `virtual_disk_workspace.rs` | 245 | 탐색 공간 우선 배분·설정 왕복/선택 보존·최대 열 폭 스크롤/전체 저장·결과 오버레이 스크롤·긴 오류 높이 제한/스크롤·복사 중 변경 차단/중지 수용 테스트 |
+| `auto_start.rs` | 140 | 자동 시작 상태별 버튼 및 재조회·확인 모의 회귀 |
+| `layout/service_actions.rs` | 259 | 서비스 상태·권한별 호출 횟수와 삭제 확인 모의 회귀 |
 | `timestamp.rs` | 86 | 양방향 변환 버튼·오류·시간대 저장/복원·지원 창 크기 경계 테스트 |
 
-### 패널 (`app/src/window/`) — 6,568줄 / 22파일
+### 패널 (`app/src/window/`) — 6,719줄 / 24파일
 
 | 파일 | 줄 | 책임 |
 | --- | ---: | --- |
-| `service_mgr.rs` | 694 | Windows 서비스 목록·행 조작·목록 내부 가로 스크롤과 보기 설정(검색·필터·권한) 렌더링 |
+| `service_mgr.rs` | 593 | Windows 서비스 목록·행 조작·목록 내부 가로 스크롤과 보기 설정(검색·필터·권한) 렌더링 |
 | `service_mgr/layout.rs` | 156 | 본문 폭에 따라 목록/설정 전환 또는 스플리터 표시·분할 폭 저장·표시명과 서비스명의 글리프 폭으로 행 최소 폭 계산·캐시 |
 | `file_sync.rs` | 698 | 편의 기능 — 파일 동기화 작업·설정·실패·상태 표시줄 레이아웃 |
 | `file_sync/browse.rs` | 182 | 제외 대상 선택용 직계 폴더·파일 탐색 UI |
 | `file_sync/history.rs` | 127 | 최근 실행 이력 카드·상태/건수/소요 시간 문구 |
 | `settings.rs` | 555 | 전역 설정 — 사용자 설정파일 경로·저장/열기·색상 모드/테마 선택 즉시 저장·로그 보관 정책 |
 | `ad_block.rs` | 514 | 편의 기능 — 웹뷰 광고 차단 (상태·타겟 ↔ 스캔 주기·프로세스 추가·카카오톡 광고 자리 회수 옵션·카드 경계) |
-| `service_view.rs` | 317 | 시스템 — 자동 시작(작업 스케줄러) 등록·삭제·즉시 실행 |
-| `ui.rs` | 333 | **공용 UI 프리미티브** — 배지·액션 버튼·토글 스위치·통계 타일·설정 행·선택 칩·로그 레벨 칸·폭 경계 |
+| `service_view.rs` | 235 | 시스템 — 자동 시작(작업 스케줄러) 등록·삭제·즉시 실행 |
+| `ui.rs` | 352 | **공용 UI 프리미티브** — 배지·액션 버튼·토글 스위치·통계 타일·설정 행·선택 칩·로그 레벨 칸·폭 경계 |
 | `dashboard.rs` | 161 | 개요 — 전체 상태 요약과 최근 활동 (플랫폼별 요약 카드 + 동기화 상태 배지) |
 | `interval.rs` | 154 | 주기 선택 렌더 — 드롭다운 + (값·단위·추가) 행 + 등록된 프리셋 목록 |
 | `log_view.rs` | 110 | 시스템 — 화면 로그 가상 리스트와 로그 파일 현황 |
@@ -385,6 +387,8 @@ VDI 연결 픽스처 `loaded_virtual_disk_root`는 `virtual_disk.rs`에서 탐�
 | `openssl.rs` | 72 | PCF 호환 단일 스크롤 작업 화면·암호 마스킹/표시·LF 토글·변환/지우기·편집 가능한 결과·평문 저장/보안 경고 |
 | `virtual_disk.rs` | 351 | 편의 기능 — VDI 파일/파티션 설정 단계·연결 요약·복사 중 변경 차단·탐색 복귀·48px 오류 스크롤·full-height 화면 조합 |
 | `virtual_disk/explorer.rs` | 593 | 가용 높이 기반 트리/파일 목록·현재 경로/행 선택/단축키·사용자 폭 설정·파일 목록 양방향 스크롤/전체 이름 툴팁 |
+| `service_mgr/actions.rs` | 152 | 서비스 명령의 상태·권한 및 삭제 확인 시 재검사 |
+| `service_view/controls.rs` | 163 | 자동 시작 조회·재조회·확인과 상태별 버튼 제어 |
 | `virtual_disk/copy.rs` | 231 | copy footer의 대상 폴더/시작/중지/요약과 높이 112px absolute 보조 결과 오버레이·내부 스크롤·오류 억제 UI |
 | `timestamp.rs` | 38 | Unix 초·날짜 입력과 변환·현재 시간·복사·시간대 선택 화면 |
 | `process.rs` | 273 | 프로세스 검색/정렬·확인 영역·독립 행 도움말·이름 우선 목록과 CPU/메모리 공통 열 폭 |
@@ -392,21 +396,21 @@ VDI 연결 픽스처 `loaded_virtual_disk_root`는 `virtual_disk.rs`에서 탐�
 | `launcher.rs` | 259 | 단축키 상태·등록 항목 검색/선택·이름 최소 폭/별도 경로 행·로컬 경로 선택·신뢰 편집·스크립트 실행 확인의 단일 스크롤 화면 |
 | `screenshot.rs` | 329 | 수동 대상/캡처·PreviewRect fit 좌표의 Canvas paint_image와 선택 오버레이·내보내기 우선/설정 하단 단일 스크롤 화면 |
 
-### 플랫폼 (`app/src/platform/`) — 2,829줄 / 9파일
+### 플랫폼 (`app/src/platform/`) — 2,888줄 / 9파일
 
 `windows.rs`(1,361줄)를 책임별로 분할한 결과다.
 
 | 파일 | 줄 | 책임 |
 | --- | ---: | --- |
-| `mod.rs` | 263 | `Platform` trait 정의 + 광고 창 후보 목록·상태 스냅샷·카카오톡 레이아웃 스냅샷/적용/복원 계약·서비스 타입, `NativePlatform` 타깃별 별칭 |
+| `mod.rs` | 281 | `Platform` trait 정의 + 광고 창 후보 목록·상태 스냅샷·카카오톡 레이아웃 스냅샷/적용/복원 계약·서비스 타입, `NativePlatform` 타깃별 별칭 |
 | `fallback.rs` | 59 | 비Windows `Platform` 구현 — 광고 차단 계열 미지원을 명시적으로 반환 |
 | `windows/scm.rs` | 449 | Windows 서비스(SCM) 등록과 서비스 모드 실행 |
 | `windows/services.rs` | 340 | 설치된 Win32 서비스 조회·시작·중지·삭제, 권한 확인 |
 | `windows/tray.rs` | 274 | 시스템 트레이 아이콘과 메시지 루프 |
 | `windows/window_ops.rs` | 719 | 타겟 프로세스 트리·최상위/명시적 자식 창 열거, 클래스 필터, 광고 팝업 후보 탐색, 창 상태 캡처·0×0 축소·복원 |
 | `windows/kakao_layout.rs` | 382 | 카카오톡 기본 채팅창의 광고 팝업·슬롯·목록 지문 확인, 6개 HWND 크기 적용·부분 실패 역복원·동일 PID/클래스/부모/소유자/치수 확인 후 복원, live ignored 테스트 |
-| `windows/mod.rs` | 195 | `WindowsPlatform` + `Platform` 구현, 다중 창 후보·상태 API와 카카오톡 레이아웃 API 연결, 하위 모듈 re-export |
-| `windows/task_scheduler.rs` | 148 | 로그온 시 자동 시작(`schtasks`) |
+| `windows/mod.rs` | 208 | `WindowsPlatform` + `Platform` 구현, 다중 창 후보·상태 API와 카카오톡 레이아웃 API 연결, 하위 모듈 re-export |
+| `windows/task_scheduler.rs` | 176 | 로그온 시 자동 시작(`schtasks`) |
 
 ### 빌드
 
@@ -431,7 +435,7 @@ VDI 연결 픽스처 `loaded_virtual_disk_root`는 `virtual_disk.rs`에서 탐�
 | `.claude/agents/docs-sync.md` | 11 | Claude용 Documentation Sync 얇은 어댑터 |
 | `.codex/agents/code-reviewer.toml` | 9 | Codex용 Code Reviewer 얇은 어댑터 |
 | `.codex/agents/docs-sync.toml` | 9 | Codex용 Documentation Sync 얇은 어댑터 |
-| `scripts/Verify-Workspace.ps1` | 288 | E-004·소유 메모리 GDI 포함 Rust/GPUI 필수 수용 테스트 등록(UX-005 VDI 열 배치·UX-003 목록 내부 스크롤·분할 폭 저장/복원 포함)·모의 설정 파일 미생성·하네스 구문 검사·해시 고정 handoff 생성 |
+| `scripts/Verify-Workspace.ps1` | 295 | E-004·소유 메모리 GDI 포함 Rust/GPUI 필수 수용 테스트 등록(UX-005 VDI 열 배치·UX-003 목록 내부 스크롤·분할 폭 저장/복원 포함)·모의 설정 파일 미생성·하네스 구문 검사·해시 고정 handoff 생성 |
 | `scripts/Invoke-ClaudeVisualCheck.ps1` | 933 | 격리 실행·합성 클립보드/PNG 시드·Screenshot 포함 초기 패널·소유 창 캡처/입력·조건부 복원·세션 정리 |
 | `scripts/visual-validation/ScreenshotSeed.ps1` | 41 | 명시적 합성 PNG의 서명/크기 확인·격리 세션 신규 파일 복사·실패 시 자체 출력 정리 |
 | `scripts/visual-validation/Test-ScreenshotSeed.ps1` | 44 | 합성 PNG 복사·바이트 일치·기존 파일/과대 크기/잘못된 헤더 거부의 파일 전용 회귀 |
