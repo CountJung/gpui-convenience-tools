@@ -150,7 +150,7 @@ flowchart LR
 
 ## 현재 소스 실측
 
-**최종 측정**: 2026-11-18 · 전체 `app/src` 총 131개 파일 · 38,636줄
+**최종 측정**: 2026-11-19 · 전체 `app/src` 총 131개 파일 · 38,755줄
 
 추적 여부와 무관하게 전체 `app/src/**/*.rs`를 열거하고 `Get-Content`로 실측했다.
 E-004 신규 Rust 소스 19개와 중앙 연결 변경을 총계·소계·파일 표에 모두 포함한다.
@@ -345,7 +345,7 @@ wc -l $(find app/src -name '*.rs' | sort) | sort -rn
 | `screenshot_ops/integration_tests.rs` | 123 | GPUI 기본 창/다중 모니터 미리보기 가시성·실제 그리기/fit 좌표 일치와 미리보기 내 포함·전역 저장/메뉴 연결·일시 이미지 미복원 회귀 |
 | `screenshot_ops/validation/tests.rs` | 271 | 합성 시드의 명시 경로·탈출/형식/크기 차단·이미지 불변·자동 저장 없는 GPUI 미리보기 회귀 |
 
-### GPUI 회귀 테스트 (`app/src/app/tests/`) — 3,431줄 / 11파일
+### GPUI 회귀 테스트 (`app/src/app/tests/`) — 3,511줄 / 11파일
 
 테스트는 시나리오별 모듈과 공용 픽스처의 11개 파일로 나뉘며, 공용 픽스처는 `mod.rs`가 소유하고 하위 모듈은
 `use super::*`로 가져다 쓴다.
@@ -362,10 +362,10 @@ VDI 연결 픽스처 `loaded_virtual_disk_root`는 `virtual_disk.rs`에서 탐�
 | `openssl.rs` | 265 | 공통 메뉴·키 입력/복사/붙여넣기·변환/지우기/undo·설정 재로드·저장 실패/재시도·지원 화면 크기/스크롤 회귀 |
 | `theme.rs` | 110 | 테마 전환·설정 화면 Light/Dark 버튼 조작과 스위치 가시성 |
 | `virtual_disk.rs` | 614 | VirtualBox 미연결 셸·게스트 탐색/선택·작업 화면 트리/목록 경계·접이식 열 폭/결과 상세·오류 억제·단축키·stale 목록·안전 안내 회귀와 연결 픽스처 |
-| `virtual_disk_workspace.rs` | 165 | 탐색 공간 우선 배분·설정 왕복/선택 보존·열 너비 접기·결과 오버레이 스크롤·긴 오류 높이 제한/스크롤·복사 중 변경 차단/중지 수용 테스트 |
+| `virtual_disk_workspace.rs` | 245 | 탐색 공간 우선 배분·설정 왕복/선택 보존·최대 열 폭 스크롤/전체 저장·결과 오버레이 스크롤·긴 오류 높이 제한/스크롤·복사 중 변경 차단/중지 수용 테스트 |
 | `timestamp.rs` | 86 | 양방향 변환 버튼·오류·시간대 저장/복원·지원 창 크기 경계 테스트 |
 
-### 패널 (`app/src/window/`) — 6,529줄 / 22파일
+### 패널 (`app/src/window/`) — 6,568줄 / 22파일
 
 | 파일 | 줄 | 책임 |
 | --- | ---: | --- |
@@ -384,7 +384,7 @@ VDI 연결 픽스처 `loaded_virtual_disk_root`는 `virtual_disk.rs`에서 탐�
 | `mod.rs` | 149 | 스크린샷 포함 패널 모듈 선언 + 균형/초기 폭 지정 스플리터·`scroll_pane` 레이아웃 헬퍼 |
 | `openssl.rs` | 72 | PCF 호환 단일 스크롤 작업 화면·암호 마스킹/표시·LF 토글·변환/지우기·편집 가능한 결과·평문 저장/보안 경고 |
 | `virtual_disk.rs` | 351 | 편의 기능 — VDI 파일/파티션 설정 단계·연결 요약·복사 중 변경 차단·탐색 복귀·48px 오류 스크롤·full-height 화면 조합 |
-| `virtual_disk/explorer.rs` | 554 | 가용 높이 기반 트리/파일 목록·현재 경로/행 선택/단축키·사용자 폭 설정·접이식 열 너비 UI |
+| `virtual_disk/explorer.rs` | 593 | 가용 높이 기반 트리/파일 목록·현재 경로/행 선택/단축키·사용자 폭 설정·파일 목록 양방향 스크롤/전체 이름 툴팁 |
 | `virtual_disk/copy.rs` | 231 | copy footer의 대상 폴더/시작/중지/요약과 높이 112px absolute 보조 결과 오버레이·내부 스크롤·오류 억제 UI |
 | `timestamp.rs` | 38 | Unix 초·날짜 입력과 변환·현재 시간·복사·시간대 선택 화면 |
 | `process.rs` | 273 | 프로세스 검색/정렬·확인 영역·독립 행 도움말·이름 우선 목록과 CPU/메모리 공통 열 폭 |
@@ -431,7 +431,7 @@ VDI 연결 픽스처 `loaded_virtual_disk_root`는 `virtual_disk.rs`에서 탐�
 | `.claude/agents/docs-sync.md` | 11 | Claude용 Documentation Sync 얇은 어댑터 |
 | `.codex/agents/code-reviewer.toml` | 9 | Codex용 Code Reviewer 얇은 어댑터 |
 | `.codex/agents/docs-sync.toml` | 9 | Codex용 Documentation Sync 얇은 어댑터 |
-| `scripts/Verify-Workspace.ps1` | 287 | E-004·소유 메모리 GDI 포함 Rust/GPUI 필수 수용 테스트 등록(UX-003 목록 내부 스크롤·분할 폭 저장/복원 포함)·모의 설정 파일 미생성·하네스 구문 검사·해시 고정 handoff 생성 |
+| `scripts/Verify-Workspace.ps1` | 288 | E-004·소유 메모리 GDI 포함 Rust/GPUI 필수 수용 테스트 등록(UX-005 VDI 열 배치·UX-003 목록 내부 스크롤·분할 폭 저장/복원 포함)·모의 설정 파일 미생성·하네스 구문 검사·해시 고정 handoff 생성 |
 | `scripts/Invoke-ClaudeVisualCheck.ps1` | 933 | 격리 실행·합성 클립보드/PNG 시드·Screenshot 포함 초기 패널·소유 창 캡처/입력·조건부 복원·세션 정리 |
 | `scripts/visual-validation/ScreenshotSeed.ps1` | 41 | 명시적 합성 PNG의 서명/크기 확인·격리 세션 신규 파일 복사·실패 시 자체 출력 정리 |
 | `scripts/visual-validation/Test-ScreenshotSeed.ps1` | 44 | 합성 PNG 복사·바이트 일치·기존 파일/과대 크기/잘못된 헤더 거부의 파일 전용 회귀 |

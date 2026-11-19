@@ -16,7 +16,18 @@ use gpui::{
     div, px, AnyElement, ClickEvent, Context, InteractiveElement, IntoElement, ParentElement,
     StatefulInteractiveElement, Styled,
 };
-use gpui_component::{h_flex, theme::ActiveTheme, v_flex, PixelsExt};
+use gpui_component::{
+    h_flex,
+    scroll::{Scrollbar, ScrollbarShow},
+    theme::ActiveTheme,
+    tooltip::Tooltip,
+    v_flex, PixelsExt,
+};
+
+const NAME_MIN: f32 = 140.;
+const CELL_GAP: f32 = 8.;
+const ROW_INSET: f32 = 8.;
+const LIST_INSET: f32 = 12.; // 스크롤바 아래로 마지막 글자가 들어가지 않게 한다.
 
 pub(super) fn render_directory_card(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElement {
     this.ensure_virtual_disk_tree_from_current_entries();
@@ -46,7 +57,7 @@ pub(super) fn render_directory_card(this: &mut AppRoot, cx: &mut Context<AppRoot
             "virtual-disk-explorer",
             px(tree_width),
             px(150.0)..px(240.0),
-            px(440.0),
+            px(NAME_MIN + 2. * LIST_INSET),
             tree,
             entries,
             move |state, _window, app| {
@@ -366,7 +377,7 @@ fn render_directory_entries(
     let attributes_width =
         normalize_virtual_disk_attributes_width(this.virtual_disk.layout.attributes_width);
     let size_width = normalize_virtual_disk_size_width(this.virtual_disk.layout.size_width);
-    let mut entries = v_flex().w_full().min_w_0().gap_1();
+    let mut entries = v_flex().w_full().min_w_0().gap_1().p(px(LIST_INSET));
 
     if this.virtual_disk.source.is_none() {
         entries = entries.child(
@@ -383,15 +394,21 @@ fn render_directory_entries(
                 .child("현재 폴더에 표시할 항목이 없습니다."),
         );
     } else {
-        entries = entries.child(
+        let table_min = NAME_MIN
+            + kind_width
+            + attributes_width
+            + size_width
+            + 3. * CELL_GAP
+            + 2. * (ROW_INSET + LIST_INSET);
+        entries = entries.min_w(px(table_min)).child(
             h_flex()
                 .w_full()
                 .min_w_0()
-                .gap_2()
-                .px_2()
+                .gap(px(CELL_GAP))
+                .px(px(ROW_INSET))
                 .py_1()
                 .text_color(theme.muted_foreground)
-                .child(div().flex_1().min_w(px(140.0)).child("이름"))
+                .child(div().flex_1().min_w(px(NAME_MIN)).child("이름"))
                 .child(
                     div()
                         .debug_selector(|| "virtual-disk-column-kind".to_string())
@@ -428,13 +445,14 @@ fn render_directory_entries(
                 format_bytes(entry.size_bytes)
             };
             let name = entry.path.file_name().unwrap_or("/").to_string();
+            let full_name = name.clone();
             let row_focus_handle = focus_handle.clone();
             entries = entries.child(
                 h_flex()
                     .debug_selector(move || format!("virtual-disk-entry-{index}"))
                     .w_full()
                     .min_w_0()
-                    .gap_2()
+                    .gap(px(CELL_GAP))
                     .items_center()
                     .cursor_pointer()
                     .bg(if selected {
@@ -445,7 +463,7 @@ fn render_directory_entries(
                     .hover(|style| style.bg(theme.secondary_hover))
                     .border_b_1()
                     .border_color(theme.border)
-                    .px_2()
+                    .px(px(ROW_INSET))
                     .py_1()
                     .id(("virtual-disk-entry", index))
                     .on_click(cx.listener(move |this, event: &ClickEvent, window, cx| {
@@ -463,10 +481,14 @@ fn render_directory_entries(
                     }))
                     .child(
                         div()
+                            .id(("virtual-disk-name", index))
+                            .debug_selector(move || format!("virtual-disk-name-{index}"))
                             .flex_1()
-                            .min_w(px(140.0))
-                            .overflow_hidden()
-                            .whitespace_nowrap()
+                            .min_w(px(NAME_MIN))
+                            .truncate()
+                            .tooltip(move |window, cx| {
+                                Tooltip::new(full_name.clone()).build(window, cx)
+                            })
                             .text_color(theme.foreground)
                             .child(name),
                     )
@@ -499,6 +521,7 @@ fn render_directory_entries(
                     )
                     .child(
                         div()
+                            .debug_selector(move || format!("virtual-disk-size-{index}"))
                             .w(px(size_width))
                             .min_w(px(size_width))
                             .flex_shrink_0()
@@ -518,11 +541,27 @@ fn render_directory_entries(
         },
     ));
     let handle = this.virtual_disk.entries_scroll_handle.clone();
-    scroll_pane(
-        "virtual-disk-entry-scroll",
-        &handle,
-        entries.p_2().into_any_element(),
-    )
+    div()
+        .relative()
+        .size_full()
+        .min_w_0()
+        .min_h_0()
+        .child(
+            div()
+                .id("virtual-disk-entry-scroll")
+                .debug_selector(|| "virtual-disk-entry-scroll".into())
+                .size_full()
+                .overflow_scroll()
+                .track_scroll(&handle)
+                .child(entries),
+        )
+        .child(
+            div()
+                .absolute()
+                .inset_0()
+                .child(Scrollbar::new(&handle).scrollbar_show(ScrollbarShow::Always)),
+        )
+        .into_any_element()
 }
 
 fn format_attribute_label(attributes: GuestFileAttributes) -> String {

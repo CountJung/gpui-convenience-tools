@@ -4,6 +4,16 @@
 현재 코드의 재검증 결과로 보지 않는다. 현재 절차와 열린 게이트는 [VERIFICATION.md](VERIFICATION.md),
 남은 일은 [TODO.md](TODO.md)를 따른다. 2026-10-19 문서 정리에서 원문 근거를 이관했다.
 
+<a id="ux005-evidence"></a>
+
+## 2026-11-19 — UX-005 VDI 파일 목록의 가로 스크롤
+
+- 범위: 작업 트리의 VDI 탐색기. 공용 세로 스크롤과 저장 형식은 변경하지 않았다. 파일 목록에만 양방향 스크롤을 두고, 이름은 최소 140px와 남는 폭을 사용한다. 생략된 이름은 호버 툴팁으로 제공한다.
+- GPUI: `virtual_disk_workspace_scrolls_columns_together_without_resizing_saved_layout`. 920×480, 사이드바 360px, 트리/종류/속성/크기 240/104/176/144px에서 가로 휠로 끝까지 이동해 크기 헤더와 값의 정렬, 긴 숨김 파일 선택, 트리·복사 도구 좌표 불변을 확인한다. 1600×900으로 넓힌 뒤 이름 열 확장과 전체 설정 저장·재로드를 검사한다. 기존 폴더 행 더블클릭·중첩 트리 탐색 테스트도 함께 실행했다.
+- Windows 실제 릴리즈: `cargo build --release --locked --offline --target-dir target/release-validation`, EXE SHA-256 `4356aee150736ea400aba6d45f556cd3a808e9d101e4ebbb88b26bdde5eefc6f`. 동일 격리 설정과 합성 NTFS VDI로 비활성 데스크톱에서 두 프로세스를 순차 실행했다. 1000×700에서 트리, 이름/종류, 목록 하단 가로 스크롤바와 복사 도구가 보이며 재실행 전후 화면 해시가 같다. 캡처: `target/visual-validation/captures/ux005-default-38304-1.png`, `ux005-default-7384-1.png`. 실제 마우스 입력·파일 복사·사용자 VDI 접근은 하지 않았다. 마지막 열 클릭과 가로 이동은 GPUI 근거다.
+- 격리된 `cargo test --locked --offline -- --test-threads=1`: **321 passed, 0 failed, 9 ignored**. 별도 엄격 검사 `cargo clippy --locked --offline --all-targets -- -D warnings`는 UX-005 변경 파일 외 5곳에서 실패했다(기존 클립보드/스크린샷의 고정 크기 청크 순회 4곳, 로그 정렬 1곳). 무관한 코드는 수정하지 않았다.
+- 산출물: 저장소 절대 경로 `D:\ArielNetworks\Predevelop\Tools\gpui-convenience-tools` 아래 기존 `target/debug`(31.85 GiB)·`target/release-validation`(4.15 GiB) 캐시를 재사용했다. 검증 EXE 24.4 MiB는 다음 격리 빌드로 대체하며 캐시는 정리 승인 시 제거한다.
+
 <a id="ux003-evidence"></a>
 
 ## 2026-11-18 — UX-003 서비스 관리의 목록 우선 배치

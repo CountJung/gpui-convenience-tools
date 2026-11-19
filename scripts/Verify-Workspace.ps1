@@ -106,6 +106,7 @@ $visualTests = @(
     "virtual_disk_directory_row_double_click_enters_directory_and_refreshes_entries",
     "virtual_disk_folder_tree_navigates_nested_paths_without_repeated_list_clicks",
     "virtual_disk_explorer_keeps_tree_and_file_list_inside_workspace",
+    "virtual_disk_workspace_scrolls_columns_together_without_resizing_saved_layout",
     "virtual_disk_workspace_prioritizes_files_at_all_supported_sizes",
     "virtual_disk_workspace_returns_to_setup_without_losing_selection",
     "virtual_disk_workspace_error_and_copy_details_remain_accessible",

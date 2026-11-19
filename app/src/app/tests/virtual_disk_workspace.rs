@@ -5,6 +5,86 @@ use crate::app::virtual_disk_copy::{VirtualDiskCopyProgress, VirtualDiskCopySumm
 use crate::virtual_disk::{copy::CopyIssue, issues::CopyIssueKind};
 
 #[gpui::test]
+fn virtual_disk_workspace_scrolls_columns_together_without_resizing_saved_layout(
+    cx: &mut TestAppContext,
+) {
+    use crate::{config::VirtualDiskLayoutConfig, virtual_disk::GuestPath};
+    let _dir = crate::config::tests::IsolatedDataDir::new("vdi-column-scroll");
+    let expected = VirtualDiskLayoutConfig {
+        tree_width: 240.,
+        kind_width: 104.,
+        attributes_width: 176.,
+        size_width: 144.,
+    };
+    let long_path = GuestPath::new(format!(".{}.sys", "긴-숨김-파일명-".repeat(12))).unwrap();
+    initialize_components(cx);
+    let (view, cx) = cx.add_window_view(|_, _| {
+        let mut root = loaded_virtual_disk_root();
+        root.virtual_disk.entries[0].path = long_path.clone();
+        root.virtual_disk.layout = expected.clone();
+        root.sidebar_width = 360.;
+        root.sync.external_side_effects_enabled = true;
+        root
+    });
+    cx.simulate_resize(size(px(920.), px(480.)));
+    refresh(cx);
+    let viewport = cx.debug_bounds("virtual-disk-entry-scroll").unwrap();
+    let tree = cx.debug_bounds("virtual-disk-tree-scroll").unwrap();
+    let copy = cx.debug_bounds("virtual-disk-copy-card").unwrap();
+    let name = cx.debug_bounds("virtual-disk-name-0").unwrap();
+    assert!(
+        name.size.width >= px(140.)
+            && name.origin.x >= viewport.origin.x
+            && name.right() <= viewport.right()
+    );
+    assert!(
+        viewport.right()
+            <= cx
+                .debug_bounds("virtual-disk-directory-card")
+                .unwrap()
+                .right()
+    );
+    assert!(cx.debug_bounds("virtual-disk-column-size").unwrap().right() > viewport.right());
+    cx.simulate_event(ScrollWheelEvent {
+        position: viewport.center(),
+        delta: ScrollDelta::Pixels(point(px(-2000.), px(0.))),
+        ..Default::default()
+    });
+    refresh(cx);
+    let header = cx.debug_bounds("virtual-disk-column-size").unwrap();
+    let value = cx.debug_bounds("virtual-disk-size-0").unwrap();
+    assert_eq!(
+        (header.origin.x, header.size.width),
+        (value.origin.x, px(144.))
+    );
+    assert_eq!(header.size.width, value.size.width);
+    assert!(value.origin.x >= viewport.origin.x && value.right() <= viewport.right());
+    assert_eq!(tree, cx.debug_bounds("virtual-disk-tree-scroll").unwrap());
+    assert_eq!(copy, cx.debug_bounds("virtual-disk-copy-card").unwrap());
+    click_debug_element(cx, "virtual-disk-size-0");
+    assert!(view.read_with(cx, |root, _| root
+        .virtual_disk
+        .selected_paths
+        .contains(&long_path)));
+    cx.simulate_resize(size(px(1600.), px(900.)));
+    refresh(cx);
+    let wide = cx.debug_bounds("virtual-disk-entry-scroll").unwrap();
+    let expanded = cx.debug_bounds("virtual-disk-name-0").unwrap();
+    assert!(expanded.size.width > name.size.width && expanded.origin.x >= wide.origin.x);
+    assert!(cx.debug_bounds("virtual-disk-size-0").unwrap().right() <= wide.right());
+    view.read_with(cx, |root, _| assert_eq!(root.virtual_disk.layout, expected));
+    view.update(cx, |root, _| root.save_current_config().unwrap());
+    assert_eq!(
+        crate::config::load_config()
+            .unwrap()
+            .unwrap()
+            .virtual_disk
+            .layout,
+        expected
+    );
+}
+
+#[gpui::test]
 fn virtual_disk_workspace_prioritizes_files_at_all_supported_sizes(cx: &mut TestAppContext) {
     initialize_components(cx);
     let (_view, cx) = cx.add_window_view(|_, _| loaded_virtual_disk_root());

@@ -4,6 +4,12 @@
 당시 문맥이며 현재 규칙이나 열린 작업이 아니다. 현재 단계는 [MASTER_PLAN.md](MASTER_PLAN.md),
 규칙은 [DEVELOPMENT_GUIDE.md](DEVELOPMENT_GUIDE.md), 현재 구조는 [PROJECT_MAP.md](PROJECT_MAP.md)를 따른다.
 
+<a id="ux005-implementation-stage"></a>
+
+## UX-005 — VDI 탐색기의 파일 목록 스크롤 (2026-11-19 완료)
+
+좁은 창에서도 폴더 트리와 복사 도구를 고정하고 파일 목록만 마지막 크기 열까지 이동한다. 저장한 열 너비를 유지하며 긴 파일명은 툴팁으로 확인한다. [회귀 테스트 및 릴리즈 화면 근거](VERIFICATION_RECORDS.md#ux005-evidence).
+
 <a id="ux003-implementation-stage"></a>
 
 ## UX-003 — Windows 서비스 목록 우선 배치 (2026-11-18 완료)
