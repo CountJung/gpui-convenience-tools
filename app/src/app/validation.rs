@@ -13,6 +13,12 @@ pub(crate) fn panel_preview_size() -> Option<gpui::Size<gpui::Pixels>> {
         .ok()?
         .as_str()
     {
+        "dashboard" | "settings" | "file_sync" | "openssl" | "timestamp" | "clipboard_history"
+        | "quick_launcher" | "screenshot"
+            if std::env::var("GPUI_CONVENIENCE_TOOLS_PREVIEW_SIZE").as_deref() == Ok("minimum") =>
+        {
+            (920., 480.)
+        }
         "services-minimum" | "ad-block-minimum" | "log-minimum" | "log-list-minimum"
         | "process-minimum" => (920., 480.),
         "services-default" | "ad-block-default" | "log-default" | "process-default" => {

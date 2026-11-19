@@ -4,6 +4,14 @@
 당시 문맥이며 현재 규칙이나 열린 작업이 아니다. 현재 단계는 [MASTER_PLAN.md](MASTER_PLAN.md),
 규칙은 [DEVELOPMENT_GUIDE.md](DEVELOPMENT_GUIDE.md), 현재 구조는 [PROJECT_MAP.md](PROJECT_MAP.md)를 따른다.
 
+<a id="ux008-implementation-stage"></a>
+
+## UX-008 — 최소 창에서 주요 조작과 결과 도달 (2026-11-19 에이전트 검증 완료)
+
+스크린샷의 모니터 선택 버튼 둘째 줄이 잘리던 문제를 수정했다. 최소 창(920×480)에서는 모든 행을 펼쳐 페이지만 스크롤하고, 기본 창(1000×700)에서는 최대 80px 안에서 추가 행을 스크롤한다. 다른 7개 패널의 배치는 유지했다.
+
+Windows 실앱 캡처와 GPUI 자동 검사의 조건·결과는 [UX-008 검증 기록](VERIFICATION_RECORDS.md#ux008-evidence)에 있다.
+
 <a id="ux006-implementation-stage"></a>
 
 ## UX-006 — 프로세스 경로와 로그 원문 확인 (2026-11-19 완료)

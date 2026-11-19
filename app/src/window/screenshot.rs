@@ -14,10 +14,9 @@ pub fn render(this: &mut AppRoot, window: &mut Window, cx: &mut Context<AppRoot>
     let muted = cx.theme().muted_foreground;
     let mut targets = h_flex()
         .id("screenshot-targets")
+        .debug_selector(|| "screenshot-targets".into())
         .w_full()
         .min_w_0()
-        .max_h(px(68.0))
-        .overflow_y_scroll()
         .flex_shrink_0()
         .flex_wrap()
         .gap_2()
@@ -38,6 +37,10 @@ pub fn render(this: &mut AppRoot, window: &mut Window, cx: &mut Context<AppRoot>
                     }),
                 )),
         );
+    // At compact height use only the page wheel so the strip cannot scroll out from under a click.
+    if window.viewport_size().height > px(480.0) {
+        targets = targets.max_h(px(80.0)).overflow_y_scroll();
+    }
     for (index, monitor) in state.monitors.iter().enumerate() {
         let device_id = monitor.device_id.clone();
         let topology = crate::screenshot_tool::platform::topology(&state.monitors);
@@ -55,15 +58,18 @@ pub fn render(this: &mut AppRoot, window: &mut Window, cx: &mut Context<AppRoot>
             monitor.rect.width,
             monitor.rect.height
         );
-        targets = targets.child(ui::action_button(
-            ("screenshot-monitor", index),
-            label,
-            Size::Sm,
-            ButtonStyle::secondary(cx),
-            cx.listener(move |this, _, _, cx| {
-                this.select_screenshot_monitor(&device_id, &topology, cx)
-            }),
-        ));
+        targets = targets.child(
+            ui::action_button(
+                ("screenshot-monitor", index),
+                label,
+                Size::Sm,
+                ButtonStyle::secondary(cx),
+                cx.listener(move |this, _, _, cx| {
+                    this.select_screenshot_monitor(&device_id, &topology, cx)
+                }),
+            )
+            .debug_selector(move || format!("screenshot-monitor-{index}")),
+        );
     }
     let mut content = v_flex()
         .w_full()
@@ -82,6 +88,7 @@ pub fn render(this: &mut AppRoot, window: &mut Window, cx: &mut Context<AppRoot>
         .child(targets)
         .child(
             h_flex()
+                .debug_selector(|| "screenshot-capture-actions".into())
                 .w_full()
                 .min_w_0()
                 .flex_wrap()

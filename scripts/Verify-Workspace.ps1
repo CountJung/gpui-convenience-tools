@@ -9,6 +9,9 @@ Set-StrictMode -Version 2.0
 $repoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 $packageName = "gpui-convenience-tools"
 $visualTests = @(
+    "compact_dashboard_tiles_activity_and_last_menu",
+    "compact_settings_long_paths_and_save_round_trip",
+    "screenshot_compact_three_monitor_buttons_clear_capture_actions",
     "screenshot_default_window_preview_visible_with_many_monitors",
     "screenshot_gdi_owned_memory_source_capture_and_cleanup",
     "screenshot_global_save_and_navigation_preserve_only_preferences",

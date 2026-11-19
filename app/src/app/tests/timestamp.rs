@@ -6,13 +6,23 @@ fn timestamp_buttons_convert_both_directions_and_report_invalid_input(cx: &mut T
     initialize_components(cx);
     let mut root_entity = None;
     let (_, cx) = cx.add_window_view(|window, cx| {
-        let entity = cx.new(|_| test_app_root(ActivePanel::Timestamp));
+        let entity = cx.new(|_| compact_root(ActivePanel::Timestamp));
         root_entity = Some(entity.clone());
         gpui_component::Root::new(entity, window, cx)
     });
     let root = root_entity.unwrap();
+    resize_compact(cx);
+    let reach = |cx: &mut gpui::VisualTestContext, item: &'static str| {
+        reach_compact_control(cx, "timestamp-page", item);
+    };
+    reach(cx, "timestamp-epoch");
+    click_debug_element(cx, "timestamp-epoch");
+    // The reverse action must replace this noncanonical spelling, not pass on stale input.
+    cx.simulate_keystrokes("ctrl-a 0 1");
     refresh(cx);
+    reach(cx, "timestamp-to-date");
     click_debug_element(cx, "timestamp-to-date");
+    reach(cx, "timestamp-date");
     cx.update(|_, cx| {
         assert_eq!(
             root.read(cx)
@@ -22,18 +32,27 @@ fn timestamp_buttons_convert_both_directions_and_report_invalid_input(cx: &mut T
                 .unwrap()
                 .read(cx)
                 .value(),
-            "2026. 10. 20. 오전 10:57:56.171"
+            "1970. 1. 1. 오전 9:00:01"
         );
         assert!(!root.read(cx).timestamp.failed);
     });
+    reach(cx, "timestamp-to-epoch");
     click_debug_element(cx, "timestamp-to-epoch");
-    cx.update(|window, cx| {
+    reach(cx, "timestamp-epoch");
+    cx.update(|_, cx| {
         let input = root.read(cx).timestamp.epoch.clone().unwrap();
-        assert_eq!(input.read(cx).value(), "1792461476.171");
-        input.update(cx, |input, cx| input.set_value("bad", window, cx));
+        assert_eq!(input.read(cx).value(), "1");
     });
+    click_debug_element(cx, "timestamp-epoch");
+    cx.simulate_keystrokes("ctrl-a b a d");
+    refresh(cx);
+    reach(cx, "timestamp-to-date");
     click_debug_element(cx, "timestamp-to-date");
-    cx.update(|_, cx| assert!(root.read(cx).timestamp.failed));
+    reach(cx, "timestamp-status");
+    cx.update(|_, cx| {
+        assert!(root.read(cx).timestamp.failed);
+        assert!(root.read(cx).timestamp.status.contains("십진수"));
+    });
 }
 
 #[gpui::test]

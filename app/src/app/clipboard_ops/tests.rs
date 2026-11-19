@@ -1,22 +1,32 @@
 use super::*;
 use crate::app::{
-    tests::{click_debug_element, initialize_components, refresh, test_app_root},
+    tests::{
+        click_debug_element, compact_root, initialize_components, reach_compact_control, refresh,
+        resize_compact, test_app_root,
+    },
     ActivePanel,
 };
 use crate::clipboard_history::tests::{png, Fixture};
 use gpui::{point, px, size, TestAppContext};
 
 fn add_window(cx: &mut TestAppContext) -> (Entity<AppRoot>, &mut gpui::VisualTestContext) {
-    let mut view = None;
-    let (_, cx) = cx.add_window_view(|window, cx| {
-        let root = cx.new(|_| test_app_root(ActivePanel::ClipboardHistory));
-        view = Some(root.clone());
-        gpui_component::Root::new(root, window, cx)
-    });
-    let view = view.unwrap();
+    let (view, cx) = add_root(cx, test_app_root(ActivePanel::ClipboardHistory));
     cx.simulate_resize(size(px(1200.0), px(1100.0)));
     refresh(cx);
     (view, cx)
+}
+
+fn add_root(
+    cx: &mut TestAppContext,
+    root: AppRoot,
+) -> (Entity<AppRoot>, &mut gpui::VisualTestContext) {
+    let mut view = None;
+    let (_, cx) = cx.add_window_view(|window, cx| {
+        let root = cx.new(|_| root);
+        view = Some(root.clone());
+        gpui_component::Root::new(root, window, cx)
+    });
+    (view.unwrap(), cx)
 }
 
 fn poll(view: &Entity<AppRoot>, cx: &mut gpui::VisualTestContext) {
@@ -262,7 +272,43 @@ fn clipboard_ui_corruption_blocks_capture_and_requires_clear_confirmation(cx: &m
 #[gpui::test]
 fn clipboard_ui_widths_and_scrolling_preserve_controls(cx: &mut TestAppContext) {
     initialize_components(cx);
-    let (view, cx) = add_window(cx);
+    let (view, cx) = add_root(cx, compact_root(ActivePanel::ClipboardHistory));
+    resize_compact(cx);
+    view.update(cx, |root, cx| {
+        root.clipboard.config.collect_text = true;
+        for n in 1..=8 {
+            root.capture_clipboard_candidate(Candidate::Text(format!("compact-{n}")), cx);
+        }
+        root.capture_clipboard_candidate(Candidate::Text("unrelated".into()), cx);
+        root.clipboard.config.collect_text = false;
+    });
+    refresh(cx);
+    let page = "clipboard-page";
+    reach_compact_control(cx, page, "clipboard-search");
+    click_debug_element(cx, "clipboard-search");
+    cx.simulate_keystrokes("c o m p a c t");
+    refresh(cx);
+    view.read_with(cx, |root, _| {
+        let ids: Vec<_> = root
+            .clipboard
+            .visible_entries()
+            .map(|entry| entry.id)
+            .collect();
+        assert_eq!(ids, (1..=8).rev().collect::<Vec<_>>());
+    });
+    let before = view.read_with(cx, |root, _| root.clipboard.scroll.offset().y);
+    reach_compact_control(cx, page, "clipboard-select-1");
+    view.read_with(cx, |root, _| {
+        assert!(root.clipboard.scroll.offset().y < before)
+    });
+    click_debug_element(cx, "clipboard-select-1");
+    view.read_with(cx, |root, _| assert_eq!(root.clipboard.selected, Some(1)));
+    reach_compact_control(cx, page, "clipboard-copy-selected");
+    click_debug_element(cx, "clipboard-copy-selected");
+    assert_eq!(
+        cx.read_from_clipboard().unwrap().text().as_deref(),
+        Some("compact-1")
+    );
     for (width, height) in [(920.0, 480.0), (1200.0, 800.0), (1500.0, 900.0)] {
         cx.simulate_resize(size(px(width), px(height)));
         view.update(cx, |this, cx| {
@@ -285,21 +331,7 @@ fn clipboard_ui_widths_and_scrolling_preserve_controls(cx: &mut TestAppContext) 
                     <= viewport.origin.x + viewport.size.width + px(1.0)
             );
         }
-        cx.simulate_event(gpui::ScrollWheelEvent {
-            position: point(
-                viewport.origin.x + viewport.size.width / 2.0,
-                viewport.origin.y + viewport.size.height / 2.0,
-            ),
-            delta: gpui::ScrollDelta::Pixels(point(px(0.0), px(-3000.0))),
-            modifiers: gpui::Modifiers::none(),
-            ..Default::default()
-        });
-        refresh(cx);
-        let clear = cx.debug_bounds("clipboard-policy-apply").unwrap();
-        assert!(
-            clear.origin.y + clear.size.height
-                <= viewport.origin.y + viewport.size.height + px(1.0)
-        );
+        reach_compact_control(cx, page, "clipboard-policy-apply");
     }
 }
 

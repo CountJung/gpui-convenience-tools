@@ -1,6 +1,9 @@
 use super::*;
 use crate::app::{
-    tests::{click_debug_element, initialize_components, refresh, test_app_root},
+    tests::{
+        click_debug_element, compact_root, initialize_components, reach_compact_control, refresh,
+        resize_compact, test_app_root,
+    },
     ActivePanel,
 };
 use gpui::{
@@ -9,9 +12,13 @@ use gpui::{
 };
 
 fn add_window(cx: &mut TestAppContext) -> (Entity<AppRoot>, &mut VisualTestContext) {
+    add_root(cx, test_app_root(ActivePanel::Screenshot))
+}
+
+fn add_root(cx: &mut TestAppContext, root: AppRoot) -> (Entity<AppRoot>, &mut VisualTestContext) {
     let mut view = None;
     let (_, cx) = cx.add_window_view(|window, cx| {
-        let inner = cx.new(|_| test_app_root(ActivePanel::Screenshot));
+        let inner = cx.new(|_| root);
         view = Some(inner.clone());
         gpui_component::Root::new(inner, window, cx)
     });
@@ -27,6 +34,110 @@ fn seed(view: &Entity<AppRoot>, cx: &mut VisualTestContext) {
         view.update(cx, |this, cx| this.install_screenshot(image(), window, cx))
     });
     refresh(cx);
+}
+
+fn seed_monitors(view: &Entity<AppRoot>, cx: &mut VisualTestContext, count: usize) {
+    let monitors = (0..count)
+        .map(|i| platform::Monitor {
+            device_id: format!("synthetic-{i}"),
+            rect: platform::DesktopRect {
+                left: i as i32 * 2560,
+                top: 0,
+                width: 2560,
+                height: if i == 2 { 1600 } else { 1440 },
+            },
+            primary: i == 0,
+        })
+        .collect();
+    view.update(cx, |root, cx| root.apply_screenshot_monitors(monitors, cx));
+    refresh(cx);
+}
+
+#[gpui::test]
+fn screenshot_compact_three_monitor_buttons_clear_capture_actions(cx: &mut TestAppContext) {
+    initialize_components(cx);
+    let (view, cx) = add_root(cx, compact_root(ActivePanel::Screenshot));
+    resize_compact(cx);
+    for count in [3, 4] {
+        seed_monitors(&view, cx, count);
+        assert_initial_monitor_rows(cx, count);
+    }
+    seed_monitors(&view, cx, 8);
+    let page = "screenshot-page";
+    let last = "screenshot-monitor-7";
+    let strip = cx.debug_bounds("screenshot-targets").unwrap();
+    let button = cx.debug_bounds(last).unwrap();
+    assert!(
+        strip.size.height > px(80.) && button.bottom() <= strip.bottom() + px(1.),
+        "compact strip must expand through the last row: {button:?} vs {strip:?}"
+    );
+    // Return from the settings below the preview. The last monitor must require a page wheel.
+    reach_compact_control(cx, page, "screenshot-folder-input");
+    let before = view.read_with(cx, |root, _| root.screenshot.scroll.offset().y);
+    reach_compact_control(cx, page, last);
+    view.read_with(cx, |root, _| {
+        assert!(root.screenshot.scroll.offset().y > before);
+        assert_eq!(root.screenshot.config.target, CaptureTarget::AllDisplays);
+        assert!(root.screenshot.config.monitor_binding.is_none());
+        assert!(!root.screenshot.failed, "{}", root.screenshot.status);
+    });
+    click_debug_element(cx, last);
+    view.read_with(cx, |root, _| {
+        assert!(!root.screenshot.failed, "{}", root.screenshot.status);
+        assert_eq!(root.screenshot.config.target, CaptureTarget::Monitor(7));
+        let binding = root.screenshot.config.monitor_binding.as_ref().unwrap();
+        assert_eq!(binding.device_id, "synthetic-7");
+        assert_eq!(
+            binding.topology,
+            platform::topology(&root.screenshot.monitors)
+        );
+    });
+    reach_compact_control(cx, page, "screenshot-capture");
+    click_debug_element(cx, "screenshot-capture");
+    view.read_with(cx, |root, _| {
+        assert_eq!(
+            root.screenshot.status,
+            ScreenshotError::CaptureFailed.to_string()
+        );
+    });
+    seed(&view, cx);
+    reach_compact_control(cx, page, "screenshot-preview");
+}
+
+fn assert_initial_monitor_rows(cx: &mut VisualTestContext, count: usize) {
+    let targets = cx.debug_bounds("screenshot-targets").unwrap();
+    let actions = cx.debug_bounds("screenshot-capture-actions").unwrap();
+    let ids = [
+        "screenshot-target-all",
+        "screenshot-monitor-0",
+        "screenshot-monitor-1",
+        "screenshot-monitor-2",
+        "screenshot-monitor-3",
+    ];
+    let buttons: Vec<_> = ids[..=count]
+        .iter()
+        .map(|&id| (id, cx.debug_bounds(id).unwrap()))
+        .collect();
+    assert!(
+        buttons
+            .iter()
+            .any(|(_, b)| b.top() >= buttons[0].1.bottom()),
+        "fixture must exercise wrapping"
+    );
+    for (id, button) in buttons {
+        let clip_gap = targets.bottom() - button.bottom();
+        let action_gap = actions.top() - button.bottom();
+        assert!(
+            button.size.width > px(0.)
+                && button.size.height > px(0.)
+                && button.left() >= targets.left()
+                && button.right() <= targets.right()
+                && button.top() >= targets.top()
+                && clip_gap >= px(-1.) // Layout bounds and painted edges can round differently.
+                && action_gap >= px(0.),
+            "{id}: clip_gap={clip_gap:?}, action_gap={action_gap:?}; button={button:?}, targets={targets:?}, actions={actions:?}"
+        );
+    }
 }
 
 #[gpui::test]
@@ -138,9 +249,11 @@ fn screenshot_selection_snapshot_defers_crop_and_busy_reset_is_ignored(cx: &mut 
 fn screenshot_gpui_drag_crop_copy_and_clear_use_only_mock_clipboard(cx: &mut TestAppContext) {
     let _isolation = crate::config::tests::IsolatedDataDir::new("screenshot-ui-drag");
     initialize_components(cx);
-    let (view, cx) = add_window(cx);
-    cx.simulate_resize(size(px(1000.0), px(1000.0)));
+    let (view, cx) = add_root(cx, compact_root(ActivePanel::Screenshot));
+    resize_compact(cx);
     seed(&view, cx);
+    let page = "screenshot-page";
+    reach_compact_control(cx, page, "screenshot-preview");
     let fit = view.read_with(cx, |this, _| this.screenshot.image_rect().unwrap());
     let start = point(
         px(fit.left + fit.width * 0.25),
@@ -160,6 +273,7 @@ fn screenshot_gpui_drag_crop_copy_and_clear_use_only_mock_clipboard(cx: &mut Tes
     assert!((49..=50).contains(&selection.y));
     assert!((200..=202).contains(&selection.width));
     assert!((100..=102).contains(&selection.height));
+    reach_compact_control(cx, page, "screenshot-copy");
     click_debug_element(cx, "screenshot-copy");
     cx.run_until_parked();
     let copied = cx.read_from_clipboard().unwrap();
@@ -172,6 +286,7 @@ fn screenshot_gpui_drag_crop_copy_and_clear_use_only_mock_clipboard(cx: &mut Tes
         (selection.width, selection.height)
     );
     view.read_with(cx, |this, _| assert!(!this.screenshot.failed));
+    reach_compact_control(cx, page, "screenshot-crop");
     click_debug_element(cx, "screenshot-crop");
     cx.run_until_parked();
     view.read_with(cx, |this, _| {
@@ -182,6 +297,26 @@ fn screenshot_gpui_drag_crop_copy_and_clear_use_only_mock_clipboard(cx: &mut Tes
         );
         assert!(this.screenshot.selection.is_none());
     });
+    let dir = crate::config::data_dir();
+    let target = dir.join("compact-crop.png");
+    view.update(cx, |root, _| {
+        root.screenshot.config.save_folder = dir.to_string_lossy().into_owned();
+        root.sync.external_side_effects_enabled = true;
+    });
+    reach_compact_control(cx, page, "screenshot-save");
+    click_debug_element(cx, "screenshot-save");
+    assert!(cx.did_prompt_for_new_path());
+    cx.simulate_new_path_selection(|_| Some(target.clone()));
+    cx.run_until_parked();
+    view.update(cx, |root, _| {
+        root.sync.external_side_effects_enabled = false;
+        assert!(!root.screenshot.busy && !root.screenshot.failed);
+    });
+    assert_eq!(
+        image::image_dimensions(target).unwrap(),
+        (selection.width, selection.height)
+    );
+    reach_compact_control(cx, page, "screenshot-clear");
     click_debug_element(cx, "screenshot-clear");
     view.read_with(cx, |this, _| {
         assert!(this.screenshot.image.is_none());
@@ -191,11 +326,13 @@ fn screenshot_gpui_drag_crop_copy_and_clear_use_only_mock_clipboard(cx: &mut Tes
         &cx.read_from_clipboard().unwrap().entries()[0],
         ClipboardEntry::Image(_)
     ));
+    reach_compact_control(cx, page, "screenshot-copy");
     click_debug_element(cx, "screenshot-copy");
     view.read_with(cx, |this, _| {
         assert_eq!(this.screenshot.status, ScreenshotError::NoImage.to_string())
     });
     // 테스트 빌드에서는 버튼을 눌러도 실제 데스크톱 캡처가 절대 실행되지 않는다.
+    reach_compact_control(cx, page, "screenshot-capture");
     click_debug_element(cx, "screenshot-capture");
     view.read_with(cx, |this, _| {
         assert!(this.screenshot.failed);
@@ -354,6 +491,22 @@ fn screenshot_gpui_preview_scales_and_minimum_window_scroll_reaches_exports(
         assert!(preview.size.width > px(300.0));
         assert!(preview.size.width <= page.size.width);
         assert!(preview.size.height >= px(220.0));
+        if height == 700.0 {
+            seed_monitors(&view, cx, 12);
+            let targets = cx.debug_bounds("screenshot-targets").unwrap();
+            let last = cx.debug_bounds("screenshot-monitor-11").unwrap();
+            assert!(targets.size.height <= px(80.0) && last.bottom() > targets.bottom());
+            let preview = cx.debug_bounds("screenshot-preview").unwrap();
+            assert!(
+                preview.bottom().min(page.bottom()) - preview.top().max(page.top()) >= px(260.0),
+                "preview={preview:?}, page={page:?}"
+            );
+            reach_compact_control(cx, "screenshot-targets", "screenshot-monitor-11");
+            click_debug_element(cx, "screenshot-monitor-11");
+            view.read_with(cx, |root, _| {
+                assert_eq!(root.screenshot.config.target, CaptureTarget::Monitor(11));
+            });
+        }
         if height == 480.0 {
             let before = view.read_with(cx, |this, _| this.screenshot.scroll.offset());
             cx.simulate_event(gpui::ScrollWheelEvent {

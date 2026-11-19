@@ -222,6 +222,7 @@ fn render_job_list(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElement 
                             )
                             .child(
                                 div()
+                                    .debug_selector(move || format!("sync-job-paths-{ix}"))
                                     .text_color(muted_fg)
                                     .child(format!("{source}  →  {target}")),
                             )

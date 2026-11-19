@@ -6,7 +6,7 @@ mod service_actions;
 use super::*;
 use crate::platform::{SysServiceInfo, SysServiceStartType, SysServiceStatus};
 
-fn drag_divider(
+pub(super) fn drag_divider(
     cx: &mut gpui::VisualTestContext,
     start: gpui::Point<gpui::Pixels>,
     end: gpui::Point<gpui::Pixels>,

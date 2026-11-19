@@ -21,20 +21,25 @@ fn openssl_buttons_transform_validate_and_clear_text(cx: &mut TestAppContext) {
     assert!(NAV_TOOLS
         .iter()
         .any(|(panel, _, _)| *panel == ActivePanel::OpenSsl));
-    let (view, cx) = add_openssl_window(cx, test_app_root(ActivePanel::OpenSsl));
-    cx.simulate_resize(size(px(1000.0), px(850.0)));
-    refresh(cx);
+    let (view, cx) = add_openssl_window(cx, compact_root(ActivePanel::OpenSsl));
+    resize_compact(cx);
+    let reach = |cx: &mut gpui::VisualTestContext, item: &'static str| {
+        reach_compact_control(cx, "openssl-page", item);
+    };
     let input = view.read_with(cx, |view, _| view.openssl.input.clone().unwrap());
     let passphrase = view.read_with(cx, |view, _| view.openssl.passphrase.clone().unwrap());
     // 실제 입력 포커스·키 입력을 거쳐 인코딩을 실행한다.
-    cx.update(|window, cx| input.update(cx, |state, cx| state.focus(window, cx)));
+    reach(cx, "openssl-input");
+    click_debug_element(cx, "openssl-input");
     cx.simulate_keystrokes("P C F");
     refresh(cx);
     assert_eq!(
         input.read_with(cx, |state, _| state.value().to_string()),
         "PCF"
     );
+    reach(cx, "openssl-encode");
     click_debug_element(cx, "openssl-encode");
+    reach(cx, "openssl-output");
     let cipher = view.read_with(cx, |view, cx| {
         assert!(!view.openssl.failed);
         view.openssl
@@ -50,14 +55,16 @@ fn openssl_buttons_transform_validate_and_clear_text(cx: &mut TestAppContext) {
         crate::openssl_codec::decrypt(&cipher, "911").unwrap().0,
         "PCF"
     );
-    let output = view.read_with(cx, |view, _| view.openssl.output.clone().unwrap());
-    cx.update(|window, cx| output.update(cx, |state, cx| state.focus(window, cx)));
+    click_debug_element(cx, "openssl-output");
     cx.simulate_keystrokes("ctrl-a ctrl-c");
     assert_eq!(cx.read_from_clipboard().unwrap().text().unwrap(), cipher);
-    cx.update(|window, cx| input.update(cx, |state, cx| state.focus(window, cx)));
+    reach(cx, "openssl-input");
+    click_debug_element(cx, "openssl-input");
     cx.simulate_keystrokes("ctrl-a ctrl-v");
     refresh(cx);
+    reach(cx, "openssl-decode");
     click_debug_element(cx, "openssl-decode");
+    reach(cx, "openssl-output");
     view.read_with(cx, |view, cx| {
         assert_eq!(
             view.openssl
@@ -72,9 +79,9 @@ fn openssl_buttons_transform_validate_and_clear_text(cx: &mut TestAppContext) {
         assert!(view.openssl.status.contains("SHA"));
     });
     // 결과 편집 이력도 지워야 이전 복호화 평문을 undo로 되살릴 수 없다.
-    let edited_output = view.read_with(cx, |view, _| view.openssl.output.clone().unwrap());
-    cx.update(|window, cx| edited_output.update(cx, |state, cx| state.focus(window, cx)));
+    click_debug_element(cx, "openssl-output");
     cx.simulate_keystrokes("X");
+    reach(cx, "openssl-clear");
     click_debug_element(cx, "openssl-clear");
     let inputs = view.read_with(cx, |view, _| {
         [
@@ -93,7 +100,9 @@ fn openssl_buttons_transform_validate_and_clear_text(cx: &mut TestAppContext) {
         passphrase.update(cx, |state, cx| state.set_value("wrong-code", window, cx))
     });
     refresh(cx);
+    reach(cx, "openssl-decode");
     click_debug_element(cx, "openssl-decode");
+    reach(cx, "openssl-status");
     view.read_with(cx, |view, cx| {
         assert!(view.openssl.failed);
         assert!(view
@@ -106,6 +115,7 @@ fn openssl_buttons_transform_validate_and_clear_text(cx: &mut TestAppContext) {
             .is_empty());
         assert!(!view.openssl.status.contains("wrong-code"));
     });
+    reach(cx, "openssl-clear");
     click_debug_element(cx, "openssl-clear");
     view.read_with(cx, |view, cx| {
         assert!(view

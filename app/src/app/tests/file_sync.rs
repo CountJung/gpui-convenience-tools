@@ -2,6 +2,21 @@
 
 use super::*;
 
+/// Existing absolute paths long enough to stress a single-line control at 920/360.
+fn long_sync_paths(_fixture: &crate::config::tests::IsolatedDataDir) -> (String, String, String) {
+    let base = crate::config::data_dir()
+        .join("departmental-project-archive")
+        .join("release-verification-and-acceptance")
+        .join("quarterly-synchronization-snapshots");
+    let paths = ["source-original", "target-archive", "source-revised"].map(|leaf| {
+        let path = base.join(leaf);
+        std::fs::create_dir_all(&path).expect("create real long-path fixture");
+        path.display().to_string()
+    });
+    let [source, target, revised] = paths;
+    (source, target, revised)
+}
+
 #[gpui::test]
 fn file_sync_unified_page_uses_full_width_and_scrolls_to_last_record(cx: &mut TestAppContext) {
     initialize_components(cx);
@@ -325,18 +340,29 @@ fn file_sync_status_bar_stays_visible_at_compact_height_while_running(cx: &mut T
 
 #[gpui::test]
 fn file_sync_stop_button_requests_cancellation_and_clears_pending_queue(cx: &mut TestAppContext) {
+    let fixture = crate::config::tests::IsolatedDataDir::new("ux008-stop");
+    let (source, target, _) = long_sync_paths(&fixture);
+    let current = std::path::Path::new(&source).join("quarterly-release-report.xlsx");
+    std::fs::write(&current, b"fixture").unwrap();
     initialize_components(cx);
     let (view, cx) = cx.add_window_view(|_, _| {
-        let mut root = test_app_root(ActivePanel::FileSync);
-        root.sync.jobs = vec![SyncJob::default(), SyncJob::default()];
+        let mut root = compact_root(ActivePanel::FileSync);
+        root.sync.jobs = vec![
+            SyncJob {
+                source,
+                target,
+                ..SyncJob::default()
+            },
+            SyncJob::default(),
+        ];
         root.sync.selected_job = Some(0);
         root
     });
 
-    cx.simulate_resize(size(px(DEFAULT_WINDOW_WIDTH), px(DEFAULT_WINDOW_HEIGHT)));
-    refresh(cx);
+    resize_compact(cx);
 
     // 유휴 상태에서 누르면 중지 요청이 생기지 않는다.
+    reach_compact_control(cx, "file-sync-page", "sync-stop");
     click_debug_element(cx, "sync-stop");
     cx.update(|_, app| {
         let root = view.read(app);
@@ -355,9 +381,9 @@ fn file_sync_stop_button_requests_cancellation_and_clears_pending_queue(cx: &mut
             root.sync.running = Some(SyncRunning {
                 id: running_id,
                 label: "검증 작업".to_string(),
-                current_path: "a.txt".to_string(),
+                current_path: current.display().to_string(),
                 total: Some(3),
-                copied: 3,
+                copied: 1,
                 skipped: 0,
                 failed: 0,
                 stopping: false,
@@ -368,6 +394,15 @@ fn file_sync_stop_button_requests_cancellation_and_clears_pending_queue(cx: &mut
     });
     refresh(cx);
 
+    wheel_to_end(cx, "file-sync-page", -180.);
+    let offset = cx.update(|_, app| view.read(app).sync.page_scroll.offset().y);
+    assert!(
+        offset < px(0.),
+        "wheel did not scroll running page: {offset:?}"
+    );
+    reach_compact_control(cx, "content-area", "file-sync-status-bar");
+    reach_compact_control(cx, "file-sync-status-bar", "file-sync-current-file");
+    reach_compact_control(cx, "file-sync-page", "sync-stop");
     click_debug_element(cx, "sync-stop");
 
     cx.update(|_, app| {
@@ -527,16 +562,17 @@ fn background_sync_event_wakes_render_without_additional_user_input(cx: &mut Tes
 
 #[gpui::test]
 fn file_sync_run_button_saves_current_inputs_and_queues_selected_job(cx: &mut TestAppContext) {
+    let fixture = crate::config::tests::IsolatedDataDir::new("ux008-run");
+    let (source_path, target_path, _) = long_sync_paths(&fixture);
     initialize_components(cx);
     let (view, cx) = cx.add_window_view(|_, _| {
-        let mut root = test_app_root(ActivePanel::FileSync);
+        let mut root = compact_root(ActivePanel::FileSync);
         root.sync.jobs = vec![SyncJob::default()];
         root.sync.selected_job = Some(0);
         root
     });
 
-    cx.simulate_resize(size(px(DEFAULT_WINDOW_WIDTH), px(DEFAULT_WINDOW_HEIGHT)));
-    refresh(cx);
+    resize_compact(cx);
 
     cx.update(|window, app| {
         let (name, source, target, exclude) = {
@@ -553,24 +589,26 @@ fn file_sync_run_button_saves_current_inputs_and_queues_selected_job(cx: &mut Te
         };
         name.update(app, |state, cx| state.set_value("즉시 백업", window, cx));
         source.update(app, |state, cx| {
-            state.set_value(r"D:\validation\source", window, cx)
+            state.set_value(source_path.clone(), window, cx)
         });
         target.update(app, |state, cx| {
-            state.set_value(r"E:\validation\target", window, cx)
+            state.set_value(target_path.clone(), window, cx)
         });
         exclude.update(app, |state, cx| {
             state.set_value("  *.tmp  \n\n cache/** \n", window, cx)
         });
     });
     refresh(cx);
+    reach_compact_control(cx, "file-sync-page", "sync-exclude-patterns-input");
+    reach_compact_control(cx, "file-sync-page", "sync-run-one");
     click_debug_element(cx, "sync-run-one");
 
     cx.update(|_, app| {
         let root = view.read(app);
         let job = &root.sync.jobs[0];
         assert_eq!(job.name, "즉시 백업");
-        assert_eq!(job.source, r"D:\validation\source");
-        assert_eq!(job.target, r"E:\validation\target");
+        assert_eq!(job.source, source_path);
+        assert_eq!(job.target, target_path);
         assert_eq!(job.exclude_patterns, vec!["*.tmp", "cache/**"]);
         assert_eq!(
             root.sync
@@ -709,12 +747,14 @@ fn sidebar_switch_turns_automatic_sync_off_and_on(cx: &mut TestAppContext) {
 /// 원본·대상을 바꾸면 이어서 시작할 지점을 버려야 한다.
 #[gpui::test]
 fn changing_the_folders_drops_the_resume_cursor(cx: &mut TestAppContext) {
+    let fixture = crate::config::tests::IsolatedDataDir::new("ux008-apply");
+    let (source, target, revised) = long_sync_paths(&fixture);
     initialize_components(cx);
     let (view, cx) = cx.add_window_view(|_, _| {
-        let mut root = test_app_root(ActivePanel::FileSync);
+        let mut root = compact_root(ActivePanel::FileSync);
         root.sync.jobs = vec![SyncJob {
-            source: r"D:\원본".to_string(),
-            target: r"E:\대상".to_string(),
+            source,
+            target: target.clone(),
             ..SyncJob::default()
         }];
         root.sync.selected_job = Some(0);
@@ -722,8 +762,7 @@ fn changing_the_folders_drops_the_resume_cursor(cx: &mut TestAppContext) {
         root
     });
 
-    cx.simulate_resize(size(px(DEFAULT_WINDOW_WIDTH), px(DEFAULT_WINDOW_HEIGHT)));
-    refresh(cx);
+    resize_compact(cx);
 
     let id = cx.update(|_, app| {
         let root = view.read(app);
@@ -745,8 +784,11 @@ fn changing_the_folders_drops_the_resume_cursor(cx: &mut TestAppContext) {
         });
     });
     refresh(cx);
+    reach_compact_control(cx, "file-sync-page", "sync-job-paths-0");
+    reach_compact_control(cx, "file-sync-page", "sync-apply-paths");
     click_debug_element(cx, "sync-apply-paths");
     cx.update(|_, app| {
+        assert_eq!(view.read(app).sync.jobs[0].name, "이름만 변경");
         assert!(
             view.read(app)
                 .sync
@@ -763,14 +805,17 @@ fn changing_the_folders_drops_the_resume_cursor(cx: &mut TestAppContext) {
     cx.update(|window, app| {
         view.update(app, |root, cx| {
             let source = root.sync.source_input.clone().expect("source input");
-            source.update(cx, |state, cx| state.set_value(r"D:\다른원본", window, cx));
+            source.update(cx, |state, cx| state.set_value(revised.clone(), window, cx));
         });
     });
     refresh(cx);
+    reach_compact_control(cx, "file-sync-page", "sync-apply-paths");
     click_debug_element(cx, "sync-apply-paths");
 
     cx.update(|_, app| {
         let root = view.read(app);
+        assert_eq!(root.sync.jobs[0].source, revised);
+        assert_eq!(root.sync.jobs[0].target, target);
         assert!(
             !root
                 .sync

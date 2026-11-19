@@ -1,5 +1,8 @@
 use super::*;
-use crate::app::tests::{click_debug_element, initialize_components, refresh, test_app_root};
+use crate::app::tests::{
+    click_debug_element, compact_root, initialize_components, reach_compact_control, refresh,
+    resize_compact, test_app_root,
+};
 use gpui::{
     point, px, size, Entity, ScrollDelta, ScrollWheelEvent, TestAppContext, VisualTestContext,
 };
@@ -419,7 +422,7 @@ fn launcher_gpui_page_bounds_scroll_and_trust_invalidation(cx: &mut TestAppConte
 #[gpui::test]
 fn launcher_gpui_registered_rows_keep_names_and_paths_separate(cx: &mut TestAppContext) {
     initialize_components(cx);
-    let mut root = test_app_root(ActivePanel::QuickLauncher);
+    let mut root = compact_root(ActivePanel::QuickLauncher);
     root.launcher.config.entries = vec![LauncherEntry {
         name: "합성 등록 · 문서 폴더 · 읽을 수 있는 이름".into(),
         path: format!(r"C:\synthetic\{}\folder", "long-path-".repeat(30)),
@@ -427,7 +430,48 @@ fn launcher_gpui_registered_rows_keep_names_and_paths_separate(cx: &mut TestAppC
         trusted: true,
         ..Default::default()
     }];
+    for i in 1..=8 {
+        root.launcher.config.entries.push(LauncherEntry {
+            name: format!("synthetic-{i}"),
+            ..Default::default()
+        });
+    }
+    root.launcher.config.entries.push(LauncherEntry {
+        name: "unrelated".into(),
+        ..Default::default()
+    });
     let (view, cx) = add_window(cx, root);
+    resize_compact(cx);
+    let page = "launcher-page";
+    reach_compact_control(cx, page, "launcher-search");
+    click_debug_element(cx, "launcher-search");
+    cx.simulate_keystrokes("s y n t h e t i c");
+    refresh(cx);
+    view.read_with(cx, |root, _| {
+        assert_eq!(
+            quick_launcher::matching_indices(&root.launcher.config.entries, &root.launcher.query),
+            (0..=8).collect::<Vec<_>>()
+        );
+    });
+    let before = view.read_with(cx, |root, _| root.launcher.scroll.offset().y);
+    reach_compact_control(cx, page, "launcher-edit-8");
+    view.read_with(cx, |root, _| {
+        assert!(root.launcher.scroll.offset().y < before)
+    });
+    click_debug_element(cx, "launcher-edit-8");
+    view.read_with(cx, |root, cx| {
+        assert_eq!(root.launcher.editing, Some(8));
+        assert_eq!(
+            root.launcher
+                .name
+                .as_ref()
+                .unwrap()
+                .read(cx)
+                .value()
+                .as_str(),
+            "synthetic-8"
+        );
+    });
     for (width, height) in [(920.0, 480.0), (1000.0, 700.0), (1500.0, 900.0)] {
         cx.simulate_resize(size(px(width), px(height)));
         scroll(&view, cx, false);

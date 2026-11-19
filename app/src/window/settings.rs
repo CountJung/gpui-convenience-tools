@@ -149,11 +149,16 @@ fn render_log_settings(this: &mut AppRoot, cx: &mut Context<AppRoot>) -> AnyElem
             v_flex()
                 .gap_3()
                 .child(div().text_color(fg).child("로그 파일 보관"))
-                .child(div().text_color(muted_fg).child(format!(
-                    "저장 위치: {} · 현재 {file_count}개 · {:.1} MB",
-                    log_dir.display(),
-                    total_bytes as f64 / (1024.0 * 1024.0),
-                )))
+                .child(
+                    div()
+                        .debug_selector(|| "settings-log-path".to_string())
+                        .text_color(muted_fg)
+                        .child(format!(
+                            "저장 위치: {} · 현재 {file_count}개 · {:.1} MB",
+                            log_dir.display(),
+                            total_bytes as f64 / (1024.0 * 1024.0),
+                        )),
+                )
                 // ── 파일 기록 사용 ──
                 .child(ui::option_row(
                     "log-file-enabled",
@@ -369,6 +374,7 @@ pub fn render(this: &mut AppRoot, window: &mut Window, cx: &mut Context<AppRoot>
                         ))
                         .child(
                             div()
+                                .debug_selector(|| "settings-config-path".to_string())
                                 .min_w_0()
                                 .overflow_hidden()
                                 .text_color(muted_fg)

@@ -4,6 +4,8 @@
 
 #[cfg(windows)]
 mod auto_start;
+mod compact;
+pub(crate) use compact::{compact_root, reach_compact_control, resize_compact};
 mod file_sync;
 mod file_sync_browse;
 mod file_sync_history;
@@ -13,6 +15,7 @@ mod log_detail;
 mod openssl;
 mod theme;
 mod timestamp;
+mod ux008_settings;
 mod virtual_disk;
 mod virtual_disk_workspace;
 

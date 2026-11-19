@@ -3,7 +3,10 @@
 //! 현재 플랫폼에서 실제로 동작하는 기능의 상태만 요약하고 최근 활동을 보여준다.
 //! 이 패널은 설정이 없어 스플리터를 쓰지 않는다.
 
-use gpui::{div, AnyElement, Context, Div, IntoElement, ParentElement, Styled};
+use gpui::{
+    div, prelude::FluentBuilder, AnyElement, Context, Div, InteractiveElement, IntoElement,
+    ParentElement, Styled,
+};
 use gpui_component::{h_flex, theme::ActiveTheme, v_flex};
 
 use crate::app::AppRoot;
@@ -18,9 +21,13 @@ pub fn render(root: &AppRoot, cx: &mut Context<AppRoot>) -> AnyElement {
     if recent.is_empty() {
         activity = activity.child(div().text_color(theme.muted_foreground).child("활동 없음"));
     } else {
-        for entry in &recent {
+        for (index, entry) in recent.iter().enumerate() {
+            let is_last = index + 1 == recent.len();
             activity = activity.child(
                 h_flex()
+                    .when(is_last, |row| {
+                        row.debug_selector(|| "dashboard-last-activity".into())
+                    })
                     .gap_2()
                     .child(ui::log_level_label(&entry.level, cx))
                     .child(
@@ -157,5 +164,7 @@ fn summary_card(content: AnyElement, cx: &Context<AppRoot>) -> AnyElement {
 }
 
 fn stat_tile(label: &'static str, value: &str, cx: &Context<AppRoot>) -> AnyElement {
-    ui::stat_tile(label, value.to_string(), cx).into_any_element()
+    ui::stat_tile(label, value.to_string(), cx)
+        .debug_selector(move || format!("dashboard-{label}"))
+        .into_any_element()
 }
